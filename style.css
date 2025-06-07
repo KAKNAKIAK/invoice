@@ -12,65 +12,91 @@ body {
 .btn-sm { @apply px-2 py-1 text-xs; }
 .btn-outline { @apply bg-white border-gray-300 text-gray-700 hover:bg-gray-50; }
 
-/* === NEW: 좌측 계산기 분할 화면 스타일 (재추가) === */
-.split-container {
+/* === 견적 그룹 버튼 색상 === */
+.btn-blue { @apply bg-blue-500 hover:bg-blue-600; }
+.btn-yellow { @apply bg-yellow-500 hover:bg-yellow-600; }
+.btn-red { @apply bg-red-500 hover:bg-red-600; }
+
+
+/* === 견적 그룹 탭 & 컨트롤 === */
+.quote-group-controls {
     display: flex;
-    flex-direction: row;
-    width: 100%;
-    height: 100%;
-    min-height: 420px; /* 최소 높이 조정 */
+    justify-content: space-between;
+    align-items: flex-end;
+    border-bottom: 1px solid #d1d5db;
+    margin-bottom: -1px; 
+}
+.quote-group-tabs-container {
+    display: flex;
+    flex-wrap: wrap;
+}
+.quote-tab {
+    padding: 8px 12px;
+    border: 1px solid #d1d5db;
+    border-bottom: none;
+    background-color: #f3f4f6;
+    cursor: pointer;
+    margin-right: -1px;
+    border-radius: 4px 4px 0 0;
+    display: flex;
+    align-items: center;
+    font-size: 13px;
+}
+.quote-tab.active {
+    background-color: white;
+    border-bottom: 1px solid white;
+    font-weight: 600;
+    position: relative;
+    z-index: 1;
+}
+.quote-tab .close-tab-btn {
+    margin-left: 8px; background: none; border: none; cursor: pointer;
+    font-size: 14px; padding: 0 4px; color: #9ca3af;
+}
+.quote-tab .close-tab-btn:hover { color: #374151; }
+.quote-group-buttons { padding-bottom: 4px; }
+
+
+.calculation-group-content { 
+    display: none; 
+    min-height: 500px;
+}
+.calculation-group-content.active { display: block; }
+
+/* === 분할 화면 스타일 === */
+.split-container {
+    display: flex; flex-direction: row; width: 100%; height: 100%;
 }
 .pnr-pane {
-    width: 30%;
-    min-width: 150px;
-    flex-shrink: 0;
-    display: flex;
-    flex-direction: column;
-    padding-right: 10px;
+    width: 30%; min-width: 150px; flex-shrink: 0; display: flex;
+    flex-direction: column; padding-right: 10px;
 }
-.pnr-pane textarea {
-    @apply input-field;
-    flex-grow: 1;
-    resize: none;
-}
+.pnr-pane textarea { @apply input-field; flex-grow: 1; resize: none; }
 .resizer-handle {
-    width: 10px;
-    flex-shrink: 0;
-    background-color: #f3f4f6;
-    cursor: col-resize;
-    transition: background-color 0.2s ease;
-    position: relative;
+    width: 10px; flex-shrink: 0; background-color: #f3f4f6; cursor: col-resize;
+    transition: background-color 0.2s ease; position: relative;
 }
 .resizer-handle:hover { background-color: #e5e7eb; }
 .resizer-handle::before {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 2px;
-    height: 30px;
-    background-color: #d1d5db;
-    transform: translate(-50%, -50%);
+    content: ''; position: absolute; top: 50%; left: 50%; width: 2px;
+    height: 30px; background-color: #d1d5db; transform: translate(-50%, -50%);
 }
 .quote-pane {
-    flex-grow: 1;
-    min-width: 300px;
-    overflow-x: auto;
-    display: flex;
-    flex-direction: column;
-    padding-left: 10px;
+    flex-grow: 1; min-width: 300px; overflow-x: auto; display: flex;
+    flex-direction: column; padding-left: 10px;
 }
 .table-container { @apply mb-4; }
 .totals-summary-section { @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mt-auto pt-4 border-t; }
 .totals-summary-section .calculated-field { @apply text-base font-semibold text-indigo-700 bg-transparent p-0; }
-/* === 분할 화면 스타일 끝 === */
+
 
 .quote-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 .quote-table th, .quote-table td { border: 1px solid #e5e7eb; padding: 0; vertical-align: middle; text-align: left; }
 .quote-table th { background-color: #f9fafb; font-weight: 600; padding: 0.5rem; }
-.quote-table th:first-child, .quote-table td:first-child { min-width: 80px; }
+.quote-table th:first-child, .quote-table td:first-child { min-width: 100px; padding: 0.25rem 0.5rem;}
 .quote-table th .remove-col-btn { @apply absolute top-1 right-1 text-gray-400 hover:text-red-600 text-xs; }
 .quote-table td .input-field-sm, .quote-table td .calculated-field { border-radius: 0; border: none; box-shadow: none; height: 100%; width: 100%; padding: 0.5rem; }
+.quote-table .dynamic-row-delete-btn { @apply text-gray-400 hover:text-red-500 text-xs p-1 cursor-pointer; }
 
 /* --- 오른쪽 패널 공통 스타일 --- */
 .dynamic-section { border: 1px dashed #ccc; padding: 1rem; border-radius: 5px; background-color: #fdfdfd; position: relative; }
@@ -94,10 +120,7 @@ body {
 .price-table .text-left { text-align: left; }
 .price-table .text-right { text-align: right; }
 .price-table tfoot .grand-total { font-weight: bold; padding-right: 0.4rem; text-align: right; }
-/* --- 인라인 복사 버튼 스타일 (신규 추가) --- */
 .inline-copy-btn {
     @apply p-2 text-gray-500 rounded-full hover:bg-gray-200 hover:text-gray-700 transition-colors;
 }
-.inline-copy-btn i {
-    @apply text-sm;
-}
+.inline-copy-btn i { @apply text-sm; }
