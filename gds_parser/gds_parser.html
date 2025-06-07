@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GDS 항공 정보 파싱</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.2.1/css/all.min.css">
+</head>
+<body class="p-8 bg-gray-100">
+
+    <div class="max-w-4xl mx-auto bg-white p-6 rounded-lg shadow-md">
+        <h1 class="text-xl font-bold mb-4">GDS 항공 스케줄 파싱</h1>
+        <p class="text-sm text-gray-600 mb-4">GDS 항공 텍스트를 아래 입력창에 붙여넣고 '파싱하여 적용' 버튼을 누르면, 정보가 추출되어 메인 화면의 항공 스케줄에 자동으로 추가됩니다.</p>
+        
+        <div class="mb-4 bg-gray-50 p-4 rounded">
+            <label for="gdsInput" class="block text-gray-700 mb-2 font-semibold">GDS 항공 텍스트 입력</label>
+            <textarea id="gdsInput" rows="6" class="w-full px-3 py-2 border rounded focus:outline-none focus:border-blue-500" placeholder="예시)&#10;2  VN 429 L 25APR 5 PUSHAN DK1  1100 1310  25APR  E  0 787 L&#10;3  KE 468 Q 17JUN 2 HANICN DK1  0020 0725  17JUN  E  0 787 D"></textarea>
+            <button type="button" id="parseAndApplyButton" class="mt-2 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition">
+                <i class="fas fa-check mr-2"></i>파싱하여 적용
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const monthMap = { 'JAN': '01', 'FEB': '02', 'MAR': '03', 'APR': '04', 'MAY': '05', 'JUN': '06', 'JUL': '07', 'AUG': '08', 'SEP': '09', 'OCT': '10', 'NOV': '11', 'DEC': '12' };
+        
+        const cityCodeMap = {
+            "ICN": "인천", "GMP": "서울(김포)", "PUS": "부산", "CJU": "제주", "TAE": "대구", "CJJ": "청주", "MWX": "무안", "YNY": "양양",
+            "NRT": "도쿄(나리타)", "HND": "도쿄(하네다)", "KIX": "오사카(간사이)", "FUK": "후쿠오카", "CTS": "삿포로(신치토세)", "SPK": "삿포로", "OKA": "오키나와", "NGO": "나고야",
+            "PEK": "베이징(수도)", "PVG": "상하이(푸동)", "HKG": "홍콩", "MFM": "마카오", "TPE": "타이베이(타오위안)",
+            "BKK": "방콕(수완나품)", "DMK": "방콕(돈므앙)", "HKT": "푸켓", "CNX": "치앙마이",
+            "SGN": "호치민", "HAN": "하노이", "DAD": "다낭", "CXR": "나트랑", "PQC": "푸꾸옥",
+            "SIN": "싱가포르", "KUL": "쿠알라룸푸르", "MNL": "마닐라", "CEB": "세부", "DPS": "발리(덴파사르)",
+            "LAX": "로스앤젤레스", "SFO": "샌프란시스코", "JFK": "뉴욕(JFK)", "HNL": "호놀룰루", "YVR": "밴쿠버", "YYZ": "토론토",
+            "LHR": "런던(히드로)", "CDG": "파리(샤를 드골)", "FRA": "프랑크푸르트", "AMS": "암스테르담", "FCO": "로마(피우미치노)",
+            "SYD": "시드니", "AKL": "오클랜드", "GUM": "괌", "SPN": "사이판"
+        };
+
+        const airlineCodeMap = {
+            "KE": "대한항공", "OZ": "아시아나항공", "7C": "제주항공", "LJ": "진에어", "TW": "티웨이항공", "RS": "에어서울", "BX": "에어부산", "ZE": "이스타항공",
+            "VN": "베트남항공", "VJ": "비엣젯항공", "QH": "뱀부항공",
+            "JL": "일본항공", "NH": "전일본공수", "MM": "피치항공",
+            "CA": "중국국제항공", "MU": "중국동방항공", "CZ": "중국남방항공",
+            "CX": "캐세이퍼시픽", "CI": "중화항공", "BR": "에바항공",
+            "SQ": "싱가포르항공", "TG": "타이항공", "PR": "필리핀항공", "MH": "말레이시아항공", "GA": "가루다인도네시아항공",
+            "AA": "아메리칸항공", "UA": "유나이티드항공", "DL": "델타항공", "HA": "하와이안항공", "AC": "에어캐나다",
+            "BA": "영국항공", "AF": "에어프랑스", "KL": "KLM네덜란드항공", "LH": "루프트한자", "TK": "터키항공",
+            "EK": "에미레이트항공", "QR": "카타르항공", "EY": "에티하드항공",
+            "QF": "콴타스항공", "NZ": "에어뉴질랜드"
+        };
+
+        document.getElementById('parseAndApplyButton').addEventListener('click', parseGdsTextAndSendData);
+
+        function parseGdsTextAndSendData() {
+            const gdsInput = document.getElementById('gdsInput').value.trim();
+            if (!gdsInput) { alert('GDS 텍스트를 입력해주세요.'); return; }
+
+            const lines = gdsInput.split('\n');
+            const parsedFlights = [];
+
+            lines.forEach(line => {
+                if (!line.trim()) return;
+                const parts = line.split(/\s+/);
+                
+                let airlineCode = '', flightNumber = '', departureDate = '', origin = '', destination = '', departureTime = '', arrivalTime = '', airlineName = '';
+
+                for (let i = 0; i < parts.length - 1; i++) {
+                    if (/^[A-Z0-9]{2}$/.test(parts[i]) && /^\d{3,4}$/.test(parts[i+1])) {
+                        airlineCode = parts[i];
+                        flightNumber = `${parts[i]} ${parts[i+1]}`;
+                        airlineName = airlineCodeMap[airlineCode] || airlineCode;
+                        break;
+                    }
+                }
+
+                const datePart = parts.find(p => /^\d{1,2}[A-Z]{3}$/.test(p));
+                if (datePart) {
+                    const day = datePart.slice(0, -3).padStart(2, '0');
+                    const month = monthMap[datePart.slice(-3).toUpperCase()] || '00';
+                    departureDate = `${month}월 ${day}일`;
+                }
+
+                const cityPairPart = parts.find(p => /^[A-Z]{6}$/.test(p));
+                if (cityPairPart) {
+                    const originCode = cityPairPart.slice(0, 3);
+                    const destinationCode = cityPairPart.slice(3, 6);
+                    origin = cityCodeMap[originCode] || originCode;
+                    destination = cityCodeMap[destinationCode] || destinationCode;
+                }
+
+                const timeParts = parts.filter(p => /^\d{4}$/.test(p));
+                if (timeParts.length >= 2) {
+                     departureTime = `${timeParts[0].slice(0, 2)}:${timeParts[0].slice(2)}`;
+                     arrivalTime = `${timeParts[1].slice(0, 2)}:${timeParts[1].slice(2)}`;
+                }
+
+                if (flightNumber) {
+                    parsedFlights.push({ airlineCode, airlineName, flightNum: flightNumber, depDate: departureDate, originCity: origin, depTime: departureTime, arrDate: departureDate, destCity: destination, arrTime: arrivalTime });
+                }
+            });
+
+            if (parsedFlights.length > 0) {
+                if (window.opener && !window.opener.closed) {
+                    window.opener.addFlightsFromParser(parsedFlights);
+                    window.close();
+                } else {
+                    alert('메인 창을 찾을 수 없습니다.');
+                }
+            } else {
+                alert('유효한 항공 정보를 파싱하지 못했습니다.');
+            }
+        }
+    </script>
+</body>
+</html>

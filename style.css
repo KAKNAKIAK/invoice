@@ -1,0 +1,114 @@
+body {
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+}
+.input-field { @apply w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm; }
+.input-field-sm { @apply px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm w-full text-right; }
+.label-text { @apply block text-sm font-medium text-gray-700 mb-1; }
+.btn { @apply px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white flex items-center justify-center; }
+.btn i.fas { @apply mr-2; }
+.btn-primary { @apply bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500; }
+.btn-secondary { @apply bg-gray-600 hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500; }
+.btn-sm { @apply px-2 py-1 text-xs; }
+.btn-outline { @apply bg-white border-gray-300 text-gray-700 hover:bg-gray-50; }
+
+/* --- 견적 계산기 탭 스타일 --- */
+.quote-group-tabs-container { @apply flex items-center border-b border-gray-300 mb-0 bg-gray-50 p-1 rounded-t-md; }
+.quote-group-tab-button { @apply px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 border-b-0 rounded-t-md mr-1 hover:bg-gray-100 flex items-center cursor-pointer; }
+.quote-group-tab-button.active { @apply text-indigo-700 bg-white border-indigo-600 border-b-white relative font-semibold; }
+.quote-group-tab-button .tab-name-span { @apply cursor-pointer hover:bg-gray-100 px-1 rounded-sm; }
+.quote-group-tab-button .tab-name-input { @apply text-sm font-medium border-b-2 border-indigo-500 focus:outline-none px-1 bg-transparent; max-width: 100px; }
+.quote-group-tab-button .close-tab-btn { @apply ml-2 text-gray-400 hover:text-red-500 text-xs font-normal; line-height: 1; }
+#quoteGroupContentsContainer { @apply relative border border-gray-300 border-t-0 rounded-b-lg p-4 min-h-[500px]; }
+.quote-group-content { display: none; }
+.quote-group-content.active { display: block; }
+
+/* === NEW: 좌측 계산기 분할 화면 스타일 (재추가) === */
+.split-container {
+    display: flex;
+    flex-direction: row;
+    width: 100%;
+    height: 100%;
+    min-height: 500px; /* 최소 높이 보장 */
+}
+.pnr-pane {
+    width: 30%;
+    min-width: 150px;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    padding-right: 10px;
+}
+.pnr-pane textarea {
+    @apply input-field;
+    flex-grow: 1;
+    resize: none;
+}
+.resizer-handle {
+    width: 10px;
+    flex-shrink: 0;
+    background-color: #f3f4f6;
+    cursor: col-resize;
+    transition: background-color 0.2s ease;
+    position: relative;
+}
+.resizer-handle:hover { background-color: #e5e7eb; }
+.resizer-handle::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 2px;
+    height: 30px;
+    background-color: #d1d5db;
+    transform: translate(-50%, -50%);
+}
+.quote-pane {
+    flex-grow: 1;
+    min-width: 300px;
+    overflow-x: auto;
+    display: flex;
+    flex-direction: column;
+    padding-left: 10px;
+}
+.table-container { @apply mb-4; }
+.totals-summary-section { @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mt-auto pt-4 border-t; }
+.totals-summary-section .calculated-field { @apply text-base font-semibold text-indigo-700 bg-transparent p-0; }
+/* === 분할 화면 스타일 끝 === */
+
+.quote-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.quote-table th, .quote-table td { border: 1px solid #e5e7eb; padding: 0; vertical-align: middle; text-align: left; }
+.quote-table th { background-color: #f9fafb; font-weight: 600; padding: 0.5rem; }
+.quote-table th:first-child, .quote-table td:first-child { min-width: 80px; }
+.quote-table th .remove-col-btn { @apply absolute top-1 right-1 text-gray-400 hover:text-red-600 text-xs; }
+.quote-table td .input-field-sm, .quote-table td .calculated-field { border-radius: 0; border: none; box-shadow: none; height: 100%; width: 100%; padding: 0.5rem; }
+
+/* --- 오른쪽 패널 공통 스타일 --- */
+.dynamic-section { border: 1px dashed #ccc; padding: 1rem; border-radius: 5px; background-color: #fdfdfd; position: relative; }
+.delete-dynamic-section-btn { position: absolute; top: 0.75rem; right: 0.75rem; background: none; border: none; padding: 0.25rem 0.5rem; font-size: 0.9rem; z-index: 10; color: #ef4444; cursor: pointer; }
+.delete-dynamic-section-btn:hover { color: #dc2626; }
+.add-row-btn { background-color: #d1fae5; color: #065f46; border: none; padding: 0.25rem 0.5rem; font-size: 0.75rem; border-radius: 4px; cursor: pointer; }
+.add-row-btn:hover { background-color: #a7f3d0; }
+
+/* 항공 스케줄 테이블 스타일 */
+.flight-schedule-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.flight-schedule-table th, .flight-schedule-table td { border: 1px solid #e5e7eb; padding: 0; vertical-align: middle; text-align: left; font-size: 11px; }
+.flight-schedule-table th { background-color: #f9fafb; font-weight: 600; padding: 0.4rem; }
+.flight-schedule-table td .flight-schedule-input { width: 100%; height: 100%; border: none; background: transparent; padding: 0.4rem; }
+.flight-schedule-table .delete-row-btn { background: none; border: none; color: #ef4444; cursor: pointer; width: 100%; }
+
+/* 요금 안내 테이블 스타일 */
+.price-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.price-table th, .price-table td { border: 1px solid #e5e7eb; padding: 0; vertical-align: middle; text-align: center; font-size: 11px; }
+.price-table th { background-color: #f9fafb; font-weight: 600; padding: 0.4rem; }
+.price-table td input { width: 100%; height: 100%; border: none; background: transparent; padding: 0.4rem; text-align: center; }
+.price-table .text-left { text-align: left; }
+.price-table .text-right { text-align: right; }
+.price-table tfoot .grand-total { font-weight: bold; padding-right: 0.4rem; text-align: right; }
+/* --- 인라인 복사 버튼 스타일 (신규 추가) --- */
+.inline-copy-btn {
+    @apply p-2 text-gray-500 rounded-full hover:bg-gray-200 hover:text-gray-700 transition-colors;
+}
+.inline-copy-btn i {
+    @apply text-sm;
+}
