@@ -7,14 +7,24 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link rel="stylesheet" href="style.css">
+    <!-- 데이터 복원을 위한 스크립트 태그 (저장 시 여기에 데이터가 삽입됨) -->
+    <script id="restored-data" type="application/json"></script>
 </head>
 <body class="bg-gray-50 p-4 sm:p-6 md:p-8">
     <div class="max-w-full mx-auto bg-white p-6 sm:p-8 rounded-lg shadow-xl">
-        <header class="mb-8">
-            <h1 class="text-3xl font-bold text-center text-indigo-700">여행 견적 계산기 (통합)</h1>
+        <!-- [수정] 헤더 영역에 버튼 추가 -->
+        <header class="mb-8 flex justify-between items-center">
+            <h1 class="text-3xl font-bold text-indigo-700">여행 견적 계산기 (통합)</h1>
+            <div class="flex items-center space-x-2">
+                <button type="button" id="saveBtn" class="btn btn-sm btn-secondary"><i class="fas fa-save"></i> 저장</button>
+                <button type="button" id="saveAsBtn" class="btn btn-sm btn-secondary"><i class="fas fa-file-export"></i> 다른 이름으로 저장</button>
+                <label for="loadFile" class="btn btn-sm btn-secondary cursor-pointer"><i class="fas fa-folder-open"></i> 불러오기</label>
+                <input type="file" id="loadFile" class="hidden" accept=".html">
+            </div>
         </header>
 
         <form id="quoteForm">
+            <!-- 이하 구조는 이전과 동일 -->
             <div class="flex gap-6 mb-8">
                 <section class="w-1/2 p-6 border border-gray-200 rounded-lg">
                     <div class="flex justify-between items-start">
@@ -39,57 +49,16 @@
             
             <hr class="my-10 border-gray-300">
 
-            <div class="flex gap-6">
-                <div class="w-1/2">
-                    <div id="quoteGroupContentsContainer" class="border border-gray-300 rounded-lg p-4 min-h-[500px]"></div>
-                </div>
-
-                <div class="w-1/2 space-y-6">
-                    <section class="p-6 border border-gray-200 rounded-lg bg-gray-50">
-                        <div class="flex justify-between items-center mb-4">
-                            <h2 class="text-xl font-semibold text-gray-800">항공 스케줄</h2>
-                            <div class="flex items-center space-x-2">
-                                <button type="button" id="copyFlightScheduleBtn" class="inline-copy-btn" title="항공 스케줄 HTML 인라인 코드로 복사"><i class="fas fa-clipboard"></i></button>
-                                <button type="button" id="parseGdsBtn" class="btn btn-sm btn-outline">GDS 파싱</button>
-                                <button type="button" id="addFlightSubgroupBtn" class="btn btn-sm btn-primary"><i class="fas fa-plus mr-1"></i> 스케줄 추가</button>
-                            </div>
-                        </div>
-                        <div id="flightScheduleContainer" class="space-y-4"></div>
-                    </section>
-                    
-                    <section class="p-6 border border-gray-200 rounded-lg bg-gray-50">
-                        <div class="flex justify-between items-center mb-4">
-                            <h2 class="text-xl font-semibold text-gray-800">요금 안내</h2>
-                             <div class="flex items-center space-x-2">
-                                <button type="button" id="copyPriceInfoBtn" class="inline-copy-btn" title="요금 안내 HTML 인라인 코드로 복사"><i class="fas fa-clipboard"></i></button>
-                                <button type="button" id="addPriceSubgroupBtn" class="btn btn-sm btn-primary"><i class="fas fa-plus mr-1"></i> 요금 그룹 추가</button>
-                            </div>
-                        </div>
-                        <div id="priceInfoContainer" class="space-y-4"></div>
-                    </section>
-
-                    <section class="p-6 border border-gray-200 rounded-lg bg-gray-50">
-                        <div class="flex justify-between items-center mb-4">
-                            <h2 class="text-xl font-semibold text-gray-800">포함/불포함 사항</h2>
-                            <button type="button" id="copyInclusionExclusionBtn" class="inline-copy-btn" title="포함/불포함 HTML 인라인 코드로 복사"><i class="fas fa-clipboard"></i></button>
-                        </div>
-                        <div class="flex gap-4">
-                            <div class="w-1/2 flex flex-col"><h3 class="font-medium mb-1">포함</h3><textarea id="inclusionText" class="input-field flex-grow" rows="5" placeholder="* 유류할증료..."></textarea></div>
-                            <div class="w-1/2 flex flex-col"><h3 class="font-medium mb-1">불포함</h3><textarea id="exclusionText" class="input-field flex-grow" rows="5" placeholder="● 개인 경비..."></textarea></div>
-                        </div>
-                    </section>
-                    
-                    <section class="p-6 border border-gray-200 rounded-lg bg-gray-50">
-                        <h2 class="text-xl font-semibold text-gray-800 mb-4">호텔카드 메이커</h2>
-                        <iframe src="./hotel_maker/index.html" style="width: 100%; height: 480px; border: 1px solid #ccc; border-radius: 0.25rem;"></iframe>
-                    </section>
-
-                    <section class="p-6 border border-gray-200 rounded-lg bg-gray-50">
-                        <h2 class="text-xl font-semibold text-gray-800 mb-4">상세 일정표</h2>
-                        <iframe src="./itinerary_planner/index.html" style="width: 100%; height: 800px; border: 1px solid #ccc; border-radius: 0.25rem;"></iframe>
-                    </section>
+            <div class="quote-group-controls">
+                <div id="quoteGroupTabs" class="quote-group-tabs-container"></div>
+                <div class="quote-group-buttons">
+                    <button type="button" id="newGroupBtn" class="btn btn-sm btn-blue"><i class="fas fa-plus"></i> 새 그룹</button>
+                    <button type="button" id="copyGroupBtn" class="btn btn-sm btn-yellow"><i class="fas fa-copy"></i> 그룹 복사</button>
+                    <button type="button" id="deleteGroupBtn" class="btn btn-sm btn-red"><i class="fas fa-trash-alt"></i> 그룹 삭제</button>
                 </div>
             </div>
+
+            <div id="quoteGroupContentsContainer" class="border border-gray-300 rounded-lg rounded-tl-none p-4"></div>
 
             <section class="text-center space-x-4 mt-8"> 
                 <button type="submit" class="btn btn-primary">견적 저장</button>
