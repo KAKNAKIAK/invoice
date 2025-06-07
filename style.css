@@ -12,34 +12,6 @@ body {
 .btn-sm { @apply px-2 py-1 text-xs; }
 .btn-outline { @apply bg-white border-gray-300 text-gray-700 hover:bg-gray-50; }
 
-/* --- 견적 메인 탭 스타일 --- */
-.quote-group-tabs-container { @apply flex items-center border-b border-gray-300 mb-0 bg-gray-50 p-1 rounded-t-md; }
-.quote-group-tab-button { @apply px-4 py-2 text-sm font-medium text-gray-600 bg-white border border-gray-300 border-b-0 rounded-t-md mr-1 hover:bg-gray-100 flex items-center cursor-pointer; }
-.quote-group-tab-button.active { @apply text-indigo-700 bg-white border-indigo-600 border-b-white relative font-semibold; }
-.quote-group-tab-button .tab-name-span { @apply cursor-pointer hover:bg-gray-100 px-1 rounded-sm; }
-.quote-group-tab-button .tab-name-input { @apply text-sm font-medium border-b-2 border-indigo-500 focus:outline-none px-1 bg-transparent; max-width: 100px; }
-.quote-group-tab-button .close-tab-btn { @apply ml-2 text-gray-400 hover:text-red-500 text-xs font-normal; line-height: 1; }
-#quoteGroupContentsContainer { @apply relative border border-gray-300 border-t-0 rounded-b-lg p-4 min-h-[500px]; }
-.quote-group-content { display: none; }
-.quote-group-content.active { display: block; }
-
-/* === NEW: 견적 하위 그룹 스타일 === */
-.calc-group-area { @apply mb-4; }
-.calc-group-tabs { @apply flex items-center border-b border-gray-200; }
-.calc-group-tab { @apply px-3 py-1.5 text-xs font-medium text-gray-500 bg-transparent border border-gray-200 border-b-0 rounded-t-md mr-1 hover:bg-gray-50 flex items-center cursor-pointer; }
-.calc-group-tab.active { @apply text-blue-700 bg-white border-blue-500 border-b-white relative font-semibold; }
-.calc-group-tab .tab-name-span { @apply cursor-pointer hover:bg-gray-100 px-1 rounded-sm; }
-.calc-group-tab .tab-name-input { @apply text-xs font-medium border-b-2 border-blue-500 focus:outline-none px-1 bg-transparent; max-width: 80px; }
-.calc-group-controls { @apply flex items-center gap-2 p-3 border-b border-gray-200 mb-4 bg-gray-50 rounded-md; }
-.btn-calc-group { @apply px-3 py-1.5 text-xs font-semibold rounded-md shadow-sm flex items-center; }
-.btn-new-group { @apply bg-blue-600 text-white hover:bg-blue-700; }
-.btn-copy-group { @apply bg-yellow-500 text-white hover:bg-yellow-600; }
-.btn-delete-group { @apply bg-red-600 text-white hover:bg-red-700; }
-.calculation-group-content { display: none; }
-.calculation-group-content.active { display: block; }
-/* === NEW: 스타일 끝 === */
-
-
 /* === NEW: 좌측 계산기 분할 화면 스타일 (재추가) === */
 .split-container {
     display: flex;
