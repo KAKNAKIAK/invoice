@@ -2,11 +2,6 @@
 let flightScheduleData = [];
 let priceInfoData = [];
 
-// --- NEW: 데이터 관리 모델 ---
-let quoteTabsData = {}; // { quoteGroupId: { id, title, activeCalcGroupId, calculationGroups: [{id, title}] } }
-let mainQuoteTabIndex = 0;
-let activeMainQuoteTabId = null;
-
 const ROW_DEFINITIONS = [
     { id: 'airfare', label: '항공', type: 'costInput' }, { id: 'hotel', label: '호텔', type: 'costInput' },
     { id: 'ground', label: '지상', type: 'costInput' }, { id: 'insurance', label: '보험', type: 'costInput' },
@@ -173,7 +168,6 @@ function generateInclusionExclusionInlineHtml() {
 // ======== 페이지 로드 후 실행될 코드 ========
 document.addEventListener('DOMContentLoaded', () => {
     const form = document.getElementById('quoteForm');
-    const quoteGroupTabsContainer = document.getElementById('quoteGroupTabsContainer');
     const quoteGroupContentsContainer = document.getElementById('quoteGroupContentsContainer');
 
     // ======== 왼쪽 패널: 견적 계산기 관련 ========
@@ -191,12 +185,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const input = document.createElement('input');
             input.type = inputType;
             input.value = inputType === 'number' ? parseInt(currentText.replace(/,/g,''), 10) || 0 : currentText;
-            input.className = element.classList.contains('calc-group-tab') ? 'tab-name-input' : 'person-type-input';
-             if (element.parentElement.classList.contains('calc-group-tab')) {
-                input.className = 'tab-name-input';
-             } else {
-                 input.className = 'person-type-input';
-             }
+            input.className = 'person-type-input';
+            
             element.style.display = 'none';
             element.parentNode.insertBefore(input, element.nextSibling);
             input.focus();
@@ -212,7 +202,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- 계산 및 업데이트 함수 ---
-    function calculateAll(calcGroupElement) {
+    function calculateAll() {
+        const calcGroupElement = document.getElementById('singleCalcGroup');
         const table = calcGroupElement.querySelector('.quote-table');
         if (!table) return;
         const numCols = table.querySelector('.header-row').cells.length;
@@ -260,7 +251,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function addPersonTypeColumn(calcGroupElement, typeName = '성인', count = 1) {
+    function addPersonTypeColumn(typeName = '성인', count = 1) {
+        const calcGroupElement = document.getElementById('singleCalcGroup');
         const table = calcGroupElement.querySelector('.quote-table');
         if (!table) return;
         const colIndex = table.querySelector('thead .header-row').cells.length;
@@ -275,11 +267,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const rowDef = ROW_DEFINITIONS.find(r => r.id === rowId) || {type: 'costInput'};
             tr.insertCell(-1).innerHTML = getCellContent(rowId, colIndex, rowDef.type);
         });
-        setupColumnEventListeners(calcGroupElement, colIndex, headerCell, countCell);
-        calculateAll(calcGroupElement);
+        setupColumnEventListeners(colIndex, headerCell, countCell);
+        calculateAll();
     }
     
-    function addDynamicCostRow(calcGroupElement, label = '신규 항목') {
+    function addDynamicCostRow(label = '신규 항목') {
+        const calcGroupElement = document.getElementById('singleCalcGroup');
         const table = calcGroupElement.querySelector('.quote-table');
         if (!table) return;
         const tbody = table.querySelector('tbody');
@@ -295,61 +288,31 @@ document.addEventListener('DOMContentLoaded', () => {
             newRow.insertCell(i).innerHTML = getCellContent(rowId, i, 'costInput');
         }
         newRow.querySelectorAll('.cost-item').forEach(input => {
-            input.addEventListener('input', () => calculateAll(calcGroupElement));
+            input.addEventListener('input', () => calculateAll());
         });
         makeEditable(newRow.querySelector('.dynamic-row-label-span'), 'text', () => {});
-        calculateAll(calcGroupElement);
+        calculateAll();
     }
 
-    function setupColumnEventListeners(calcGroupElement, colIndex, headerCell, countCell) {
+    function setupColumnEventListeners(colIndex, headerCell, countCell) {
         if (!headerCell || !countCell) return;
-        makeEditable(headerCell.querySelector('.person-type-name-span'), 'text', () => calculateAll(calcGroupElement));
-        makeEditable(countCell.querySelector('.person-count-span'), 'number', () => calculateAll(calcGroupElement));
+        const calcGroupElement = document.getElementById('singleCalcGroup');
+        makeEditable(headerCell.querySelector('.person-type-name-span'), 'text', () => calculateAll());
+        makeEditable(countCell.querySelector('.person-count-span'), 'number', () => calculateAll());
         headerCell.querySelector('.remove-col-btn').addEventListener('click', () => {
             if (!confirm(`'${headerCell.textContent.trim()}' 항목을 삭제하시겠습니까?`)) return;
             calcGroupElement.querySelectorAll('.quote-table tr').forEach(row => {
                 if (row.cells.length > colIndex) row.deleteCell(colIndex);
             });
-            calculateAll(calcGroupElement);
+            calculateAll();
         });
         calcGroupElement.querySelectorAll('tbody tr').forEach(tr => {
             const cell = tr.cells[colIndex];
             if (cell) {
                 const input = cell.querySelector('input');
-                if (input) input.addEventListener('input', () => calculateAll(calcGroupElement));
+                if (input) input.addEventListener('input', () => calculateAll());
             }
         });
-    }
-
-    // --- 계산 그룹(하위) 관련 함수 ---
-    function getCalculationGroupTemplate(calcGroupId) {
-        return `<div class="calculation-group-content" id="${calcGroupId}">
-            <div class="split-container">
-                <div class="pnr-pane">
-                    <label class="label-text font-semibold mb-2">PNR 정보</label>
-                    <textarea class="w-full flex-grow px-3 py-2 border border-gray-300 rounded-md shadow-sm resize-none" placeholder="PNR 정보를 여기에 붙여넣으세요."></textarea>
-                </div>
-                <div class="resizer-handle"></div>
-                <div class="quote-pane">
-                    <div class="table-container">
-                        <table class="quote-table">
-                            <thead>
-                                <tr class="header-row">
-                                    <th><button type="button" class="btn btn-sm btn-primary add-person-type-btn"><i class="fas fa-plus"></i> 항목 추가</button></th>
-                                </tr>
-                                <tr class="count-row"><th></th></tr>
-                            </thead>
-                            <tbody></tbody>
-                        </table>
-                    </div>
-                    <div class="totals-summary-section">
-                        <div><label class="label-text">전체상품가</label><div class="calculated-field totalSalesPrice">0 원</div></div>
-                        <div><label class="label-text">전체수익</label><div class="calculated-field totalProfit">0 원</div></div>
-                        <div><label class="label-text">전체수익률</label><div class="calculated-field totalProfitMargin">0.00 %</div></div>
-                    </div>
-                </div>
-            </div>
-        </div>`;
     }
     
     function initializeSplitView(groupElement) {
@@ -376,223 +339,59 @@ document.addEventListener('DOMContentLoaded', () => {
             document.addEventListener('mouseup', stopDrag);
         });
     }
-    
-    function createNewCalculationGroup(mainTabContent, title = null) {
-        const mainTabId = mainTabContent.id;
-        const mainTabData = quoteTabsData[mainTabId];
-        const calcGroupIndex = mainTabData.calculationGroups.length + 1;
-        const newCalcGroupId = `calcGroup_${mainTabId}_${Date.now()}`;
-        const newCalcGroupTitle = title || `그룹 ${calcGroupIndex}`;
-        
-        mainTabData.calculationGroups.push({ id: newCalcGroupId, title: newCalcGroupTitle });
 
-        const container = mainTabContent.querySelector('.calculation-groups-container');
-        const newGroupHTML = getCalculationGroupTemplate(newCalcGroupId);
-        container.insertAdjacentHTML('beforeend', newGroupHTML);
-        
-        const newCalcGroupElement = document.getElementById(newCalcGroupId);
-        initializeSplitView(newCalcGroupElement);
+    // --- 초기화 함수들 ---
+    function initializeCalculator() {
+        quoteGroupContentsContainer.innerHTML = `
+            <div class="calculation-group-content active" id="singleCalcGroup">
+                <div class="split-container">
+                    <div class="pnr-pane">
+                        <label class="label-text font-semibold mb-2">PNR 정보</label>
+                        <textarea class="w-full flex-grow px-3 py-2 border border-gray-300 rounded-md shadow-sm resize-none" placeholder="PNR 정보를 여기에 붙여넣으세요."></textarea>
+                    </div>
+                    <div class="resizer-handle"></div>
+                    <div class="quote-pane">
+                        <div class="table-container">
+                            <table class="quote-table">
+                                <thead>
+                                    <tr class="header-row">
+                                        <th><button type="button" class="btn btn-sm btn-primary add-person-type-btn"><i class="fas fa-plus"></i> 항목 추가</button></th>
+                                    </tr>
+                                    <tr class="count-row"><th></th></tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                        <div class="totals-summary-section">
+                            <div><label class="label-text">전체상품가</label><div class="calculated-field totalSalesPrice">0 원</div></div>
+                            <div><label class="label-text">전체수익</label><div class="calculated-field totalProfit">0 원</div></div>
+                            <div><label class="label-text">전체수익률</label><div class="calculated-field totalProfitMargin">0.00 %</div></div>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
 
-        const tbody = newCalcGroupElement.querySelector('tbody');
+        const calcGroupElement = document.getElementById('singleCalcGroup');
+        initializeSplitView(calcGroupElement);
+
+        const tbody = calcGroupElement.querySelector('tbody');
         ROW_DEFINITIONS.forEach(def => {
             const row = tbody.insertRow();
             row.dataset.rowId = def.id;
             const labelCell = row.insertCell(0);
             if (def.type === 'button') {
                 labelCell.innerHTML = `<button type="button" class="btn btn-sm btn-outline add-dynamic-row-btn">${def.label}</button>`;
-                labelCell.querySelector('.add-dynamic-row-btn').addEventListener('click', () => addDynamicCostRow(newCalcGroupElement));
+                labelCell.querySelector('.add-dynamic-row-btn').addEventListener('click', () => addDynamicCostRow());
             } else {
                 labelCell.textContent = def.label;
             }
         });
 
-        addPersonTypeColumn(newCalcGroupElement, '성인', 1);
-        newCalcGroupElement.querySelector('.add-person-type-btn').addEventListener('click', () => addPersonTypeColumn(newCalcGroupElement, '아동', 0));
-        
-        renderCalculationGroupTabs(mainTabContent);
-        switchCalculationGroup(mainTabContent, newCalcGroupId);
-    }
-    
-    function renderCalculationGroupTabs(mainTabContent) {
-        const mainTabId = mainTabContent.id;
-        const mainTabData = quoteTabsData[mainTabId];
-        const tabsContainer = mainTabContent.querySelector('.calc-group-tabs');
-        tabsContainer.innerHTML = '';
-
-        mainTabData.calculationGroups.forEach(group => {
-            const tabButton = document.createElement('button');
-            tabButton.type = 'button';
-            tabButton.className = 'calc-group-tab';
-            tabButton.dataset.groupId = group.id;
-            tabButton.innerHTML = `<span class="tab-name-span">${group.title}</span>`;
-            if (group.id === mainTabData.activeCalcGroupId) {
-                tabButton.classList.add('active');
-            }
-            tabButton.addEventListener('click', () => switchCalculationGroup(mainTabContent, group.id));
-            makeEditable(tabButton.querySelector('.tab-name-span'), 'text', () => {
-                group.title = tabButton.querySelector('.tab-name-span').textContent;
-            });
-            tabsContainer.appendChild(tabButton);
-        });
-    }
-    
-    function switchCalculationGroup(mainTabContent, groupId) {
-        const mainTabId = mainTabContent.id;
-        quoteTabsData[mainTabId].activeCalcGroupId = groupId;
-        
-        mainTabContent.querySelectorAll('.calculation-group-content').forEach(c => c.classList.remove('active'));
-        document.getElementById(groupId)?.classList.add('active');
-        
-        renderCalculationGroupTabs(mainTabContent);
+        addPersonTypeColumn('성인', 1);
+        calcGroupElement.querySelector('.add-person-type-btn').addEventListener('click', () => addPersonTypeColumn('아동', 0));
     }
 
-    function handleDeleteCalculationGroup(mainTabContent) {
-        const mainTabId = mainTabContent.id;
-        const mainTabData = quoteTabsData[mainTabId];
-        if (mainTabData.calculationGroups.length <= 1) {
-            alert('최소 1개의 그룹은 유지해야 합니다.');
-            return;
-        }
 
-        const activeGroupId = mainTabData.activeCalcGroupId;
-        const activeGroupTitle = mainTabData.calculationGroups.find(g => g.id === activeGroupId)?.title;
-        if (!confirm(`'${activeGroupTitle}' 그룹을 삭제하시겠습니까?`)) return;
-
-        const groupIndex = mainTabData.calculationGroups.findIndex(g => g.id === activeGroupId);
-        mainTabData.calculationGroups.splice(groupIndex, 1);
-        document.getElementById(activeGroupId)?.remove();
-
-        const newActiveIndex = Math.max(0, groupIndex - 1);
-        const newActiveGroupId = mainTabData.calculationGroups[newActiveIndex]?.id;
-        switchCalculationGroup(mainTabContent, newActiveGroupId);
-    }
-    
-    function handleCopyCalculationGroup(mainTabContent) {
-        const mainTabId = mainTabContent.id;
-        const mainTabData = quoteTabsData[mainTabId];
-        const sourceGroupId = mainTabData.activeCalcGroupId;
-        const sourceGroupElement = document.getElementById(sourceGroupId);
-        if(!sourceGroupElement) return;
-
-        const sourceGroupData = mainTabData.calculationGroups.find(g => g.id === sourceGroupId);
-        
-        createNewCalculationGroup(mainTabContent, `${sourceGroupData.title} (복사)`);
-        
-        const newGroupId = mainTabData.activeCalcGroupId;
-        const newGroupElement = document.getElementById(newGroupId);
-        
-        // 데이터 복사
-        const sourcePnr = sourceGroupElement.querySelector('textarea').value;
-        newGroupElement.querySelector('textarea').value = sourcePnr;
-
-        const sourceTable = sourceGroupElement.querySelector('.quote-table');
-        const newTable = newGroupElement.querySelector('.quote-table');
-
-        // 열 복사
-        const personTypes = [];
-        sourceTable.querySelectorAll('.header-row th:not(:first-child)').forEach((th, index) => {
-             const countTh = sourceTable.querySelector(`.count-row th:nth-child(${index + 2})`);
-             personTypes.push({
-                 name: th.querySelector('.person-type-name-span').textContent,
-                 count: countTh.querySelector('.person-count-span').textContent
-             });
-        });
-        
-        // 기존 열 삭제 후 복사한 열 추가
-        newTable.querySelectorAll('.header-row th:not(:first-child), .count-row th:not(:first-child)').forEach(th => th.remove());
-        newTable.querySelectorAll('tbody tr').forEach(tr => {
-            while(tr.cells.length > 1) {
-                tr.deleteCell(1);
-            }
-        });
-        personTypes.forEach(pt => addPersonTypeColumn(newGroupElement, pt.name, pt.count));
-        
-        // 행 값 복사
-        sourceTable.querySelectorAll('tbody tr').forEach((sourceRow, rowIndex) => {
-            const newRow = newTable.querySelectorAll('tbody tr')[rowIndex];
-            sourceRow.querySelectorAll('input').forEach((sourceInput, colIndex) => {
-                if(newRow.querySelectorAll('input')[colIndex]) {
-                    newRow.querySelectorAll('input')[colIndex].value = sourceInput.value;
-                }
-            });
-        });
-        
-        calculateAll(newGroupElement);
-    }
-    
-    // --- 메인 탭 관련 함수 ---
-    function createNewQuoteGroup(isFirst = false) {
-        mainQuoteTabIndex++;
-        const mainTabId = `quoteGroupContent${mainQuoteTabIndex}`;
-        
-        // 데이터 모델 생성
-        quoteTabsData[mainTabId] = {
-            id: mainTabId,
-            title: `견적 ${mainQuoteTabIndex}`,
-            activeCalcGroupId: null,
-            calculationGroups: []
-        };
-        
-        const tabButton = document.createElement('button');
-        tabButton.type = 'button';
-        tabButton.className = 'quote-group-tab-button';
-        tabButton.dataset.target = `#${mainTabId}`;
-        tabButton.innerHTML = `<span class="tab-name-span">견적 ${mainQuoteTabIndex}</span><button type="button" class="close-tab-btn" title="탭 닫기">×</button>`;
-        quoteGroupTabsContainer.appendChild(tabButton);
-        
-        const contentDiv = document.createElement('div');
-        contentDiv.id = mainTabId;
-        contentDiv.className = 'quote-group-content';
-        contentDiv.innerHTML = `
-            <div class="calc-group-area">
-                <div class="calc-group-tabs"></div>
-                <div class="calc-group-controls">
-                    <button type="button" class="btn-calc-group btn-new-group"><i class="fas fa-plus mr-1"></i>새 그룹</button>
-                    <button type="button" class="btn-calc-group btn-copy-group"><i class="fas fa-copy mr-1"></i>그룹 복사</button>
-                    <button type="button" class="btn-calc-group btn-delete-group"><i class="fas fa-trash-alt mr-1"></i>그룹 삭제</button>
-                </div>
-                <div class="calculation-groups-container"></div>
-            </div>`;
-        quoteGroupContentsContainer.appendChild(contentDiv);
-        
-        createNewCalculationGroup(contentDiv);
-
-        // 이벤트 리스너
-        makeEditable(tabButton.querySelector('.tab-name-span'), 'text', () => {
-            quoteTabsData[mainTabId].title = tabButton.querySelector('.tab-name-span').textContent;
-        });
-        tabButton.addEventListener('click', () => activateMainTab(tabButton, contentDiv));
-        tabButton.querySelector('.close-tab-btn').addEventListener('click', (e) => {
-            e.stopPropagation();
-            if (!confirm(`'${quoteTabsData[mainTabId].title}' 탭을 닫으시겠습니까?`)) return;
-            delete quoteTabsData[mainTabId];
-            tabButton.remove();
-            contentDiv.remove();
-            if (activeMainQuoteTabId === mainTabId && quoteGroupTabsContainer.children.length > 0) {
-                quoteGroupTabsContainer.querySelector('.quote-group-tab-button').click();
-            } else if (quoteGroupTabsContainer.children.length === 0) {
-                createNewQuoteGroup(true);
-            }
-        });
-        
-        contentDiv.querySelector('.btn-new-group').addEventListener('click', () => createNewCalculationGroup(contentDiv));
-        contentDiv.querySelector('.btn-copy-group').addEventListener('click', () => handleCopyCalculationGroup(contentDiv));
-        contentDiv.querySelector('.btn-delete-group').addEventListener('click', () => handleDeleteCalculationGroup(contentDiv));
-        
-        if (isFirst) {
-            activateMainTab(tabButton, contentDiv);
-        }
-    }
-
-    function activateMainTab(tabButton, contentDiv) {
-        document.querySelectorAll('.quote-group-tab-button.active').forEach(t => t.classList.remove('active'));
-        document.querySelectorAll('.quote-group-content.active').forEach(c => c.classList.remove('active'));
-        tabButton.classList.add('active');
-        contentDiv.classList.add('active');
-        activeMainQuoteTabId = contentDiv.id;
-    }
-
-    // --- 초기화 함수들 ---
     function initFlightSchedule() {
         const addBtn = document.getElementById('addFlightSubgroupBtn');
         const parseBtn = document.getElementById('parseGdsBtn');
@@ -622,17 +421,18 @@ document.addEventListener('DOMContentLoaded', () => {
     if(copyInclusionExclusionBtn) { copyInclusionExclusionBtn.addEventListener('click', () => { copyHtmlToClipboard(generateInclusionExclusionInlineHtml()); }); }
 
     // ======== 모든 기능 초기화 실행 ========
-    createNewQuoteGroup(true);
+    initializeCalculator();
     initFlightSchedule();
     initPriceSection();
 
     form.addEventListener('reset', (e) => {
         e.preventDefault();
         if (!confirm("작성중인 모든 내용을 삭제하고 새로 시작하시겠습니까?")) return;
-        quoteGroupTabsContainer.innerHTML = ''; quoteGroupContentsContainer.innerHTML = '';
-        mainQuoteTabIndex = 0; activeMainQuoteTabId = null; quoteTabsData = {}; createNewQuoteGroup(true);
-        document.getElementById('flightScheduleContainer').innerHTML = ''; document.getElementById('priceInfoContainer').innerHTML = '';
-        document.getElementById('inclusionText').value = ''; document.getElementById('exclusionText').value = '';
+        initializeCalculator();
+        document.getElementById('flightScheduleContainer').innerHTML = ''; 
+        document.getElementById('priceInfoContainer').innerHTML = '';
+        document.getElementById('inclusionText').value = ''; 
+        document.getElementById('exclusionText').value = '';
         flightScheduleData = []; priceInfoData = [];
     });
 });
