@@ -130,7 +130,6 @@ function switchTab(newGroupId) {
 }
 
 // --- 그룹 UI 초기화 및 생성 ---
-// ▼▼▼ [수정됨] initializeGroup 함수, 버튼 위치 및 구조 수정 ▼▼▼
 function initializeGroup(groupEl, groupId) {
     groupEl.innerHTML = `<div class="flex gap-6">
         <div class="w-1/2 flex flex-col">
@@ -185,7 +184,6 @@ function initializeGroup(groupEl, groupId) {
 }
 
 // --- 좌측 계산기 관련 함수 ---
-// ▼▼▼ [수정됨] createCalculatorInstance 함수, 삭제 로직 안정화 ▼▼▼
 function createCalculatorInstance(wrapper, groupId, calcData) {
     const instanceContainer = document.createElement('div');
     instanceContainer.className = 'calculator-instance border p-4 rounded-lg relative bg-white shadow';
@@ -197,7 +195,6 @@ function createCalculatorInstance(wrapper, groupId, calcData) {
     deleteBtn.innerHTML = '<i class="fas fa-times-circle"></i>';
     deleteBtn.title = '이 계산기 삭제';
     
-    // 이벤트 리스너를 한 번만 올바르게 할당
     deleteBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         if (confirm('이 견적 계산기를 삭제하시겠습니까?')) {
@@ -240,30 +237,28 @@ function restoreCalculatorState(instanceContainer, calcData) {
         table.innerHTML = calcData.tableHTML;
         rebindCalculatorEventListeners(instanceContainer);
     } else {
-        // 복원할 HTML이 없는 새 계산기인 경우, 기본 열을 추가
         addPersonTypeColumn(instanceContainer, '성인', 1);
     }
     calculateAll(instanceContainer);
 }
-// ▼▼▼ [수정됨] rebindCalculatorEventListeners 함수, 이벤트 중복 할당 방지 ▼▼▼
+
+// ▼▼▼ [수정됨] rebindCalculatorEventListeners 함수, 이벤트 바인딩 방식 개선 ▼▼▼
 function rebindCalculatorEventListeners(calcContainer) {
     const calcAll = () => calculateAll(calcContainer);
-    calcContainer.querySelectorAll('input:not([data-bound])').forEach(input => {
-        input.dataset.bound = "true";
-        input.addEventListener('input', calcAll);
-    });
-    calcContainer.querySelectorAll('.person-type-name-span:not([data-bound])').forEach(span => {
-        span.dataset.bound = "true";
-        makeEditable(span, 'text', calcAll);
-    });
-    calcContainer.querySelectorAll('.person-count-span:not([data-bound])').forEach(span => {
-        span.dataset.bound = "true";
-        makeEditable(span, 'number', calcAll);
-    });
-    calcContainer.querySelectorAll('.dynamic-row-label-span:not([data-bound])').forEach(span => {
-        span.dataset.bound = "true";
-        makeEditable(span, 'text', () => {});
-    });
+    // data-bound 속성을 사용하여 이벤트 중복 바인딩 방지
+    const addListener = (selector, event, handler) => {
+        calcContainer.querySelectorAll(selector).forEach(el => {
+            if (el.dataset.bound) return;
+            el.dataset.bound = "true";
+            el.addEventListener(event, handler);
+        });
+    };
+
+    addListener('input', 'input', calcAll);
+    calcContainer.querySelectorAll('.person-type-name-span:not([data-bound])').forEach(span => { span.dataset.bound = "true"; makeEditable(span, 'text', calcAll); });
+    calcContainer.querySelectorAll('.person-count-span:not([data-bound])').forEach(span => { span.dataset.bound = "true"; makeEditable(span, 'number', calcAll); });
+    calcContainer.querySelectorAll('.dynamic-row-label-span:not([data-bound])').forEach(span => { span.dataset.bound = "true"; makeEditable(span, 'text', () => {}); });
+
     calcContainer.querySelectorAll('th .remove-col-btn:not([data-bound])').forEach((btn) => {
         btn.dataset.bound = "true";
         const headerCell = btn.closest('th');
@@ -276,6 +271,7 @@ function rebindCalculatorEventListeners(calcContainer) {
             calcAll();
         });
     });
+
     calcContainer.querySelectorAll('.dynamic-row-delete-btn:not([data-bound])').forEach(btn => {
         btn.dataset.bound = "true";
         btn.addEventListener('click', () => {
@@ -285,28 +281,23 @@ function rebindCalculatorEventListeners(calcContainer) {
             }
         });
     });
-    const addPersonBtn = calcContainer.querySelector('.add-person-type-btn:not([data-bound])');
-    if (addPersonBtn) {
-        addPersonBtn.dataset.bound = "true";
-        addPersonBtn.addEventListener('click', () => addPersonTypeColumn(calcContainer));
-    }
-    const addDynamicRowBtn = calcContainer.querySelector('.add-dynamic-row-btn:not([data-bound])');
-    if (addDynamicRowBtn) {
-        addDynamicRowBtn.dataset.bound = "true";
-        addDynamicRowBtn.addEventListener('click', () => addDynamicCostRow(calcContainer));
-    }
+
     updateSummaryRow(calcContainer);
 }
-
+// ▼▼▼ [수정됨] buildCalculatorDOM 함수, 버튼 이벤트 리스너 직접 할당 ▼▼▼
 function buildCalculatorDOM(calcContainer) {
     const content = document.createElement('div');
     content.innerHTML = `<div class="split-container"><div class="pnr-pane"><label class="label-text font-semibold mb-2">PNR 정보</label><textarea class="w-full flex-grow px-3 py-2 border border-gray-300 rounded-md shadow-sm resize-none" placeholder="PNR 정보를 여기에 붙여넣으세요."></textarea></div><div class="resizer-handle"></div><div class="quote-pane"><div class="table-container"><table class="quote-table"><thead><tr class="header-row"><th><button type="button" class="btn btn-sm btn-primary add-person-type-btn"><i class="fas fa-plus"></i> 항목 추가</button></th></tr><tr class="count-row"><th></th></tr></thead><tbody></tbody><tfoot></tfoot></table></div></div></div>`;
     
-    // Node.firstElementChild를 사용하여 새로 생성된 최상위 div만 추가
-    calcContainer.appendChild(content.firstElementChild);
+    const calculatorElement = content.firstElementChild;
+    calcContainer.appendChild(calculatorElement);
     
-    initializeSplitView(calcContainer.querySelector('.split-container'));
-    const tbody = calcContainer.querySelector('tbody');
+    initializeSplitView(calculatorElement.querySelector('.split-container'));
+
+    // 버튼에 이벤트 리스너를 여기서 직접 할당
+    calculatorElement.querySelector('.add-person-type-btn').addEventListener('click', () => addPersonTypeColumn(calcContainer, '아동', 1));
+    
+    const tbody = calculatorElement.querySelector('tbody');
     ROW_DEFINITIONS.forEach(def => {
         const row = tbody.insertRow();
         row.dataset.rowId = def.id;
@@ -333,7 +324,7 @@ function updateSummaryRow(calcContainer) {
     labelCell.innerHTML = '<div class="p-2 font-bold text-center">전체 합계</div>';
     const summaryCell = summaryRow.insertCell(1);
     summaryCell.colSpan = colCount - 1;
-    summaryCell.innerHTML = `<div class="totals-summary-section flex items-center justify-around p-1"><div class="text-center mx-2"><span class="text-sm font-medium text-gray-600">전체상품가 </span><span class="text-sm font-bold text-indigo-700 totalSalesPrice">0 원</span></div><div class="text-center mx-2"><span class="text-sm font-medium text-gray-600">전체수익 </span><span class="text-sm font-bold text-indigo-700 totalProfit">0 원</span></div><div class="text-center mx-2"><span class="text-sm font-medium text-gray-600">전체수익률 </span><span class="text-sm font-bold text-indigo-700 totalProfitMargin">0.00 %</span></div></div>`;
+    summaryCell.innerHTML = `<div class="totals-summary-section flex items-center justify-around p-1"><div class="text-center mx-2"><span class="text-base font-medium text-gray-600">전체상품가 </span><span class="text-lg font-bold text-indigo-700 totalSalesPrice">0 원</span></div><div class="text-center mx-2"><span class="text-base font-medium text-gray-600">전체수익 </span><span class="text-lg font-bold text-indigo-700 totalProfit">0 원</span></div><div class="text-center mx-2"><span class="text-base font-medium text-gray-600">전체수익률 </span><span class="text-lg font-bold text-indigo-700 totalProfitMargin">0.00 %</span></div></div>`;
     labelCell.style.borderTop = "2px solid #a0aec0";
     summaryCell.style.borderTop = "2px solid #a0aec0";
 }
@@ -387,7 +378,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     const addCustomerBtn = document.getElementById('addCustomerBtn');
     if(addCustomerBtn) { addCustomerBtn.addEventListener('click', () => createCustomerCard()); }
-    createCustomerCard({ name: '', phone: '', email: '' });
+    createCustomerCard({ name: '홍길동', phone: '010-1234-5678', email: 'hong@example.com' });
     
     document.getElementById('newGroupBtn').addEventListener('click', () => addNewGroup());
     document.getElementById('copyGroupBtn').addEventListener('click', copyActiveGroup);
