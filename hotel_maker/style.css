@@ -28,7 +28,7 @@ body {
 }
 .control-buttons button {
     padding: 0.5rem 0.8rem;
-    font-size: 0.875rem;
+    font-size: 0.675rem;
     border-radius: 0.5rem;
     color: white;
     display: inline-flex;
