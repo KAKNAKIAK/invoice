@@ -365,23 +365,75 @@ function restoreCalculatorState(instanceContainer, calcData) {
 
 function rebindCalculatorEventListeners(calcContainer) {
     const calcAll = () => calculateAll(calcContainer);
-    calcContainer.querySelectorAll('input').forEach(el => { el.addEventListener('input', calcAll); });
-    calcContainer.querySelectorAll('.person-type-name-span').forEach(span => { makeEditable(span, 'text', calcAll); });
-    calcContainer.querySelectorAll('.person-count-span').forEach(span => { makeEditable(span, 'number', calcAll); });
-    calcContainer.querySelectorAll('.dynamic-row-label-span').forEach(span => { makeEditable(span, 'text', () => {}); });
+
+    // 모든 input 필드에 실시간 계산 이벤트 연결
+    calcContainer.querySelectorAll('input').forEach(el => {
+        el.addEventListener('input', calcAll);
+    });
+
+    // 모든 span에 '수정 가능' 기능 연결
+    calcContainer.querySelectorAll('.person-type-name-span').forEach(span => {
+        makeEditable(span, 'text', calcAll);
+    });
+    calcContainer.querySelectorAll('.person-count-span').forEach(span => {
+        makeEditable(span, 'number', calcAll);
+    });
+    calcContainer.querySelectorAll('.dynamic-row-label-span').forEach(span => {
+        makeEditable(span, 'text', () => {});
+    });
+
+    // 모든 삭제 버튼 기능 연결
     calcContainer.querySelectorAll('th .remove-col-btn').forEach((btn) => {
         const headerCell = btn.closest('th');
         if (!headerCell) return;
         const colIndex = Array.from(headerCell.parentNode.children).indexOf(headerCell);
-        btn.addEventListener('click', () => { if (!confirm('해당 항목을 삭제하시겠습니까?')) return; calcContainer.querySelectorAll('.quote-table tr').forEach(row => row.cells[colIndex]?.remove()); updateSummaryRow(calcContainer); calcAll(); });
+        btn.addEventListener('click', () => { 
+            if (!confirm('해당 항목을 삭제하시겠습니까?')) return; 
+            calcContainer.querySelectorAll('.quote-table tr').forEach(row => row.cells[colIndex]?.remove()); 
+            updateSummaryRow(calcContainer); 
+            calcAll(); 
+        });
     });
     calcContainer.querySelectorAll('.dynamic-row-delete-btn').forEach(btn => {
-        btn.addEventListener('click', () => { if (confirm('해당 항목을 삭제하시겠습니까?')) { btn.closest('tr').remove(); calcAll(); } });
+        btn.addEventListener('click', () => { 
+            if (confirm('해당 항목을 삭제하시겠습니까?')) { 
+                btn.closest('tr').remove(); 
+                calcAll(); 
+            } 
+        });
     });
+
+    // 모든 추가 버튼 기능 연결
     const addPersonBtn = calcContainer.querySelector('.add-person-type-btn');
-    if (addPersonBtn) { addPersonBtn.addEventListener('click', () => addPersonTypeColumn(calcContainer, '아동', 1)); }
+    if (addPersonBtn) {
+        addPersonBtn.addEventListener('click', () => addPersonTypeColumn(calcContainer, '아동', 1));
+    }
     const addRowBtn = calcContainer.querySelector('.add-dynamic-row-btn');
-    if (addRowBtn) { addRowBtn.addEventListener('click', () => addDynamicCostRow(calcContainer)); }
+    if (addRowBtn) {
+        addRowBtn.addEventListener('click', () => addDynamicCostRow(calcContainer));
+    }
+    
+    // ▼▼▼ [신규] 수식 계산 결과 툴팁 기능 추가 ▼▼▼
+    calcContainer.querySelectorAll('.cost-item, .sales-price').forEach(input => {
+        const updateTooltip = () => {
+            const expression = input.value;
+            // 수식 기호(+, -, *, /)가 있을 때만 툴팁을 표시
+            if (expression && /[+\-*/]/.test(expression)) {
+                const result = evaluateMath(expression);
+                // HTML title 속성을 이용해 브라우저 기본 툴팁을 생성
+                input.title = ` ${new Intl.NumberFormat('ko-KR').format(Math.round(result))}`;
+            } else {
+                // 수식이 아니면 툴팁을 제거
+                input.title = '';
+            }
+        };
+
+        // 마우스를 올리거나, 키보드로 포커스했을 때 툴팁을 업데이트
+        input.addEventListener('mouseover', updateTooltip);
+        input.addEventListener('focus', updateTooltip);
+    });
+    // ▲▲▲ 신규 기능 추가 끝 ▲▲▲
+
     updateSummaryRow(calcContainer);
 }
 
