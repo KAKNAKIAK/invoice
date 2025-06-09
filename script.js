@@ -298,12 +298,23 @@ function initializeGroup(groupEl, groupId) {
         createFlightSubgroup(flightContainer, sg, groupId); 
     });
     
+    // ▼▼▼ 여기만 수정 ▼▼▼
     groupEl.querySelector('.add-price-subgroup-btn').addEventListener('click', () => { 
         if (!groupData.priceInfo) groupData.priceInfo = [];
-        const sg = { id: `price_sub_${Date.now()}`, title: "", rows: [{ item: "성인요금", price: 0, count: 1, remarks: "" }] }; 
+        // 기본 3개 항목(성인/소아/유아)으로 rows 생성
+        const sg = { 
+            id: `price_sub_${Date.now()}`, 
+            title: "", 
+            rows: [
+                { item: "성인요금", price: 0, count: 1, remarks: "" },
+                { item: "소아요금", price: 0, count: 1, remarks: "만2~12세미만" },
+                { item: "유아요금", price: 0, count: 1, remarks: "만24개월미만" }
+            ] 
+        }; 
         groupData.priceInfo.push(sg); 
         createPriceSubgroup(priceContainer, sg, groupId); 
     });
+    // ▲▲▲
 
     groupEl.querySelector('.copy-flight-schedule-btn').addEventListener('click', () => copyHtmlToClipboard(generateFlightScheduleInlineHtml(groupData.flightSchedule)));
     groupEl.querySelector('.copy-price-info-btn').addEventListener('click', () => copyHtmlToClipboard(generatePriceInfoInlineHtml(groupData.priceInfo)));
