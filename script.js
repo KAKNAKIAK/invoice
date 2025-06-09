@@ -242,25 +242,69 @@ function createGroupUI(groupId) {
 }
 
 function initializeGroup(groupEl, groupId) {
-    groupEl.innerHTML = `<div class="flex gap-6"> <div class="w-1/2 flex flex-col"> <div id="calculators-wrapper-${groupId}" class="space-y-4"></div> <div class="mt-4"><button type="button" class="btn btn-outline add-calculator-btn w-full"><i class="fas fa-plus mr-2"></i>견적 계산 추가</button></div> </div> <div class="w-1/2 space-y-6 right-panel-container"> <section class="p-6 border border-gray-200 rounded-lg bg-gray-50"><div class="flex justify-between items-center mb-4"><h2 class="text-xl font-semibold text-gray-800">항공 스케줄</h2><div class="flex items-center space-x-2"><button type="button" class="btn btn-sm btn-secondary copy-flight-schedule-btn" title="항공 스케줄 HTML 복사"><i class="fas fa-clipboard"></i> 복사</button><button type="button" class="btn btn-sm btn-secondary parse-gds-btn">GDS 파싱</button><button type="button" class="btn btn-sm btn-secondary add-flight-subgroup-btn"><i class="fas fa-plus mr-1"></i> 스케줄 추가</button></div></div><div class="space-y-4 flight-schedule-container"></div></section> <section class="p-6 border border-gray-200 rounded-lg bg-gray-50"><div class="flex justify-between items-center mb-4"><h2 class="text-xl font-semibold text-gray-800">요금 안내</h2><div class="flex items-center space-x-2"><button type="button" class="btn btn-sm btn-secondary copy-price-info-btn" title="요금 안내 HTML 복사"><i class="fas fa-clipboard"></i> 복사</button><button type="button" class="btn btn-sm btn-secondary add-price-subgroup-btn"><i class="fas fa-plus mr-1"></i> 요금 그룹 추가</button></div></div><div class="space-y-4 price-info-container"></div></section> <section class="p-6 border border-gray-200 rounded-lg bg-gray-50"><div class="flex justify-between items-center mb-4"><h2 class="text-xl font-semibold text-gray-800">포함/불포함 사항</h2><button type="button" class="btn btn-sm btn-secondary copy-inclusion-exclusion-btn" title="포함/불포함 HTML 복사"><i class="fas fa-clipboard"></i> 복사</button></div><div class="flex gap-4"><div class="w-1/2 flex flex-col"><h3 class="font-medium mb-1">포함</h3><textarea class="input-field flex-grow inclusion-text" rows="5"></textarea></div><div class="w-1/2 flex flex-col"><h3 class="font-medium mb-1">불포함</h3><textarea class="input-field flex-grow exclusion-text" rows="5"></textarea></div></div></section> <section class="p-6 border border-gray-200 rounded-lg bg-gray-50"><h2 class="text-xl font-semibold text-gray-800 mb-4">호텔카드 메이커</h2><iframe src="https://kaknakiak.github.io/invoice/hotel_maker/index.html" style="width: 100%; height: 480px; border: 1px solid #ccc; border-radius: 0.25rem;"></iframe></section> <section class="p-6 border border-gray-200 rounded-lg bg-gray-50"><h2 class="text-xl font-semibold text-gray-800 mb-4">상세 일정표</h2><iframe src="https://kaknakiak.github.io/invoice/itinerary_planner/index.html" style="width: 100%; height: 800px; border: 1px solid #ccc; border-radius: 0.25rem;"></iframe></section> </div> </div>`;
+    // [수정] iframe 태그에 allow="clipboard-write" 속성을 추가합니다.
+    groupEl.innerHTML = `<div class="flex gap-6"> 
+        <div class="w-1/2 flex flex-col"> 
+            <div id="calculators-wrapper-${groupId}" class="space-y-4"></div> 
+            <div class="mt-4"><button type="button" class="btn btn-outline add-calculator-btn w-full"><i class="fas fa-plus mr-2"></i>견적 계산 추가</button></div> 
+        </div> 
+        <div class="w-1/2 space-y-6 right-panel-container"> 
+            <section class="p-6 border border-gray-200 rounded-lg bg-gray-50"><div class="flex justify-between items-center mb-4"><h2 class="text-xl font-semibold text-gray-800">항공 스케줄</h2><div class="flex items-center space-x-2"><button type="button" class="btn btn-sm btn-secondary copy-flight-schedule-btn" title="항공 스케줄 HTML 복사"><i class="fas fa-clipboard"></i> 복사</button><button type="button" class="btn btn-sm btn-secondary parse-gds-btn">GDS 파싱</button><button type="button" class="btn btn-sm btn-secondary add-flight-subgroup-btn"><i class="fas fa-plus mr-1"></i> 스케줄 추가</button></div></div><div class="space-y-4 flight-schedule-container"></div></section> 
+            <section class="p-6 border border-gray-200 rounded-lg bg-gray-50"><div class="flex justify-between items-center mb-4"><h2 class="text-xl font-semibold text-gray-800">요금 안내</h2><div class="flex items-center space-x-2"><button type="button" class="btn btn-sm btn-secondary copy-price-info-btn" title="요금 안내 HTML 복사"><i class="fas fa-clipboard"></i> 복사</button><button type="button" class="btn btn-sm btn-secondary add-price-subgroup-btn"><i class="fas fa-plus mr-1"></i> 요금 그룹 추가</button></div></div><div class="space-y-4 price-info-container"></div></section> 
+            <section class="p-6 border border-gray-200 rounded-lg bg-gray-50"><div class="flex justify-between items-center mb-4"><h2 class="text-xl font-semibold text-gray-800">포함/불포함 사항</h2><button type="button" class="btn btn-sm btn-secondary copy-inclusion-exclusion-btn" title="포함/불포함 HTML 복사"><i class="fas fa-clipboard"></i> 복사</button></div><div class="flex gap-4"><div class="w-1/2 flex flex-col"><h3 class="font-medium mb-1">포함</h3><textarea class="input-field flex-grow inclusion-text" rows="5"></textarea></div><div class="w-1/2 flex flex-col"><h3 class="font-medium mb-1">불포함</h3><textarea class="input-field flex-grow exclusion-text" rows="5"></textarea></div></div></section> 
+            <section class="p-6 border border-gray-200 rounded-lg bg-gray-50"><h2 class="text-xl font-semibold text-gray-800 mb-4">호텔카드 메이커</h2><iframe src="https://kaknakiak.github.io/invoice/hotel_maker/index.html" style="width: 100%; height: 480px; border: 1px solid #ccc; border-radius: 0.25rem;" allow="clipboard-write"></iframe></section> 
+            <section class="p-6 border border-gray-200 rounded-lg bg-gray-50"><h2 class="text-xl font-semibold text-gray-800 mb-4">상세 일정표</h2><iframe src="https://kaknakiak.github.io/invoice/itinerary_planner/index.html" style="width: 100%; height: 800px; border: 1px solid #ccc; border-radius: 0.25rem;" allow="clipboard-write"></iframe></section> 
+        </div> 
+    </div>`;
+
     const groupData = quoteGroupsData[groupId];
     if (!groupData) return;
+
     const calculatorsWrapper = groupEl.querySelector(`#calculators-wrapper-${groupId}`);
-    if (groupData.calculators && groupData.calculators.length > 0) { groupData.calculators.forEach(calcData => createCalculatorInstance(calculatorsWrapper, groupId, calcData)); }
-    groupEl.querySelector('.add-calculator-btn').addEventListener('click', () => { saveAllCalculatorsInGroup(groupId); const newCalcData = { id: `calc_${Date.now()}`, pnr: '', tableHTML: null }; groupData.calculators.push(newCalcData); createCalculatorInstance(calculatorsWrapper, groupId, newCalcData); });
+    if (groupData.calculators && groupData.calculators.length > 0) { 
+        groupData.calculators.forEach(calcData => createCalculatorInstance(calculatorsWrapper, groupId, calcData)); 
+    }
+    groupEl.querySelector('.add-calculator-btn').addEventListener('click', () => { 
+        saveAllCalculatorsInGroup(groupId); 
+        const newCalcData = { id: `calc_${Date.now()}`, pnr: '', tableHTML: null }; 
+        groupData.calculators.push(newCalcData); 
+        createCalculatorInstance(calculatorsWrapper, groupId, newCalcData); 
+    });
+
     const flightContainer = groupEl.querySelector('.flight-schedule-container');
-    if (groupData.flightSchedule) groupData.flightSchedule.forEach(subgroup => createFlightSubgroup(flightContainer, subgroup, groupId));
+    if (groupData.flightSchedule) {
+        groupData.flightSchedule.forEach(subgroup => createFlightSubgroup(flightContainer, subgroup, groupId));
+    }
+    
     const priceContainer = groupEl.querySelector('.price-info-container');
-    if (groupData.priceInfo) groupData.priceInfo.forEach(subgroup => createPriceSubgroup(priceContainer, subgroup, groupId));
+    if (groupData.priceInfo) {
+        groupData.priceInfo.forEach(subgroup => createPriceSubgroup(priceContainer, subgroup, groupId));
+    }
+    
     const inclusionTextEl = groupEl.querySelector('.inclusion-text');
     const exclusionTextEl = groupEl.querySelector('.exclusion-text');
     if (inclusionTextEl) inclusionTextEl.value = groupData.inclusionText || '';
     if (exclusionTextEl) exclusionTextEl.value = groupData.exclusionText || '';
+    
     inclusionTextEl.addEventListener('input', e => { groupData.inclusionText = e.target.value; });
     exclusionTextEl.addEventListener('input', e => { groupData.exclusionText = e.target.value; });
+
     groupEl.querySelector('.parse-gds-btn').addEventListener('click', () => { window.open('./gds_parser/gds_parser.html', 'GDS_Parser', `width=800,height=500,top=${(screen.height / 2) - 250},left=${(screen.width / 2) - 400}`); });
-    groupEl.querySelector('.add-flight-subgroup-btn').addEventListener('click', () => { if (!groupData.flightSchedule) groupData.flightSchedule = []; const sg = { id: `flight_sub_${Date.now()}`, title: "", rows: [{}] }; groupData.flightSchedule.push(sg); createFlightSubgroup(flightContainer, sg, groupId); });
-    groupEl.querySelector('.add-price-subgroup-btn').addEventListener('click', () => { if (!groupData.priceInfo) groupData.priceInfo = []; const sg = { id: `price_sub_${Date.now()}`, title: "", rows: [{ item: "성인요금", price: 0, count: 1, remarks: "" }] }; groupData.priceInfo.push(sg); createPriceSubgroup(priceContainer, sg, groupId); });
+    
+    groupEl.querySelector('.add-flight-subgroup-btn').addEventListener('click', () => { 
+        if (!groupData.flightSchedule) groupData.flightSchedule = [];
+        const sg = { id: `flight_sub_${Date.now()}`, title: "", rows: [{}] }; 
+        groupData.flightSchedule.push(sg); 
+        createFlightSubgroup(flightContainer, sg, groupId); 
+    });
+    
+    groupEl.querySelector('.add-price-subgroup-btn').addEventListener('click', () => { 
+        if (!groupData.priceInfo) groupData.priceInfo = [];
+        const sg = { id: `price_sub_${Date.now()}`, title: "", rows: [{ item: "성인요금", price: 0, count: 1, remarks: "" }] }; 
+        groupData.priceInfo.push(sg); 
+        createPriceSubgroup(priceContainer, sg, groupId); 
+    });
+
     groupEl.querySelector('.copy-flight-schedule-btn').addEventListener('click', () => copyHtmlToClipboard(generateFlightScheduleInlineHtml(groupData.flightSchedule)));
     groupEl.querySelector('.copy-price-info-btn').addEventListener('click', () => copyHtmlToClipboard(generatePriceInfoInlineHtml(groupData.priceInfo)));
     groupEl.querySelector('.copy-inclusion-exclusion-btn').addEventListener('click', () => copyHtmlToClipboard(generateInclusionExclusionInlineHtml(groupData.inclusionText, groupData.exclusionText)));
