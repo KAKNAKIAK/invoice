@@ -7,14 +7,12 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link rel="stylesheet" href="style.css">
-    <!-- 데이터 복원을 위한 스크립트 태그 (저장 시 여기에 데이터가 삽입됨) -->
     <script id="restored-data" type="application/json"></script>
 </head>
 <body class="bg-gray-50 p-4 sm:p-6 md:p-8">
     <div class="max-w-full mx-auto bg-white p-6 sm:p-8 rounded-lg shadow-xl">
-        <!-- [수정] 헤더 영역에 버튼 추가 -->
         <header class="mb-8 flex justify-between items-center">
-            <h1 class="text-3xl font-bold text-indigo-700">여행 견적 계산기 (통합)</h1>
+            <h1 class="text-3xl font-bold text-indigo-700">2025 견적</h1>
             <div class="flex items-center space-x-2">
                 <button type="button" id="saveBtn" class="btn btn-sm btn-secondary"><i class="fas fa-save"></i> 저장</button>
                 <button type="button" id="saveAsBtn" class="btn btn-sm btn-secondary"><i class="fas fa-file-export"></i> 다른 이름으로 저장</button>
@@ -24,22 +22,16 @@
         </header>
 
         <form id="quoteForm">
-            <!-- 이하 구조는 이전과 동일 -->
             <div class="flex gap-6 mb-8">
                 <section class="w-1/2 p-6 border border-gray-200 rounded-lg">
-                    <div class="flex justify-between items-start">
-                        <div>
-                            <h2 class="text-xl font-semibold text-gray-800 mb-4">1. 고객 정보</h2>
-                            <div class="space-y-2 text-sm text-gray-600">
-                                <p><span class="font-medium text-gray-800 w-16 inline-block">고객명</span> 홍길동</p>
-                                <p><span class="font-medium text-gray-800 w-16 inline-block">연락처</span> 010-1234-5678</p>
-                                <p><span class="font-medium text-gray-800 w-16 inline-block">이메일</span> hong@example.com</p>
-                            </div>
-                        </div>
-                        <div>
-                            <button type="button" onclick="alert('고객 정보 관리 기능은 구현 예정입니다.');" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium">고객 추가</button>
-                        </div>
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-semibold text-gray-800">1. 고객 정보</h2>
+                        <button type="button" id="addCustomerBtn" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium">
+                            <i class="fas fa-plus-circle mr-1"></i>고객 추가
+                        </button>
                     </div>
+                    <div id="customerInfoContainer" class="flex flex-wrap gap-4">
+                        </div>
                 </section>
                 <section class="w-1/2 p-6 border border-gray-200 rounded-lg flex flex-col">
                     <h2 class="text-xl font-semibold text-gray-800 mb-4">메모</h2>
