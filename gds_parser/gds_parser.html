@@ -25,9 +25,52 @@
     </div>
 
     <script>
-        const monthMap = { 'JAN': '01', 'FEB': '02', 'MAR': '03', 'APR': '04', 'MAY': '05', 'JUN': '06', 'JUL': '07', 'AUG': '08', 'SEP': '09', 'OCT': '10', 'NOV': '11', 'DEC': '12' };
-        const cityCodeMap = { "ICN":"인천","GMP":"서울(김포)","PUS":"부산","CJU":"제주","TAE":"대구","CJJ":"청주","MWX":"무안","YNY":"양양","NRT":"도쿄(나리타)","HND":"도쿄(하네다)","KIX":"오사카(간사이)","FUK":"후쿠오ка","CTS":"삿포로(신치토세)","SPK":"삿포로","OKA":"오키나와","NGO":"나고야","PEK":"베이징(수도)","PVG":"상하이(푸동)","HKG":"홍콩","MFM":"마카오","TPE":"타이베이(타오위안)","BKK":"방콕(수완나품)","DMK":"방콕(돈므앙)","HKT":"푸켓","CNX":"치앙마이","SGN":"호치민","HAN":"하노이","DAD":"다낭","CXR":"나트랑","PQC":"푸꾸옥","SIN":"싱가포르","KUL":"쿠알라룸푸르","MNL":"마닐라","CEB":"세부","DPS":"발리(덴파사르)","LAX":"로스앤젤레스","SFO":"샌프란시스코","JFK":"뉴욕(JFK)","HNL":"호놀룰루","YVR":"밴쿠버","YYZ":"토론토","LHR":"런던(히드로)","CDG":"파리(샤를 드골)","FRA":"프랑크푸르트","AMS":"암스테르담","FCO":"로마(피우미치노)","SYD":"시드니","AKL":"오클랜드","GUM":"괌","SPN":"사이판" };
-        const airlineCodeMap = { "KE":"대한항공","OZ":"아시아나항공","7C":"제주항공","LJ":"진에어","TW":"티웨이항공","RS":"에어서울","BX":"에어부산","ZE":"이스타항공","VN":"베트남항공","VJ":"비엣젯항공","QH":"뱀부항공","JL":"일본항공","NH":"전일본공수","MM":"피치항공","CA":"중국국제항공","MU":"중국동방항공","CZ":"중국남방항공","CX":"캐세이퍼시픽","CI":"중화항공","BR":"에바항공","SQ":"싱가포르항공","TG":"타이항공","PR":"필리핀항공","MH":"말레이시아항공","GA":"가루다인도네시아항공","AA":"아메리칸항공","UA":"유나이티드항공","DL":"델타항공","HA":"하와이안항공","AC":"에어캐나다","BA":"영국항공","AF":"에어프랑스","KL":"KLM네덜란드항공","LH":"루프트한자","TK":"터키항공","EK":"에미레이트항공","QR":"카타르항공","EY":"에티하드항공","QF":"콴타스항공","NZ":"에어뉴질랜드" };
+        // [수정] 전 세계 주요 도시/공항 코드를 대폭 추가했습니다.
+        const cityCodeMap = {
+            // 아시아 주요 도시
+            "ICN": "인천", "GMP": "서울(김포)", "PUS": "부산", "CJU": "제주", "TAE": "대구", "CJJ": "청주", "MWX": "무안", "YNY": "양양",
+            "NRT": "도쿄(나리타)", "HND": "도쿄(하네다)", "KIX": "오사카(간사이)", "FUK": "후쿠오카", "CTS": "삿포로(신치토세)", "OKA": "오키나와", "NGO": "나고야",
+            "PEK": "베이징(수도)", "PVG": "상하이(푸동)", "CAN": "광저우", "HKG": "홍콩", "MFM": "마카오",
+            "TPE": "타이베이(타오위안)", "SGN": "호치민", "HAN": "하노이", "DAD": "다낭", "CXR": "나트랑", "PQC": "푸꾸옥",
+            "BKK": "방콕(수완나품)", "DMK": "방콕(돈므앙)", "HKT": "푸켓", "CNX": "치앙마이",
+            "SIN": "싱가포르", "KUL": "쿠알라룸푸르", "MNL": "마닐라", "CEB": "세부", "DPS": "발리(덴파사르)", "JKT": "자카르타",
+            "DEL": "델리", "BOM": "뭄바이", "DXB": "두바이", "AUH": "아부다비", "DOH": "도하",
+            // 미주 주요 도시
+            "LAX": "로스앤젤레스", "SFO": "샌프란시스코", "JFK": "뉴욕(JFK)", "EWR": "뉴어크", "ORD": "시카고(오헤어)", "ATL": "애틀랜타", "DFW": "댈러스/포트워스",
+            "LAS": "라스베이거스", "MIA": "마이애미", "SEA": "시애틀", "DEN": "덴버", "HNL": "호놀룰루",
+            "YVR": "밴쿠버", "YYZ": "토론토", "MEX": "멕시코시티", "CUN": "칸쿤",
+            "GRU": "상파울루", "EZE": "부에노스아이레스", "SCL": "산티아고",
+            // 유럽 주요 도시
+            "LHR": "런던(히드로)", "LGW": "런던(개트윅)", "CDG": "파리(샤를 드골)", "ORY": "파리(오를리)",
+            "FRA": "프랑크푸르트", "MUC": "뮌헨", "AMS": "암스테르담", "FCO": "로마(피우미치노)", "MXP": "밀라노(말펜사)",
+            "MAD": "마드리드", "BCN": "바르셀로나", "ZRH": "취리히", "GVA": "제네바", "VIE": "비엔나",
+            "IST": "이스탄불", "ATH": "아테네", "PRG": "프라하", "BUD": "부다페스트", "WAW": "바르샤바", "SVO": "모스크바(셰레메티예보)",
+            // 오세아니아 주요 도시
+            "SYD": "시드니", "MEL": "멜버른", "BNE": "브리즈번", "AKL": "오클랜드",
+            // 아프리카 주요 도시
+            "JNB": "요하네스버그", "CAI": "카이로", "ADD": "아디스아바바"
+        };
+
+        // [수정] 전 세계 주요 항공사 코드를 대폭 추가했습니다.
+        const airlineCodeMap = {
+            // 대한민국
+            "KE": "대한항공", "OZ": "아시아나항공", "7C": "제주항공", "LJ": "진에어", "TW": "티웨이항공", "RS": "에어서울", "BX": "에어부산", "ZE": "이스타항공",
+            // 아시아
+            "NH": "전일본공수(ANA)", "JL": "일본항공", "MM": "피치항공",
+            "CA": "중국국제항공", "MU": "중국동방항공", "CZ": "중국남방항공", "CX": "캐세이퍼시픽",
+            "CI": "중화항공", "BR": "에바항공", "SQ": "싱가포르항공", "TG": "타이항공", "VN": "베트남항공", "VJ": "비엣젯항공", "QH": "뱀부항공",
+            "PR": "필리핀항공", "MH": "말레이시아항공", "GA": "가루다인도네시아항공",
+            // 중동
+            "EK": "에미레이트항공", "QR": "카타르항공", "EY": "에티하드항공", "SV": "사우디아항공", "TK": "터키항공",
+            // 미주
+            "AA": "아메리칸항공", "UA": "유나이티드항공", "DL": "델타항공", "HA": "하와이안항공", "AS": "알래스카항공",
+            "AC": "에어캐나다", "AM": "아에로멕시코",
+            // 유럽
+            "AF": "에어프랑스", "KL": "KLM네덜란드항공", "BA": "영국항공", "VS": "버진애틀랜틱",
+            "LH": "루프트한자", "AZ": "알리탈리아(ITA)", "IB": "이베리아항공", "LX": "스위스국제항공", "AY": "핀에어", "SU": "아에로플로트",
+            // 오세아니아
+            "QF": "콴타스항공", "NZ": "에어뉴질랜드"
+        };
 
         document.getElementById('parseAndApplyButton').addEventListener('click', parseGdsTextAndSendData);
 
@@ -44,21 +87,17 @@
             lines.forEach(line => {
                 if (!line.trim()) return;
 
-                // [수정된 부분] 예약 상태 코드(HK, DK 등)를 유연하게 처리하도록 정규식 개선
-                const flightRegex = /(?<airline>[A-Z0-9]{2})\s+(?<flightNo>\d{3,4}).*?(?<depDate>\d{1,2}[A-Z]{3}).*?(?<depCity>[A-Z]{3})\s*(?<arrCity>[A-Z]{3})\s*[A-Z]{2}\d.*?(?<depTime>\d{4})\s+(?<arrTime>\d{4})/;
+                const flightRegex = /(?<airline>[A-Z0-9]{2})\s*(?<flightNo>\d{3,5}).*?(?<depDate>\d{1,2}[A-Z]{3}).*?(?<depCity>[A-Z]{3})(?<arrCity>[A-Z]{3}).*?(?<depTime>\d{4})\s+(?<arrTime>\d{4})/;
                 const match = line.match(flightRegex);
                 
                 if (match && match.groups) {
                     const g = match.groups;
-                    
                     const airlineCode = g.airline;
                     const flightNum = `${g.airline} ${g.flightNo}`;
-                    
                     const depDateObj = parseDate(g.depDate);
                     const depDateStr = formatDate(depDateObj);
-
                     const arrDateObj = new Date(depDateObj);
-                    if (g.arrTime < g.depTime) {
+                    if (parseInt(g.arrTime, 10) < parseInt(g.depTime, 10)) {
                         arrDateObj.setDate(arrDateObj.getDate() + 1);
                     }
                     const arrDateStr = formatDate(arrDateObj);
@@ -93,6 +132,7 @@
         function parseDate(dateStr) {
             const day = parseInt(dateStr.slice(0, -3), 10);
             const monthStr = dateStr.slice(-3).toUpperCase();
+            const monthMap = { 'JAN': '01', 'FEB': '02', 'MAR': '03', 'APR': '04', 'MAY': '05', 'JUN': '06', 'JUL': '07', 'AUG': '08', 'SEP': '09', 'OCT': '10', 'NOV': '11', 'DEC': '12' };
             const month = monthMap[monthStr] ? parseInt(monthMap[monthStr], 10) - 1 : 0;
             const currentYear = new Date().getFullYear();
             return new Date(currentYear, month, day);
