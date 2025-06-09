@@ -47,6 +47,15 @@ function createCustomerCard(initialData = { name: '', phone: '', email: '' }) {
     card.id = cardId;
     card.innerHTML = `<button type="button" class="absolute top-1 right-1 text-gray-400 hover:text-red-500 text-xs remove-customer-btn p-1" title="고객 삭제"><i class="fas fa-times"></i></button><div class="space-y-3 text-sm"><div class="flex items-center gap-2"><label for="customerName_${cardId}" class="font-medium text-gray-800 w-12 text-left flex-shrink-0">고객명</label><input type="text" id="customerName_${cardId}" class="input-field customer-name" data-field="name" value="${initialData.name}"></div><div class="flex items-center gap-2"><label for="customerPhone_${cardId}" class="font-medium text-gray-800 w-12 text-left flex-shrink-0">연락처</label><input type="tel" id="customerPhone_${cardId}" class="input-field customer-phone" data-field="phone" value="${initialData.phone}"></div><div class="flex items-center gap-2"><label for="customerEmail_${cardId}" class="font-medium text-gray-800 w-12 text-left flex-shrink-0">이메일</label><input type="email" id="customerEmail_${cardId}" class="input-field customer-email" data-field="email" value="${initialData.email}"></div></div>`;
     container.appendChild(card);
+
+    // [수정] 고객 정보 input에 더블클릭 복사 기능 추가
+    card.querySelectorAll('input').forEach(input => {
+        input.addEventListener('dblclick', (event) => {
+            const label = event.target.previousElementSibling.textContent;
+            copyToClipboard(event.target.value, label);
+        });
+    });
+
     card.querySelector('.remove-customer-btn').addEventListener('click', () => { card.remove(); });
 }
 
@@ -72,6 +81,19 @@ const formatCurrency = (amount) => new Intl.NumberFormat('ko-KR').format(Math.ro
 const formatPercentage = (value) => (isNaN(value) || !isFinite(value) ? 0 : value * 100).toFixed(2) + ' %';
 const copyHtmlToClipboard = (htmlString) => { if (!htmlString || htmlString.trim() === "") { alert('복사할 내용이 없습니다.'); return; } navigator.clipboard.writeText(htmlString).then(() => alert('HTML 소스 코드가 클립보드에 복사되었습니다.')).catch(err => { console.error('클립보드 복사 실패:', err); alert('복사에 실패했습니다.'); }); };
 
+// [신규] 텍스트를 클립보드에 복사하고 알림을 보여주는 함수
+function copyToClipboard(text, fieldName = '텍스트') {
+    if (!text || text.trim() === "") {
+        alert('복사할 내용이 없습니다.');
+        return;
+    }
+    navigator.clipboard.writeText(text).then(() => {
+        alert(`'${text}'\n(${fieldName}) 클립보드에 복사되었습니다.`);
+    }).catch(err => {
+        console.error('클립보드 복사 실패:', err);
+        alert('복사에 실패했습니다.');
+    });
+}
 
 // --- 저장 및 불러오기 ---
 function saveAllCalculatorsInGroup(groupId) {
@@ -442,6 +464,15 @@ function rebindCalculatorEventListeners(calcContainer) {
         // 마우스를 올리거나, 키보드로 포커스했을 때 툴팁을 업데이트
         input.addEventListener('mouseover', updateTooltip);
         input.addEventListener('focus', updateTooltip);
+    });
+
+    // ▼▼▼ [신규] 상품가 입력란에 더블클릭 복사 기능 추가 ▼▼▼
+    calcContainer.querySelectorAll('.sales-price').forEach(input => {
+        input.addEventListener('dblclick', (event) => {
+            // 수식이 입력된 경우 계산된 값을 복사합니다.
+            const calculatedValue = evaluateMath(event.target.value).toString();
+            copyToClipboard(calculatedValue, '상품가');
+        });
     });
     // ▲▲▲ 신규 기능 추가 끝 ▲▲▲
 
