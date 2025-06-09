@@ -92,7 +92,7 @@ function addNewGroup(dataToRestore = null) {
             id: groupId,
             calculators: [], 
             flightSchedule: [], priceInfo: [],
-            inclusionText: '* 유류할증료\n* 각종 TAX\n* 1억원 여행자보험',
+            inclusionText: '● 왕복 항공권\n● \n└ 조식포함\n└ 스탠다드 더블\n└ 2025-10-01(수) ~ 2025-10-05(일) (4박)\n* 1억원 여행자보험',
             exclusionText: '● 개인경비\n● 식사 시 음료 및 주류\n● 매너팁'
         };
     }
@@ -212,6 +212,8 @@ function createCalculatorInstance(wrapper, groupId, calcData) {
     buildCalculatorDOM(instanceContainer);
     if (calcData) {
         restoreCalculatorState(instanceContainer, calcData);
+    } else {
+        addPersonTypeColumn(instanceContainer, '성인', 1);
     }
 }
 function saveAllCalculatorsInGroup(groupId) {
@@ -242,7 +244,6 @@ function restoreCalculatorState(instanceContainer, calcData) {
     calculateAll(instanceContainer);
 }
 
-// ▼▼▼ [수정됨] rebindCalculatorEventListeners 함수, 이벤트 바인딩 방식 개선 ▼▼▼
 function rebindCalculatorEventListeners(calcContainer) {
     const calcAll = () => calculateAll(calcContainer);
     // data-bound 속성을 사용하여 이벤트 중복 바인딩 방지
@@ -284,7 +285,7 @@ function rebindCalculatorEventListeners(calcContainer) {
 
     updateSummaryRow(calcContainer);
 }
-// ▼▼▼ [수정됨] buildCalculatorDOM 함수, 버튼 이벤트 리스너 직접 할당 ▼▼▼
+
 function buildCalculatorDOM(calcContainer) {
     const content = document.createElement('div');
     content.innerHTML = `<div class="split-container"><div class="pnr-pane"><label class="label-text font-semibold mb-2">PNR 정보</label><textarea class="w-full flex-grow px-3 py-2 border border-gray-300 rounded-md shadow-sm resize-none" placeholder="PNR 정보를 여기에 붙여넣으세요."></textarea></div><div class="resizer-handle"></div><div class="quote-pane"><div class="table-container"><table class="quote-table"><thead><tr class="header-row"><th><button type="button" class="btn btn-sm btn-primary add-person-type-btn"><i class="fas fa-plus"></i> 항목 추가</button></th></tr><tr class="count-row"><th></th></tr></thead><tbody></tbody><tfoot></tfoot></table></div></div></div>`;
@@ -292,10 +293,13 @@ function buildCalculatorDOM(calcContainer) {
     const calculatorElement = content.firstElementChild;
     calcContainer.appendChild(calculatorElement);
     
-    initializeSplitView(calculatorElement.querySelector('.split-container'));
+    // ▼▼▼ [삭제] 기존의 불안정한 크기 조절 초기화 함수 호출을 제거합니다. ▼▼▼
+    // initializeSplitView(calculatorElement); 
+    // ▲▲▲ [삭제] 기존의 불안정한 크기 조절 초기화 함수 호출을 제거합니다. ▲▲▲
 
     // 버튼에 이벤트 리스너를 여기서 직접 할당
-    calculatorElement.querySelector('.add-person-type-btn').addEventListener('click', () => addPersonTypeColumn(calcContainer, '아동', 1));
+    const instanceSpecificCalcContainer = calcContainer.querySelector('.calculator-instance') || calcContainer;
+    calculatorElement.querySelector('.add-person-type-btn').addEventListener('click', () => addPersonTypeColumn(instanceSpecificCalcContainer, '아동', 1));
     
     const tbody = calculatorElement.querySelector('tbody');
     ROW_DEFINITIONS.forEach(def => {
@@ -304,7 +308,7 @@ function buildCalculatorDOM(calcContainer) {
         const labelCell = row.insertCell(0);
         if (def.type === 'button') {
             labelCell.innerHTML = `<button type="button" class="btn btn-sm btn-outline add-dynamic-row-btn">${def.label}</button>`;
-            labelCell.querySelector('.add-dynamic-row-btn').addEventListener('click', () => addDynamicCostRow(calcContainer));
+            labelCell.querySelector('.add-dynamic-row-btn').addEventListener('click', () => addDynamicCostRow(instanceSpecificCalcContainer));
         } else {
             labelCell.innerHTML = `<span>${def.label}</span>`;
         }
@@ -330,9 +334,32 @@ function updateSummaryRow(calcContainer) {
 }
 function calculateAll(calcContainer){if(!calcContainer)return;const table=calcContainer.querySelector('.quote-table');if(!table)return;const headerRow=table.querySelector('.header-row');if(!headerRow)return;const numCols=headerRow.cells.length;let grandTotalSales=0,grandTotalProfit=0;for(let i=1;i<numCols;i++){const countCell=table.querySelector(`.count-row th:nth-child(${i+1})`);if(!countCell)continue;const count=parseInt(countCell.textContent.replace(/,/g,''),10)||0;let netCost=0;table.querySelectorAll(`tbody tr td:nth-child(${i+1}) .cost-item`).forEach(input=>{netCost+=evaluateMath(input.value);});const salesPriceInput=table.querySelector(`tbody tr td:nth-child(${i+1}) .sales-price`);const salesPrice=salesPriceInput?evaluateMath(salesPriceInput.value):0;const profitPerPerson=salesPrice-netCost;const profitMargin=salesPrice>0?(profitPerPerson/salesPrice):0;updateCalculatedCell(table,i,'netCost',formatCurrency(netCost));updateCalculatedCell(table,i,'profitPerPerson',formatCurrency(profitPerPerson));updateCalculatedCell(table,i,'profitMargin',formatPercentage(profitMargin));grandTotalSales+=salesPrice*count;grandTotalProfit+=profitPerPerson*count;}const grandTotalProfitMargin=grandTotalSales>0?(grandTotalProfit/grandTotalSales):0;const summarySection=calcContainer.querySelector('.totals-summary-section');if(!summarySection)return;summarySection.querySelector('.totalSalesPrice').textContent=formatCurrency(grandTotalSales);summarySection.querySelector('.totalProfit').textContent=formatCurrency(grandTotalProfit);summarySection.querySelector('.totalProfitMargin').textContent=formatPercentage(grandTotalProfitMargin);}
 function updateCalculatedCell(table,colIndex,rowId,value){const row=table.querySelector(`tbody tr[data-row-id="${rowId}"]`);if(row&&row.cells[colIndex]){const div=row.cells[colIndex].querySelector('div');if(div)div.textContent=value;}}
-function getCellContent(rowId,colIndex,type){const name=`group[${colIndex}][${rowId}]`;switch(type){case'costInput':return`<input type="text" class="input-field-sm cost-item" name="${name}" value="0" placeholder="0">`;case'salesInput':return`<input type="text" class="input-field-sm sales-price" name="${name}" value="0" placeholder="0">`;case'calculated':return`<div class="calculated-field" data-row-id="${rowId}">0 원</div>`;case'calculatedPercentage':return`<div class="calculated-field" data-row-id="${rowId}">0.00 %</div>`;default:return'';}}
-function makeEditable(element,inputType,onBlurCallback){if(!element||element.querySelector('input'))return;const clickHandler=()=>{if(element.style.display==='none')return;const currentText=element.textContent;const input=document.createElement('input');input.type=inputType;input.value=inputType==='number'?parseInt(currentText.replace(/,/g,''),10)||0:currentText;input.className='person-type-input';element.style.display='none';element.parentNode.insertBefore(input,element.nextSibling);input.focus();const finishEditing=()=>{element.textContent=input.value;element.style.display='';if(input.parentNode)input.parentNode.removeChild(input);if(onBlurCallback)onBlurCallback();};input.addEventListener('blur',finishEditing);input.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key==='Escape')e.target.blur();});};element.addEventListener('click',clickHandler);}
-function initializeSplitView(calcContainer){if(!calcContainer)return;const pnrPane=calcContainer.querySelector('.pnr-pane');const resizer=calcContainer.querySelector('.resizer-handle');if(!pnrPane||!resizer)return;resizer.addEventListener('mousedown',(e)=>{e.preventDefault();document.body.style.cursor='col-resize';const doDrag=(dragEvent)=>{const rect=calcContainer.getBoundingClientRect();let newWidth=dragEvent.clientX-rect.left;if(newWidth<150)newWidth=150;if(newWidth>rect.width-350)newWidth=rect.width-350;pnrPane.style.width=newWidth+'px';};const stopDrag=()=>{document.removeEventListener('mousemove',doDrag);document.removeEventListener('mouseup',stopDrag);document.body.style.cursor='default';};document.addEventListener('mousemove',doDrag);document.addEventListener('mouseup',stopDrag);});}
+function getCellContent(rowId, colIndex, type) {
+    const name = `group[${colIndex}][${rowId}]`;
+    switch (type) {
+        case 'costInput':
+            // 보험료 행일 경우 기본값을 '5000'으로 설정
+            if (rowId === 'insurance') {
+                return `<input type="text" class="input-field-sm cost-item" name="${name}" value="5000" placeholder="0">`;
+            } else {
+                return `<input type="text" class="input-field-sm cost-item" name="${name}" value="" placeholder="0">`;
+            }
+        case 'salesInput':
+            return `<input type="text" class="input-field-sm sales-price" name="${name}" value="0" placeholder="0">`;
+        case 'calculated':
+            return `<div class="calculated-field" data-row-id="${rowId}">0 원</div>`;
+        case 'calculatedPercentage':
+            return `<div class="calculated-field" data-row-id="${rowId}">0.00 %</div>`;
+        default:
+            return '';
+    }
+}
+function makeEditable(element,inputType,onBlurCallback){if(!element||element.querySelector('input'))return;const clickHandler=()=>{if(element.style.display==='none')return;const currentText=element.textContent;const input=document.createElement('input');input.type=inputType;input.value=inputType==='number'?parseInt(currentText.replace(/,/g,''),10)||0:currentText;input.className='person-type-input';element.style.display='none';element.parentNode.insertBefore(input,element.nextSibling);input.focus();input.select();const finishEditing=()=>{element.textContent=input.value;element.style.display='';if(input.parentNode)input.parentNode.removeChild(input);if(onBlurCallback)onBlurCallback();};input.addEventListener('blur',finishEditing);input.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key==='Escape')e.target.blur();});};element.addEventListener('click',clickHandler);}
+
+// ▼▼▼ [삭제] 기존의 initializeSplitView 함수를 완전히 제거합니다. ▼▼▼
+// function initializeSplitView(calcContainer){ ... }
+// ▲▲▲ [삭제] 기존의 initializeSplitView 함수를 완전히 제거합니다. ▲▲▲
+
 function setupColumnEventListeners(calcContainer,colIndex,headerCell,countCell){if(!headerCell||!countCell)return;const calcAllForGroup=()=>calculateAll(calcContainer);makeEditable(headerCell.querySelector('.person-type-name-span'),'text',calcAllForGroup);makeEditable(countCell.querySelector('.person-count-span'),'number',calcAllForGroup);const removeBtn=headerCell.querySelector('.remove-col-btn');if(removeBtn){removeBtn.addEventListener('click',()=>{if(!confirm(`'${headerCell.textContent.trim()}' 항목을 삭제하시겠습니까?`))return;calcContainer.querySelectorAll('.quote-table tr').forEach(row=>{if(row.cells.length>colIndex)row.deleteCell(colIndex);});updateSummaryRow(calcContainer);calcAllForGroup();});}calcContainer.querySelectorAll('tbody tr').forEach(tr=>{const cell=tr.cells[colIndex];if(cell){const input=cell.querySelector('input');if(input)input.addEventListener('input',calcAllForGroup);}});}
 function addPersonTypeColumn(calcContainer,typeName='성인',count=1){const table=calcContainer.querySelector('.quote-table');if(!table)return;const headerRow=table.querySelector('thead .header-row');const colIndex=headerRow.cells.length;const headerCell=document.createElement('th');headerCell.innerHTML=`<div class="relative"><span class="person-type-name-span">${typeName}</span><button type="button" class="remove-col-btn" title="이 항목 삭제"><i class="fas fa-times"></i></button></div>`;headerRow.appendChild(headerCell);const countCell=document.createElement('th');countCell.innerHTML=`<span class="person-count-span">${count}</span>`;table.querySelector('thead .count-row').appendChild(countCell);table.querySelectorAll('tbody tr').forEach(tr=>{const rowId=tr.dataset.rowId;const rowDef=ROW_DEFINITIONS.find(r=>r.id===rowId)||{type:'costInput'};tr.insertCell(-1).innerHTML=getCellContent(rowId,colIndex,rowDef.type);});setupColumnEventListeners(calcContainer,colIndex,headerCell,countCell);updateSummaryRow(calcContainer);calculateAll(calcContainer);}
 function addDynamicCostRow(calcContainer,label='신규 항목'){const table=calcContainer.querySelector('.quote-table');if(!table)return;const tbody=table.querySelector('tbody');const numCols=table.querySelector('thead .header-row').cells.length;const rowId=`dynamic_${Date.now()}`;const buttonRow=tbody.querySelector('tr[data-row-id="addDynamicRow"]');if(!buttonRow)return;const insertionIndex=Array.from(tbody.rows).indexOf(buttonRow);const newRow=tbody.insertRow(insertionIndex);newRow.dataset.rowId=rowId;newRow.insertCell(0).innerHTML=`<div class="flex items-center"><button type="button" class="dynamic-row-delete-btn"><i class="fas fa-trash-alt"></i></button><span class="dynamic-row-label-span ml-2">${label}</span></div>`;for(let i=1;i<numCols;i++){newRow.insertCell(i).innerHTML=getCellContent(rowId,i,'costInput');}const calcAllForGroup=()=>calculateAll(calcContainer);newRow.querySelectorAll('.cost-item').forEach(input=>input.addEventListener('input',calcAllForGroup));makeEditable(newRow.querySelector('.dynamic-row-label-span'),'text',calcAllForGroup);newRow.querySelector('.dynamic-row-delete-btn').addEventListener('click',()=>{if(confirm(`'${newRow.querySelector('.dynamic-row-label-span').textContent}' 항목을 삭제하시겠습니까?`)){newRow.remove();calcAllForGroup();}});calcAllForGroup();}
@@ -387,4 +414,48 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('saveAsBtn').addEventListener('click', saveToFile);
     document.getElementById('loadFile').addEventListener('change', (e) => { if (e.target.files.length > 0) { loadFromFile(e.target.files[0]); } });
     document.getElementById('quoteForm').addEventListener('reset', (e) => { e.preventDefault(); if (confirm("작성중인 모든 내용을 삭제하고 새로 시작하시겠습니까?")) { window.location.reload(); } });
+
+    // ▼▼▼ [신규] 이벤트 위임 방식으로 창 크기 조절 기능 구현 ▼▼▼
+    let isResizing = false;
+    let pnrPaneToResize = null;
+    let splitContainerToResize = null;
+
+    document.addEventListener('mousedown', (e) => {
+        // 크기 조절 핸들을 클릭했을 때만 동작
+        if (e.target.matches('.resizer-handle')) {
+            isResizing = true;
+            // 현재 핸들이 속한 가장 가까운 split-container를 찾음
+            splitContainerToResize = e.target.closest('.split-container');
+            if (!splitContainerToResize) return;
+
+            pnrPaneToResize = splitContainerToResize.querySelector('.pnr-pane');
+            if (!pnrPaneToResize) return;
+
+            e.preventDefault(); // 텍스트 선택 등 기본 동작 방지
+            document.body.style.cursor = 'col-resize'; // 커서 모양 변경
+        }
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (!isResizing) return;
+
+        const rect = splitContainerToResize.getBoundingClientRect();
+        let newWidth = e.clientX - rect.left;
+
+        // 최소/최대 너비 제한
+        if (newWidth < 150) newWidth = 150;
+        if (newWidth > rect.width - 350) newWidth = rect.width - 350;
+        
+        pnrPaneToResize.style.width = newWidth + 'px';
+    });
+
+    document.addEventListener('mouseup', () => {
+        if (isResizing) {
+            isResizing = false;
+            pnrPaneToResize = null;
+            splitContainerToResize = null;
+            document.body.style.cursor = 'default'; // 커서 모양 복원
+        }
+    });
+    // ▲▲▲ [신규] 이벤트 위임 방식으로 창 크기 조절 기능 구현 ▲▲▲
 });
