@@ -378,7 +378,7 @@ document.addEventListener('DOMContentLoaded', () => {
     
     const addCustomerBtn = document.getElementById('addCustomerBtn');
     if(addCustomerBtn) { addCustomerBtn.addEventListener('click', () => createCustomerCard()); }
-    createCustomerCard({ name: '홍길동', phone: '010-1234-5678', email: 'hong@example.com' });
+    createCustomerCard({ name: '', phone: '', email: '' });
     
     document.getElementById('newGroupBtn').addEventListener('click', () => addNewGroup());
     document.getElementById('copyGroupBtn').addEventListener('click', copyActiveGroup);
