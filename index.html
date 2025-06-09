@@ -8,6 +8,9 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link rel="stylesheet" href="style.css">
     <script id="restored-data" type="application/json"></script>
+    <!-- [추가] PWA 관련 메타 및 manifest -->
+    <meta name="theme-color" content="#4f46e5"/>
+    <link rel="manifest" href="manifest.json">
 </head>
 <body class="bg-gray-50 p-4 sm:p-6 md:p-8">
     <div class="max-w-full mx-auto bg-white p-6 sm:p-8 rounded-lg shadow-xl">
@@ -25,7 +28,7 @@
             <div class="flex gap-6 mb-8">
                 <section class="w-1/2 p-6 border border-gray-200 rounded-lg">
                     <div class="flex justify-between items-center mb-4">
-                        <h2 class="text-xl font-semibold text-gray-800">고객 정보</h2>
+                        <h2 class="text-xl font-semibold text-gray-800">1. 고객 정보</h2>
                         <button type="button" id="addCustomerBtn" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium">
                             <i class="fas fa-plus-circle mr-1"></i>고객 추가
                         </button>
@@ -71,6 +74,18 @@
             </section>
         </form>
     </div>
+    <!-- [추가] 서비스워커 등록 스크립트 -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/service-worker.js').then((reg) => {
+                    console.log('서비스 워커가 등록되었습니다.', reg);
+                }).catch((err) => {
+                    console.error('서비스 워커 등록 실패:', err);
+                });
+            });
+        }
+    </script>
     <script src="script.js"></script>
 </body>
 </html>
