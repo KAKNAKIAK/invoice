@@ -148,7 +148,7 @@ async function saveFile(isSaveAs = false, clickedButton = null) {
             alert('변경사항이 성공적으로 저장되었습니다.');
         }
     } catch (err) {
-        if (err.name !== 'AbortError') { console.error('파일 저장 실패:', err); alert('파일 저장에 실패했습니다.'); if (!isSaveAs) currentFileHandle = null; }
+        if (err.name !== 'AbortError') { console.error('파일 저장 실패:', err); alert('파일 저장에 실패했습니다.'); }
     } finally {
         saveBtn.disabled = false;
         saveAsBtn.disabled = false;
@@ -733,4 +733,38 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('mousedown', (e) => { if (e.target.matches('.resizer-handle')) { isResizing = true; splitContainerToResize = e.target.closest('.split-container'); if (!splitContainerToResize) return; pnrPaneToResize = splitContainerToResize.querySelector('.pnr-pane'); if (!pnrPaneToResize) return; e.preventDefault(); document.body.style.cursor = 'col-resize'; } });
     document.addEventListener('mousemove', (e) => { if (!isResizing) return; const rect = splitContainerToResize.getBoundingClientRect(); let newWidth = e.clientX - rect.left; if (newWidth < 150) newWidth = 150; if (newWidth > rect.width - 350) newWidth = rect.width - 350; pnrPaneToResize.style.width = newWidth + 'px'; });
     document.addEventListener('mouseup', () => { if (isResizing) { isResizing = false; pnrPaneToResize = null; splitContainerToResize = null; document.body.style.cursor = 'default'; } });
+
+    // --- [신규] 단축키 기능 추가 ---
+    document.addEventListener('keydown', (event) => {
+        // 다른 입력창에 타이핑하는 것을 방해하지 않기 위해,
+        // 특정 요소(INPUT, TEXTAREA)에 포커스가 있을 때는 단축키가 동작하지 않도록 함
+        if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') {
+            return;
+        }
+
+        // Shift 키가 눌렸을 때만 동작
+        if (event.shiftKey) {
+            switch (event.code) {
+                // Shift + S: 저장
+                case 'KeyS':
+                    event.preventDefault(); // 브라우저 기본 저장 동작 방지
+                    document.getElementById('saveBtn').click();
+                    break;
+
+                // Shift + W: 다른 이름으로 저장
+                case 'KeyW':
+                    event.preventDefault();
+                    document.getElementById('saveAsBtn').click();
+                    break;
+                
+                // Shift + F: 불러오기
+                case 'KeyF':
+                    event.preventDefault();
+                    document.querySelector('label[for="loadFile"]').click();
+                    break;
+            }
+        }
+    });
+    // ▲▲▲ 여기까지 추가 ▲▲▲
+
 });
