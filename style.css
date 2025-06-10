@@ -162,3 +162,12 @@ body {
 #recentFilesList li .file-date {
     @apply text-xs text-gray-500 block;
 }
+
+/* style.css 파일 하단에 추가 */
+.summary-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.25rem 0.5rem;
+    background-color: #f9fafb;
+    border-radius: 4px;
+}
