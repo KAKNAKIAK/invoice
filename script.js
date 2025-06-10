@@ -18,6 +18,20 @@ const ROW_DEFINITIONS = [
     { id: 'profitPerPerson', label: '1인수익', type: 'calculated' }, { id: 'profitMargin', label: '1인수익률', type: 'calculatedPercentage' }
 ];
 
+// [신규] Firebase 연동 관련 변수 및 초기화
+const firebaseConfig = {
+    apiKey: "AIzaSyC7eXBtNczq0ylN5UZNyZaMUH3M-6Gicvc",
+    authDomain: "memo-1-e9ee8.firebaseapp.com",
+    projectId: "memo-1-e9ee8",
+    storageBucket: "memo-1-e9ee8.appspot.com",
+    messagingSenderId: "787316238134",
+    appId: "1:787316238134:web:20b136703e76ff3de67597",
+    measurementId: "G-WGB4VSG0MP"
+};
+const fbApp = firebase.initializeApp(firebaseConfig, 'memoApp');
+const db = firebase.firestore(fbApp);
+const serverTimestamp = firebase.firestore.FieldValue.serverTimestamp();
+
 // =======================================================================
 // 2. GDS 파서 연동 함수
 // =======================================================================
@@ -372,9 +386,13 @@ function addNewGroup() {
     quoteGroupsData[groupId] = {
         id: groupId,
         calculators: [{ id: `calc_${Date.now()}`, pnr: '', tableHTML: null }],
-        flightSchedule: [], priceInfo: [],
+        flightSchedule: [],
+        priceInfo: [],
         inclusionText: '● 왕복 항공권\n● 호텔\n└ 조식포함\n└ 스탠다드 더블\n└ 2025-10-01(수) ~ 2025-10-05(일) (4박)\n* 1억원 여행자보험',
-        exclusionText: '● 개인경비\n● 식사 시 음료 및 주류\n● 매너팁'
+        exclusionText: '● 개인경비\n● 식사 시 음료 및 주류\n● 매너팁',
+        // [신규] 포함/불포함 DB 연동 상태 추가
+        inclusionExclusionDocId: null,
+        inclusionExclusionDocName: '새로운 포함/불포함 내역'
     };
     createGroupUI(groupId);
     switchTab(groupId);
@@ -439,8 +457,7 @@ function createGroupUI(groupId) {
 }
 
 function initializeGroup(groupEl, groupId) {
-    // [수정] iframe 태그에 allow="clipboard-write" 속성을 추가합니다.
-    // [수정] 포함/불포함 섹션에서 복사 버튼 삭제
+    // [수정] 포함/불포함 섹션에 DB 불러오기 및 개별 복사 버튼 추가
     groupEl.innerHTML = `<div class="flex gap-6"> 
         <div class="w-1/2 flex flex-col"> 
             <div id="calculators-wrapper-${groupId}" class="space-y-4"></div> 
@@ -449,9 +466,37 @@ function initializeGroup(groupEl, groupId) {
         <div class="w-1/2 space-y-6 right-panel-container"> 
             <section class="p-6 border border-gray-200 rounded-lg bg-gray-50"><div class="flex justify-between items-center mb-4"><h2 class="text-xl font-semibold text-gray-800">항공 스케줄</h2><div class="flex items-center space-x-2"><button type="button" class="btn btn-sm btn-secondary copy-flight-schedule-btn" title="항공 스케줄 HTML 복사"><i class="fas fa-clipboard"></i> 복사</button><button type="button" class="btn btn-sm btn-secondary parse-gds-btn">GDS 파싱</button><button type="button" class="btn btn-sm btn-secondary add-flight-subgroup-btn"><i class="fas fa-plus mr-1"></i> 스케줄 추가</button></div></div><div class="space-y-4 flight-schedule-container"></div></section> 
             <section class="p-6 border border-gray-200 rounded-lg bg-gray-50"><div class="flex justify-between items-center mb-4"><h2 class="text-xl font-semibold text-gray-800">요금 안내</h2><div class="flex items-center space-x-2"><button type="button" class="btn btn-sm btn-secondary copy-price-info-btn" title="요금 안내 HTML 복사"><i class="fas fa-clipboard"></i> 복사</button><button type="button" class="btn btn-sm btn-secondary add-price-subgroup-btn"><i class="fas fa-plus mr-1"></i> 요금 그룹 추가</button></div></div><div class="space-y-4 price-info-container"></div></section> 
-            <section class="p-6 border border-gray-200 rounded-lg bg-gray-50"><div class="flex justify-between items-center mb-4"><h2 class="text-xl font-semibold text-gray-800">포함/불포함 사항</h2></div><div class="flex gap-4"><div class="w-1/2 flex flex-col"><h3 class="font-medium mb-1">포함</h3><textarea class="input-field flex-grow inclusion-text" rows="5"></textarea></div><div class="w-1/2 flex flex-col"><h3 class="font-medium mb-1">불포함</h3><textarea class="input-field flex-grow exclusion-text" rows="5"></textarea></div></div></section> 
-            <section class="p-6 border border-gray-200 rounded-lg bg-gray-50"><h2 class="text-xl font-semibold text-gray-800 mb-4">호텔카드 메이커</h2><iframe src="https://kaknakiak.github.io/invoice/hotel_maker/index.html" style="width: 100%; height: 480px; border: 1px solid #ccc; border-radius: 0.25rem;" allow="clipboard-write"></iframe></section> 
-            <section class="p-6 border border-gray-200 rounded-lg bg-gray-50"><h2 class="text-xl font-semibold text-gray-800 mb-4">상세 일정표</h2><iframe src="https://kaknakiak.github.io/invoice/itinerary_planner/index.html" style="width: 100%; height: 800px; border: 1px solid #ccc; border-radius: 0.25rem;" allow="clipboard-write"></iframe></section> 
+            
+            <section class="p-6 border border-gray-200 rounded-lg bg-gray-50">
+                <div class="flex justify-between items-center mb-4">
+                    <div class="flex items-center">
+                        <h2 class="text-xl font-semibold text-gray-800">포함/불포함 사항</h2>
+                        <span class="text-sm text-gray-500 ml-2 inclusion-exclusion-doc-name-display"></span>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <button type="button" class="btn btn-sm btn-outline load-inclusion-exclusion-db-btn"><i class="fas fa-database mr-1"></i> DB 불러오기</button>
+                    </div>
+                </div>
+                <div class="flex gap-4">
+                    <div class="w-1/2 flex flex-col">
+                        <div class="flex items-center mb-1">
+                            <h3 class="font-medium">포함</h3>
+                            <button type="button" class="ml-2 copy-inclusion-btn inline-copy-btn" title="포함 내역 복사"><i class="far fa-copy"></i></button>
+                        </div>
+                        <textarea class="input-field flex-grow inclusion-text" rows="5"></textarea>
+                    </div>
+                    <div class="w-1/2 flex flex-col">
+                        <div class="flex items-center mb-1">
+                            <h3 class="font-medium">불포함</h3>
+                            <button type="button" class="ml-2 copy-exclusion-btn inline-copy-btn" title="불포함 내역 복사"><i class="far fa-copy"></i></button>
+                        </div>
+                        <textarea class="input-field flex-grow exclusion-text" rows="5"></textarea>
+                    </div>
+                </div>
+            </section> 
+            
+            <section class="p-6 border border-gray-200 rounded-lg bg-gray-50"><h2 class="text-xl font-semibold text-gray-800 mb-4">호텔카드 메이커</h2><iframe src="./hotel_maker/index.html" style="width: 100%; height: 480px; border: 1px solid #ccc; border-radius: 0.25rem;" allow="clipboard-write"></iframe></section> 
+            <section class="p-6 border border-gray-200 rounded-lg bg-gray-50"><h2 class="text-xl font-semibold text-gray-800 mb-4">상세 일정표</h2><iframe src="./itinerary_planner/index.html" style="width: 100%; height: 800px; border: 1px solid #ccc; border-radius: 0.25rem;" allow="clipboard-write"></iframe></section> 
         </div> 
     </div>`;
 
@@ -484,8 +529,23 @@ function initializeGroup(groupEl, groupId) {
     if (inclusionTextEl) inclusionTextEl.value = groupData.inclusionText || '';
     if (exclusionTextEl) exclusionTextEl.value = groupData.exclusionText || '';
     
+    groupEl.querySelector('.inclusion-exclusion-doc-name-display').textContent = `(${groupData.inclusionExclusionDocName || '새 내역'})`;
+    
     inclusionTextEl.addEventListener('input', e => { groupData.inclusionText = e.target.value; });
     exclusionTextEl.addEventListener('input', e => { groupData.exclusionText = e.target.value; });
+    
+    // [신규] 개별 복사 버튼 이벤트 리스너
+    groupEl.querySelector('.copy-inclusion-btn').addEventListener('click', () => {
+        copyToClipboard(inclusionTextEl.value, '포함 내역');
+    });
+    groupEl.querySelector('.copy-exclusion-btn').addEventListener('click', () => {
+        copyToClipboard(exclusionTextEl.value, '불포함 내역');
+    });
+
+    // [신규] DB 불러오기 버튼 이벤트 리스너
+    groupEl.querySelector('.load-inclusion-exclusion-db-btn').addEventListener('click', () => {
+        openLoadInclusionsModal();
+    });
 
     groupEl.querySelector('.parse-gds-btn').addEventListener('click', () => { window.open('./gds_parser/gds_parser.html', 'GDS_Parser', `width=800,height=500,top=${(screen.height / 2) - 250},left=${(screen.width / 2) - 400}`); });
     
@@ -1098,3 +1158,93 @@ document.addEventListener('DOMContentLoaded', () => {
     // ▲▲▲ 여기까지 수정 ▲▲▲
 
 });
+
+// [신규] 포함/불포함 DB 연동 함수들
+async function loadAllInclusionDataSets() {
+    const dataSets = [];
+    try {
+        const q = db.collection("inclusionsExclusions").orderBy("timestamp", "desc");
+        const querySnapshot = await q.get();
+        querySnapshot.forEach((doc) => {
+            dataSets.push({ id: doc.id, ...doc.data() });
+        });
+        return dataSets;
+    } catch (error) {
+        console.error("목록 불러오기 오류:", error);
+        showToastMessage("목록을 불러오는 중 오류가 발생했습니다.", true);
+        return [];
+    }
+}
+
+// [신규] 필터링된 포함/불포함 목록을 렌더링하는 함수
+function renderFilteredInclusionsList(fullList, searchTerm) {
+    const listEl = document.getElementById('inclusionsList');
+    if (!listEl) return;
+
+    listEl.innerHTML = '';
+    const lowerCaseSearchTerm = searchTerm.toLowerCase();
+
+    const filteredList = fullList.filter(item =>
+        item.name.toLowerCase().includes(lowerCaseSearchTerm)
+    );
+
+    if (filteredList.length > 0) {
+        filteredList.forEach(item => {
+            const li = document.createElement('li');
+            li.className = 'p-3 hover:bg-gray-100 cursor-pointer text-sm';
+            li.textContent = item.name;
+            li.addEventListener('click', () => {
+                applyInclusionData(item);
+                document.getElementById('loadInclusionsModal').classList.add('hidden');
+            });
+            listEl.appendChild(li);
+        });
+    } else {
+        listEl.innerHTML = '<li class="p-3 text-gray-500 text-sm text-center">검색 결과가 없습니다.</li>';
+    }
+}
+
+async function openLoadInclusionsModal() {
+    if (!activeGroupId) {
+        showToastMessage("견적 그룹을 먼저 선택해주세요.", true);
+        return;
+    }
+    const modal = document.getElementById('loadInclusionsModal');
+    const listEl = document.getElementById('inclusionsList');
+    const loadingMsg = document.getElementById('loadingInclusionsMsg');
+    const searchInput = document.getElementById('inclusionsSearchInput'); // [수정] 검색창 요소 가져오기
+
+    searchInput.value = ''; // [수정] 모달 열 때 검색창 초기화
+    modal.classList.remove('hidden');
+    listEl.innerHTML = '';
+    loadingMsg.style.display = 'block';
+
+    const allSets = await loadAllInclusionDataSets();
+    loadingMsg.style.display = 'none';
+
+    renderFilteredInclusionsList(allSets, ''); // [수정] 초기 전체 목록 렌더링
+
+    // [수정] 검색창에 입력할 때마다 필터링된 목록을 다시 렌더링하도록 이벤트 핸들러 설정
+    searchInput.oninput = () => {
+        renderFilteredInclusionsList(allSets, searchInput.value);
+    };
+}
+
+function applyInclusionData(item) {
+    if (!activeGroupId) return;
+    
+    const groupData = quoteGroupsData[activeGroupId];
+    const groupEl = document.getElementById(`group-content-${activeGroupId}`);
+    if (!groupData || !groupEl) return;
+
+    groupData.inclusionText = item.inclusions || '';
+    groupData.exclusionText = item.exclusions || '';
+    groupData.inclusionExclusionDocId = item.id;
+    groupData.inclusionExclusionDocName = item.name;
+
+    groupEl.querySelector('.inclusion-text').value = groupData.inclusionText;
+    groupEl.querySelector('.exclusion-text').value = groupData.exclusionText;
+    groupEl.querySelector('.inclusion-exclusion-doc-name-display').textContent = `(${item.name})`;
+
+    showToastMessage(`'${item.name}' 내역을 적용했습니다.`);
+}
