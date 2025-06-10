@@ -1,145 +1,9 @@
-Skip to content
-Navigation Menu
-KAKNAKIAK
-invoice
-
-Type / to search
-Code
-Issues
-Pull requests
-Actions
-Projects
-Wiki
-Security
-2
-Insights
-Settings
-invoice
-/
-index.html
-in
-main
-
-Edit
-
-Preview
-Indent mode
-
-Spaces
-Indent size
-
-4
-Line wrap mode
-
-No wrap
-Editing index.html file contents
-1
-2
-3
-4
-5
-6
-7
-8
-9
-10
-11
-12
-13
-14
-15
-16
-17
-18
-19
-20
-21
-22
-23
-24
-25
-26
-27
-28
-29
-30
-31
-32
-33
-34
-35
-36
-37
-38
-39
-40
-41
-42
-43
-44
-45
-46
-47
-48
-49
-50
-51
-52
-53
-54
-55
-56
-57
-58
-59
-60
-61
-62
-63
-64
-65
-66
-67
-68
-69
-70
-71
-72
-73
-74
-75
-76
-77
-78
-79
-80
-81
-82
-83
-84
-85
-86
-87
-88
-89
-90
-91
-92
-93
-94
-95
-96
-97
-98
-99
-100
-101
 <!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>한원희연구소_견적 인보이스_0610-1</title>
+    <title>한원희연구소_견적 인보이스_최종</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link rel="stylesheet" href="style.css">
@@ -152,10 +16,10 @@ Editing index.html file contents
         <header class="mb-8 flex justify-between items-center">
             <h1 class="text-3xl font-bold text-indigo-700">2025 견적</h1>
             <div id="header-buttons" class="flex items-center space-x-2">
-                <button type="button" id="recentFilesBtn" class="btn btn-sm btn-primary"><i class="fas fa-history"></i> 최근에 사용한 항목 (Shift+R)</button>
-                <button type="button" id="openFileBtn" class="btn btn-sm btn-secondary"><i class="fas fa-folder-open"></i> 불러오기 (Shift+F)</button>
-                <button type="button" id="saveBtn" class="btn btn-sm btn-secondary"><i class="fas fa-save"></i> 저장 (Shift+S)</button>
-                <button type="button" id="saveAsBtn" class="btn btn-sm btn-secondary"><i class="fas fa-file-export"></i> 다른 이름으로 저장 (Shift+W)</button>
+                <button type="button" id="recentFilesBtn" class="btn btn-primary"><i class="fas fa-history"></i> 최근 항목 (Shift+R)</button>
+                <button type="button" id="openFileBtn" class="btn btn-secondary"><i class="fas fa-folder-open"></i> 불러오기 (Shift+F)</button>
+                <button type="button" id="saveBtn" class="btn btn-secondary"><i class="fas fa-save"></i> 저장 (Shift+S)</button>
+                <button type="button" id="saveAsBtn" class="btn btn-secondary"><i class="fas fa-file-export"></i> 다른 이름으로 저장 (Shift+W)</button>
             </div>
         </header>
         <form id="quoteForm">
@@ -170,23 +34,10 @@ Editing index.html file contents
                     <div id="customerInfoContainer" class="flex flex-wrap gap-4">
                     </div>
                 </section>
-                <div class="w-1/2 flex gap-6">
-                    <section class="w-1/2 p-6 border border-gray-200 rounded-lg flex flex-col">
-                        <h2 class="text-xl font-semibold text-gray-800 mb-4">메모</h2>
-                        <textarea id="memoText" class="input-field flex-grow" placeholder="여기에 메모를 입력하세요..."></textarea>
-                    </section>
-                    <section class="w-1/2 p-6 border border-gray-200 rounded-lg">
-                        <h2 class="text-xl font-semibold text-gray-800 mb-4">업무 보조 툴</h2>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-4">
-                            <a href="https://kaknakiak.github.io/ERPTOGDS/" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline text-base text-center">GDS 엔트리 생성기</a>
-                            <a href="https://kaknakiak.github.io/PNRTOERP/" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline text-base  text-center">PNR 네임필드추출</a>
-                            <a href="https://incomparable-meringue-d33b6b.netlify.app/" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline text-base  text-center">간편 URL 단축기</a>
-                            <a href="https://kaknakiak.github.io/hotelbooking/" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline text-base  text-center">호텔 수배서 작성기</a>
-                            <a href="https://kaknakiak.github.io/hotelinformation/" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline text-base  text-center">호텔카드 메이커</a>
-                            <a href="https://kaknakiak.github.io/tripplantest2/" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline text-base  text-center">상세일정표</a>
-                        </div>
-                    </section>
-                </div>
+                <section class="w-1/2 p-6 border border-gray-200 rounded-lg flex flex-col">
+                    <h2 class="text-xl font-semibold text-gray-800 mb-4">메모</h2>
+                    <textarea id="memoText" class="input-field flex-grow" placeholder="여기에 메모를 입력하세요..."></textarea>
+                </section>
             </div>
             <hr class="my-10 border-gray-300">
             <div class="quote-group-controls">
@@ -199,7 +50,6 @@ Editing index.html file contents
             </div>
             <div id="quoteGroupContentsContainer" class="border border-gray-300 rounded-lg rounded-tl-none p-4"></div>
             <section class="text-center space-x-4 mt-8"> 
-                <button type="submit" class="btn btn-primary">견적 저장</button>
                 <button type="reset" class="btn btn-secondary">새 견적 작성</button>
             </section>
         </form>
@@ -234,7 +84,3 @@ Editing index.html file contents
     <script src="script.js"></script>
 </body>
 </html>
-
-Use Control + Shift + m to toggle the tab key moving focus. Alternatively, use esc then tab to move to the next interactive element on the page.
-Editing invoice/index.html at main · KAKNAKIAK/invoice
- 
