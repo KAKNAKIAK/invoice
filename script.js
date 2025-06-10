@@ -716,7 +716,7 @@ function updateSummaryRow(calcContainer) {
     summaryRow.insertCell(0).innerHTML = '<div class="p-2 font-bold text-center">전체 합계</div>';
     const summaryCell = summaryRow.insertCell(1);
     summaryCell.colSpan = headerRow.cells.length - 1;
-    summaryCell.innerHTML = `<div class="totals-summary-section flex items-center justify-around p-1"><div class="text-center mx-2"><span class="text-base font-medium text-gray-600">전체상품가 </span><span class="text-lg font-bold text-indigo-700 totalSalesPrice">0 원</span></div><div class="text-center mx-2"><span class="text-base font-medium text-gray-600">전체수익 </span><span class="text-lg font-bold text-indigo-700 totalProfit">0 원</span></div><div class="text-center mx-2"><span class="text-base font-medium text-gray-600">전체수익률 </span><span class="text-lg font-bold text-indigo-700 totalProfitMargin">0.00 %</span></div></div>`;
+    summaryCell.innerHTML = `<div class="totals-summary-section flex items-center justify-around p-1"><div class="text-center mx-2"><span class="text-xs font-medium text-gray-600">전체상품가 </span><span class="text-base font-bold text-indigo-700 totalSalesPrice">0 원</span></div><div class="text-center mx-2"><span class="text-xs font-medium text-gray-600">전체수익 </span><span class="text-base font-bold text-indigo-700 totalProfit">0 원</span></div><div class="text-center mx-2"><span class="text-xs font-medium text-gray-600">전체수익률 </span><span class="text-base font-bold text-indigo-700 totalProfitMargin">0.00 %</span></div></div>`;
     summaryRow.cells[0].style.borderTop = "2px solid #a0aec0";
     summaryCell.style.borderTop = "2px solid #a0aec0";
 }
