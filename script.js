@@ -6,6 +6,10 @@ let groupCounter = 0;
 let activeGroupId = null;
 let currentFileHandle = null;
 
+// [추가] 최근 파일 목록 관리를 위한 상수
+const RECENT_FILES_STORAGE_KEY = 'recentLoadedFiles';
+const MAX_RECENT_FILES = 10; // 저장할 최대 최근 파일 개수
+
 const ROW_DEFINITIONS = [
     { id: 'airfare', label: '항공', type: 'costInput' }, { id: 'hotel', label: '호텔', type: 'costInput' },
     { id: 'ground', label: '지상', type: 'costInput' }, { id: 'insurance', label: '보험', type: 'costInput' },
@@ -19,18 +23,32 @@ const ROW_DEFINITIONS = [
 // =======================================================================
 function addFlightsFromParser(parsedFlights) {
     if (!parsedFlights || parsedFlights.length === 0) return;
-    if (!activeGroupId) { alert("파싱된 항공편을 추가할 활성 견적이 없습니다."); return; }
+    if (!activeGroupId) { showToastMessage("파싱된 항공편을 추가할 활성 견적이 없습니다.", true); return; } // [수정] alert 대신 toast
     const activeGroupData = quoteGroupsData[activeGroupId];
     const activeGroupElement = document.getElementById(`group-content-${activeGroupId}`);
     if (!activeGroupData || !activeGroupElement) return;
     const flightContainer = activeGroupElement.querySelector('.flight-schedule-container');
-    const airlineCodeMap = { "VN": "베트남항공", "ZE": "이스타항공", "KE": "대한항공", "OZ": "아시아나항공" };
+    // [수정] 항공사 코드를 맵에서 가져오도록 수정
+    const airlineCodeMap = {
+        "KE": "대한항공", "OZ": "아시아나항공", "7C": "제주항공", "LJ": "진에어", "TW": "티웨이항공", "RS": "에어서울", "BX": "에어부산", "ZE": "이스타항공",
+        "NH": "전일본공수(ANA)", "JL": "일본항공", "MM": "피치항공",
+        "CA": "중국국제항공", "MU": "중국동방항공", "CZ": "중국남방항공", "CX": "캐세이퍼시픽",
+        "CI": "중화항공", "BR": "에바항공", "SQ": "싱가포르항공", "TG": "타이항공", "VN": "베트남항공", "VJ": "비엣젯항공", "QH": "뱀부항공",
+        "PR": "필리핀항공", "MH": "말레이시아항공", "GA": "가루다인도네시아항공",
+        "EK": "에미레이트항공", "QR": "카타르항공", "EY": "에티하드항공", "SV": "사우디아항공", "TK": "터키항공",
+        "AA": "아메리칸항공", "UA": "유나이티드항공", "DL": "델타항공", "HA": "하와이안항공", "AS": "알래스카항공",
+        "AC": "에어캐나다", "AM": "아에로멕시코",
+        "AF": "에어프랑스", "KL": "KLM네덜란드항공", "BA": "영국항공", "VS": "버진애틀랜틱",
+        "LH": "루프트한자", "AZ": "알리탈리아(ITA)", "IB": "이베리아항공", "LX": "스위스국제항공", "AY": "핀에어", "SU": "아에로플로트",
+        "QF": "콴타스항공", "NZ": "에어뉴질랜드"
+    };
     const firstFlightAirlineCode = parsedFlights[0].airlineCode;
     const subgroupTitle = airlineCodeMap[firstFlightAirlineCode] || firstFlightAirlineCode;
     const newSubgroup = { id: `flight_sub_${Date.now()}`, title: subgroupTitle, rows: parsedFlights.map(flight => ({ ...flight })) };
     if (!activeGroupData.flightSchedule) activeGroupData.flightSchedule = [];
     activeGroupData.flightSchedule.push(newSubgroup);
     createFlightSubgroup(flightContainer, newSubgroup, activeGroupId);
+    showToastMessage("GDS 항공 정보가 추가되었습니다."); // [추가] 토스트 메시지
 }
 
 // =======================================================================
@@ -48,10 +66,10 @@ function createCustomerCard(initialData = { name: '', phone: '', email: '' }) {
     card.innerHTML = `<button type="button" class="absolute top-1 right-1 text-gray-400 hover:text-red-500 text-xs remove-customer-btn p-1" title="고객 삭제"><i class="fas fa-times"></i></button><div class="space-y-3 text-sm"><div class="flex items-center gap-2"><label for="customerName_${cardId}" class="font-medium text-gray-800 w-12 text-left flex-shrink-0">고객명</label><input type="text" id="customerName_${cardId}" class="input-field customer-name" data-field="name" value="${initialData.name}"></div><div class="flex items-center gap-2"><label for="customerPhone_${cardId}" class="font-medium text-gray-800 w-12 text-left flex-shrink-0">연락처</label><input type="tel" id="customerPhone_${cardId}" class="input-field customer-phone" data-field="phone" value="${initialData.phone}"></div><div class="flex items-center gap-2"><label for="customerEmail_${cardId}" class="font-medium text-gray-800 w-12 text-left flex-shrink-0">이메일</label><input type="email" id="customerEmail_${cardId}" class="input-field customer-email" data-field="email" value="${initialData.email}"></div></div>`;
     container.appendChild(card);
 
-    // [수정] 고객 정보 input에 더블클릭 복사 기능 추가
+    // [수정] 고객 정보 input에 더블클릭 복사 기능 추가 (알림 변경)
     card.querySelectorAll('input').forEach(input => {
         input.addEventListener('dblclick', (event) => {
-            const label = event.target.previousElementSibling.textContent;
+            const label = event.target.previousElementSibling ? event.target.previousElementSibling.textContent : '입력 필드';
             copyToClipboard(event.target.value, label);
         });
     });
@@ -79,21 +97,58 @@ function getCustomerData() {
 const evaluateMath = (expression) => { if (typeof expression !== 'string' || !expression) return 0; const s = expression.replace(/,/g, ''); if (!/^[0-9+\-*/().\s]+$/.test(s)) { return parseFloat(s) || 0; } try { return new Function('return ' + s)(); } catch (e) { return parseFloat(s) || 0; } };
 const formatCurrency = (amount) => new Intl.NumberFormat('ko-KR').format(Math.round(amount)) + ' 원';
 const formatPercentage = (value) => (isNaN(value) || !isFinite(value) ? 0 : value * 100).toFixed(2) + ' %';
-const copyHtmlToClipboard = (htmlString) => { if (!htmlString || htmlString.trim() === "") { alert('복사할 내용이 없습니다.'); return; } navigator.clipboard.writeText(htmlString).then(() => alert('HTML 소스 코드가 클립보드에 복사되었습니다.')).catch(err => { console.error('클립보드 복사 실패:', err); alert('복사에 실패했습니다.'); }); };
+const copyHtmlToClipboard = (htmlString) => { 
+    if (!htmlString || htmlString.trim() === "") { 
+        showToastMessage('복사할 내용이 없습니다.', true); 
+        return; 
+    } 
+    navigator.clipboard.writeText(htmlString).then(() => showToastMessage('HTML 소스 코드가 클립보드에 복사되었습니다.'))
+    .catch(err => { 
+        console.error('클립보드 복사 실패:', err); 
+        showToastMessage('복사에 실패했습니다.', true); 
+    }); 
+};
 
-// [신규] 텍스트를 클립보드에 복사하고 알림을 보여주는 함수
+// [신규] 텍스트를 클립보드에 복사하고 알림을 보여주는 함수 (토스트 메시지 사용)
 function copyToClipboard(text, fieldName = '텍스트') {
     if (!text || text.trim() === "") {
-        alert('복사할 내용이 없습니다.');
+        showToastMessage('복사할 내용이 없습니다.', true);
         return;
     }
     navigator.clipboard.writeText(text).then(() => {
-        alert(`'${text}'\n(${fieldName}) 클립보드에 복사되었습니다.`);
+        showToastMessage(`'${text}'\n(${fieldName}) 클립보드에 복사되었습니다.`);
     }).catch(err => {
         console.error('클립보드 복사 실패:', err);
-        alert('복사에 실패했습니다.');
+        showToastMessage('복사에 실패했습니다.', true);
     });
 }
+
+// [신규] 토스트 메시지 함수
+function showToastMessage(message, isError = false) {
+    const toastContainer = document.getElementById('toast-container');
+    if (!toastContainer) return;
+
+    const toast = document.createElement('div');
+    toast.className = `p-3 mb-2 rounded-md shadow-lg text-white text-sm opacity-0 transition-opacity duration-300 transform translate-y-4`;
+    toast.style.backgroundColor = isError ? '#dc2626' : '#10B981'; // Tailwind red-600, green-500
+    toast.textContent = message;
+
+    toastContainer.appendChild(toast);
+
+    // Fade in
+    setTimeout(() => {
+        toast.classList.remove('opacity-0', 'translate-y-4');
+        toast.classList.add('opacity-100', 'translate-y-0');
+    }, 10);
+
+    // Fade out and remove
+    setTimeout(() => {
+        toast.classList.remove('opacity-100', 'translate-y-0');
+        toast.classList.add('opacity-0', 'translate-y-4');
+        toast.addEventListener('transitionend', () => toast.remove(), { once: true });
+    }, 3000);
+}
+
 
 // --- 저장 및 불러오기 ---
 function saveAllCalculatorsInGroup(groupId) {
@@ -141,7 +196,7 @@ async function getSaveDataBlob() {
         return new Blob([doc.documentElement.outerHTML], { type: 'text/html' });
     } catch (error) {
         console.error("CSS 또는 JS 파일을 포함하는 중 오류 발생:", error);
-        alert("저장 준비 중 오류가 발생했습니다. 외부 파일을 읽을 수 없습니다.");
+        showToastMessage("저장 준비 중 오류가 발생했습니다. 외부 파일을 읽을 수 없습니다.", true); // [수정] alert 대신 toast
         return null;
     }
 }
@@ -157,20 +212,28 @@ async function saveFile(isSaveAs = false, clickedButton = null) {
         const blob = await getSaveDataBlob();
         if (!blob) throw new Error("Blob 생성 실패");
         if (isSaveAs || !currentFileHandle) {
-            const newHandle = await window.showSaveFilePicker({ suggestedName: `견적서_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}.html`, types: [{ description: 'HTML 파일', accept: { 'text/html': ['.html'] } }] });
+            const newHandle = await window.showSaveFilePicker({ 
+                suggestedName: `견적서_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}.html`, 
+                types: [{ description: 'HTML 파일', accept: { 'text/html': ['.html'] } }] 
+            });
             const writableStream = await newHandle.createWritable();
             await writableStream.write(blob);
             await writableStream.close();
             currentFileHandle = newHandle;
-            alert('파일이 성공적으로 저장되었습니다.');
+            showToastMessage('파일이 성공적으로 저장되었습니다.'); // [수정] alert 대신 toast
+            saveRecentFile(newHandle.name); // [추가] 최근 파일 목록에 저장
         } else {
             const writableStream = await currentFileHandle.createWritable();
             await writableStream.write(blob);
             await writableStream.close();
-            alert('변경사항이 성공적으로 저장되었습니다.');
+            showToastMessage('변경사항이 성공적으로 저장되었습니다.'); // [수정] alert 대신 toast
+            saveRecentFile(currentFileHandle.name); // [추가] 최근 파일 목록에 저장
         }
     } catch (err) {
-        if (err.name !== 'AbortError') { console.error('파일 저장 실패:', err); alert('파일 저장에 실패했습니다.'); }
+        if (err.name !== 'AbortError') { 
+            console.error('파일 저장 실패:', err); 
+            showToastMessage('파일 저장에 실패했습니다.', true); // [수정] alert 대신 toast
+        }
     } finally {
         saveBtn.disabled = false;
         saveAsBtn.disabled = false;
@@ -190,11 +253,115 @@ async function loadFile() {
         if (restoredDataScript && restoredDataScript.textContent) {
             const restoredData = JSON.parse(restoredDataScript.textContent);
             restoreState(restoredData);
-        } else { alert('유효한 데이터가 포함된 견적서 파일이 아닙니다.'); }
+            showToastMessage('파일이 성공적으로 불러와졌습니다.'); // [추가] 토스트 메시지
+            saveRecentFile(fileHandle.name); // [추가] 최근 파일 목록에 저장
+        } else { showToastMessage('유효한 데이터가 포함된 견적서 파일이 아닙니다.', true); } // [수정] alert 대신 toast
     } catch (err) {
-        if (err.name !== 'AbortError') { console.error('파일 열기 실패:', err); alert('파일을 열지 못했습니다.'); }
+        if (err.name !== 'AbortError') { 
+            console.error('파일 열기 실패:', err); 
+            showToastMessage('파일을 열지 못했습니다.', true); // [수정] alert 대신 toast
+        }
     }
 }
+
+// [신규] 최근 파일 목록 관리 함수
+function saveRecentFile(fileName) {
+    let recentFiles = getRecentFiles();
+    // 중복 제거 및 최신 순서 유지
+    recentFiles = recentFiles.filter(item => item !== fileName);
+    recentFiles.unshift(fileName); // 가장 앞에 추가
+    if (recentFiles.length > MAX_RECENT_FILES) {
+        recentFiles = recentFiles.slice(0, MAX_RECENT_FILES);
+    }
+    localStorage.setItem(RECENT_FILES_STORAGE_KEY, JSON.stringify(recentFiles));
+}
+
+function getRecentFiles() {
+    const stored = localStorage.getItem(RECENT_FILES_STORAGE_KEY);
+    return stored ? JSON.parse(stored) : [];
+}
+
+function deleteRecentFile(fileNameToDelete) {
+    let recentFiles = getRecentFiles();
+    recentFiles = recentFiles.filter(item => item !== fileNameToDelete);
+    localStorage.setItem(RECENT_FILES_STORAGE_KEY, JSON.stringify(recentFiles));
+    renderRecentFileList(); // 목록 다시 렌더링
+    showToastMessage(`'${fileNameToDelete}'이(가) 최근 파일 목록에서 삭제되었습니다.`);
+}
+
+// [신규] 최근 파일 모달 관련 DOM 요소
+let recentFilesModal, recentFileSearchInput, recentFileListUl, loadingRecentFileListMsg, cancelRecentFilesModalButton, closeRecentFilesModalButton;
+
+// [신규] 최근 파일 모달 열기
+async function openRecentFilesModal() {
+    if (!recentFilesModal || !recentFileListUl || !loadingRecentFileListMsg || !recentFileSearchInput) {
+        showToastMessage("최근 파일 불러오기 UI가 준비되지 않았습니다.", true);
+        return;
+    }
+
+    loadingRecentFileListMsg.textContent = "목록을 불러오는 중...";
+    loadingRecentFileListMsg.style.display = 'block';
+    recentFileListUl.innerHTML = '';
+    recentFileSearchInput.value = '';
+    
+    recentFilesModal.classList.remove('hidden');
+    renderRecentFileList();
+    loadingRecentFileListMsg.style.display = 'none'; // 데이터 로드 후 숨김
+
+}
+
+// [신규] 최근 파일 목록 렌더링
+function renderRecentFileList() {
+    if (!recentFileListUl || !recentFileSearchInput) return;
+
+    const searchTerm = recentFileSearchInput.value.toLowerCase();
+    recentFileListUl.innerHTML = '';
+
+    const allRecentFiles = getRecentFiles();
+    const filteredFiles = allRecentFiles.filter(fileName =>
+        fileName.toLowerCase().includes(searchTerm)
+    );
+
+    if (filteredFiles.length > 0) {
+        filteredFiles.forEach(fileName => {
+            const listItem = document.createElement('li');
+            listItem.className = 'flex justify-between items-center p-3 hover:bg-gray-50 cursor-pointer';
+
+            const titleSpan = document.createElement('span');
+            titleSpan.textContent = fileName;
+            titleSpan.className = 'text-sm font-medium text-gray-900 flex-grow';
+            titleSpan.title = `"${fileName}" 파일 다시 불러오기 (클릭)`;
+            titleSpan.addEventListener('click', async () => { 
+                showToastMessage(`'${fileName}' 파일을 다시 불러옵니다. 파일 선택 대화상자가 나타나면 해당 파일을 선택해주세요.`);
+                recentFilesModal.classList.add('hidden'); // 모달 닫기
+                await loadFile(); // 파일 선택 대화상자를 다시 띄움
+            });
+            
+            const deleteButton = document.createElement('button');
+            deleteButton.innerHTML = `<svg class="w-5 h-5 text-gray-400 hover:text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>`;
+            deleteButton.className = 'p-1 rounded-full hover:bg-red-100 ml-2';
+            deleteButton.title = `"${fileName}" 최근 파일 목록에서 삭제`;
+            deleteButton.addEventListener('click', (e) => {
+                e.stopPropagation(); // li 클릭 이벤트 방지
+                deleteRecentFile(fileName);
+            });
+
+            listItem.appendChild(titleSpan);
+            listItem.appendChild(deleteButton);
+            recentFileListUl.appendChild(listItem);
+        });
+    } else {
+        const isLoading = loadingRecentFileListMsg && loadingRecentFileListMsg.style.display !== 'none';
+        if (!isLoading) {
+             if (searchTerm && allRecentFiles.length > 0) {
+                recentFileListUl.innerHTML = `<li class="p-3 text-sm text-gray-500 text-center">"'${recentFileSearchInput.value}'" 검색 결과가 없습니다.</li>`;
+            } else if (allRecentFiles.length === 0) {
+                recentFileListUl.innerHTML = '<li class="p-3 text-sm text-gray-500 text-center">최근 로드한 파일이 없습니다.</li>';
+            }
+        }
+    }
+}
+
 
 // --- 견적 그룹 관리 ---
 function addNewGroup() {
@@ -209,10 +376,11 @@ function addNewGroup() {
     };
     createGroupUI(groupId);
     switchTab(groupId);
+    showToastMessage(`새 견적 그룹 ${groupId}이(가) 추가되었습니다.`); // [추가] 토스트 메시지
 }
 
 function deleteGroup(groupId) {
-    if (Object.keys(quoteGroupsData).length <= 1) { alert('마지막 견적 그룹은 삭제할 수 없습니다.'); return; }
+    if (Object.keys(quoteGroupsData).length <= 1) { showToastMessage('마지막 견적 그룹은 삭제할 수 없습니다.', true); return; } // [수정] alert 대신 toast
     if (confirm(`견적 ${groupId}을(를) 삭제하시겠습니까?`)) {
         document.querySelector(`.quote-tab[data-group-id="${groupId}"]`)?.remove();
         document.getElementById(`group-content-${groupId}`)?.remove();
@@ -221,6 +389,7 @@ function deleteGroup(groupId) {
             const lastTab = document.querySelector('.quote-tab:last-child');
             if (lastTab) { switchTab(lastTab.dataset.groupId); } else { activeGroupId = null; }
         }
+        showToastMessage(`견적 그룹 ${groupId}이(가) 삭제되었습니다.`); // [추가] 토스트 메시지
     }
 }
 
@@ -228,7 +397,8 @@ function deleteActiveGroup() { if (activeGroupId) { deleteGroup(activeGroupId); 
 
 function copyActiveGroup() {
     if (!activeGroupId) return;
-    alert("현재 탭의 모든 정보가 복사됩니다.\n(단, 호텔카드와 일정표 내용은 기술적 제약으로 인해 복사되지 않습니다.)");
+    // [수정] 토스트 메시지로 변경
+    showToastMessage("현재 탭의 모든 정보가 복사됩니다. (단, 호텔카드와 일정표 내용은 기술적 제약으로 인해 복사되지 않습니다.)");
     saveAllCalculatorsInGroup(activeGroupId);
     const newGroupData = JSON.parse(JSON.stringify(quoteGroupsData[activeGroupId]));
     groupCounter++;
@@ -236,6 +406,7 @@ function copyActiveGroup() {
     quoteGroupsData[groupCounter] = newGroupData;
     createGroupUI(groupCounter);
     switchTab(groupCounter);
+    showToastMessage(`견적 그룹 ${activeGroupId}이(가) 복사되어 새 그룹 ${groupCounter}이(가) 생성되었습니다.`); // [추가] 토스트 메시지
 }
 
 function switchTab(newGroupId) {
@@ -243,6 +414,8 @@ function switchTab(newGroupId) {
     activeGroupId = String(newGroupId);
     document.querySelectorAll('.quote-tab').forEach(tab => { tab.classList.toggle('active', tab.dataset.groupId == newGroupId); });
     document.querySelectorAll('.calculation-group-content').forEach(content => { content.classList.toggle('active', content.id == `group-content-${newGroupId}`); });
+    // [추가] 탭 전환 시 모든 입력 필드에 엔터 시 다음 필드로 이동 로직 재적용
+    setupEnterKeyListenerForForm(); 
 }
 
 // --- UI 생성 및 초기화 ---
@@ -265,6 +438,7 @@ function createGroupUI(groupId) {
 
 function initializeGroup(groupEl, groupId) {
     // [수정] iframe 태그에 allow="clipboard-write" 속성을 추가합니다.
+    // [수정] 포함/불포함 섹션에서 복사 버튼 삭제
     groupEl.innerHTML = `<div class="flex gap-6"> 
         <div class="w-1/2 flex flex-col"> 
             <div id="calculators-wrapper-${groupId}" class="space-y-4"></div> 
@@ -273,7 +447,7 @@ function initializeGroup(groupEl, groupId) {
         <div class="w-1/2 space-y-6 right-panel-container"> 
             <section class="p-6 border border-gray-200 rounded-lg bg-gray-50"><div class="flex justify-between items-center mb-4"><h2 class="text-xl font-semibold text-gray-800">항공 스케줄</h2><div class="flex items-center space-x-2"><button type="button" class="btn btn-sm btn-secondary copy-flight-schedule-btn" title="항공 스케줄 HTML 복사"><i class="fas fa-clipboard"></i> 복사</button><button type="button" class="btn btn-sm btn-secondary parse-gds-btn">GDS 파싱</button><button type="button" class="btn btn-sm btn-secondary add-flight-subgroup-btn"><i class="fas fa-plus mr-1"></i> 스케줄 추가</button></div></div><div class="space-y-4 flight-schedule-container"></div></section> 
             <section class="p-6 border border-gray-200 rounded-lg bg-gray-50"><div class="flex justify-between items-center mb-4"><h2 class="text-xl font-semibold text-gray-800">요금 안내</h2><div class="flex items-center space-x-2"><button type="button" class="btn btn-sm btn-secondary copy-price-info-btn" title="요금 안내 HTML 복사"><i class="fas fa-clipboard"></i> 복사</button><button type="button" class="btn btn-sm btn-secondary add-price-subgroup-btn"><i class="fas fa-plus mr-1"></i> 요금 그룹 추가</button></div></div><div class="space-y-4 price-info-container"></div></section> 
-            <section class="p-6 border border-gray-200 rounded-lg bg-gray-50"><div class="flex justify-between items-center mb-4"><h2 class="text-xl font-semibold text-gray-800">포함/불포함 사항</h2><button type="button" class="btn btn-sm btn-secondary copy-inclusion-exclusion-btn" title="포함/불포함 HTML 복사"><i class="fas fa-clipboard"></i> 복사</button></div><div class="flex gap-4"><div class="w-1/2 flex flex-col"><h3 class="font-medium mb-1">포함</h3><textarea class="input-field flex-grow inclusion-text" rows="5"></textarea></div><div class="w-1/2 flex flex-col"><h3 class="font-medium mb-1">불포함</h3><textarea class="input-field flex-grow exclusion-text" rows="5"></textarea></div></div></section> 
+            <section class="p-6 border border-gray-200 rounded-lg bg-gray-50"><div class="flex justify-between items-center mb-4"><h2 class="text-xl font-semibold text-gray-800">포함/불포함 사항</h2></div><div class="flex gap-4"><div class="w-1/2 flex flex-col"><h3 class="font-medium mb-1">포함</h3><textarea class="input-field flex-grow inclusion-text" rows="5"></textarea></div><div class="w-1/2 flex flex-col"><h3 class="font-medium mb-1">불포함</h3><textarea class="input-field flex-grow exclusion-text" rows="5"></textarea></div></div></section> 
             <section class="p-6 border border-gray-200 rounded-lg bg-gray-50"><h2 class="text-xl font-semibold text-gray-800 mb-4">호텔카드 메이커</h2><iframe src="https://kaknakiak.github.io/invoice/hotel_maker/index.html" style="width: 100%; height: 480px; border: 1px solid #ccc; border-radius: 0.25rem;" allow="clipboard-write"></iframe></section> 
             <section class="p-6 border border-gray-200 rounded-lg bg-gray-50"><h2 class="text-xl font-semibold text-gray-800 mb-4">상세 일정표</h2><iframe src="https://kaknakiak.github.io/invoice/itinerary_planner/index.html" style="width: 100%; height: 800px; border: 1px solid #ccc; border-radius: 0.25rem;" allow="clipboard-write"></iframe></section> 
         </div> 
@@ -340,7 +514,8 @@ function initializeGroup(groupEl, groupId) {
 
     groupEl.querySelector('.copy-flight-schedule-btn').addEventListener('click', () => copyHtmlToClipboard(generateFlightScheduleInlineHtml(groupData.flightSchedule)));
     groupEl.querySelector('.copy-price-info-btn').addEventListener('click', () => copyHtmlToClipboard(generatePriceInfoInlineHtml(groupData.priceInfo)));
-    groupEl.querySelector('.copy-inclusion-exclusion-btn').addEventListener('click', () => copyHtmlToClipboard(generateInclusionExclusionInlineHtml(groupData.inclusionText, groupData.exclusionText)));
+    // [수정] 포함/불포함 복사 버튼이 삭제되었으므로 이 이벤트 리스너도 제거.
+    // groupEl.querySelector('.copy-inclusion-exclusion-btn').addEventListener('click', () => copyHtmlToClipboard(generateInclusionExclusionInlineHtml(groupData.inclusionText, groupData.exclusionText)));
 }
 
 // --- 계산기 관련 함수들 ---
@@ -350,7 +525,7 @@ function buildCalculatorDOM(calcContainer) {
     content.innerHTML = `<div class="split-container"><div class="pnr-pane"><label class="label-text font-semibold mb-2">PNR 정보</label><textarea class="w-full flex-grow px-3 py-2 border border-gray-300 rounded-md shadow-sm resize-none" placeholder="PNR 정보를 여기에 붙여넣으세요."></textarea></div><div class="resizer-handle"></div><div class="quote-pane"><div class="table-container"><table class="quote-table"><thead><tr class="header-row"><th><button type="button" class="btn btn-sm btn-primary add-person-type-btn"><i class="fas fa-plus"></i> 항목 추가</button></th></tr><tr class="count-row"><th></th></tr></thead><tbody></tbody><tfoot></tfoot></table></div></div></div>`;
     const calculatorElement = content.firstElementChild;
     calcContainer.appendChild(calculatorElement);
-    calculatorElement.querySelector('.add-person-type-btn').addEventListener('click', () => addPersonTypeColumn(calcContainer, '아동', 1));
+    calculatorElement.querySelector('.add-person-type-btn').addEventListener('click', () => addPersonTypeColumn(calculatorElement, '아동', 1)); // [수정] calcContainer 대신 calculatorElement 전달
     const tbody = calculatorElement.querySelector('tbody');
     ROW_DEFINITIONS.forEach(def => {
         const row = tbody.insertRow();
@@ -358,7 +533,7 @@ function buildCalculatorDOM(calcContainer) {
         const labelCell = row.insertCell(0);
         if (def.type === 'button') {
             labelCell.innerHTML = `<button type="button" class="btn btn-sm btn-outline add-dynamic-row-btn">${def.label}</button>`;
-            labelCell.querySelector('.add-dynamic-row-btn').addEventListener('click', () => addDynamicCostRow(calcContainer));
+            labelCell.querySelector('.add-dynamic-row-btn').addEventListener('click', () => addDynamicCostRow(calculatorElement)); // [수정] calcContainer 대신 calculatorElement 전달
         } else {
             labelCell.innerHTML = `<span>${def.label}</span>`;
         }
@@ -499,7 +674,22 @@ function makeEditable(element, inputType, onBlurCallback) {
             if (onBlurCallback) onBlurCallback();
         };
         input.addEventListener('blur', finishEditing);
-        input.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === 'Escape') e.target.blur(); });
+        // [수정] Enter 키 입력 시 다음 필드로 포커스 이동
+        input.addEventListener('keydown', e => { 
+            if (e.key === 'Enter') {
+                e.preventDefault(); // 기본 폼 제출 방지
+                const formElements = Array.from(document.getElementById('quoteForm').querySelectorAll('input, textarea, button, select'));
+                const currentIndex = formElements.indexOf(e.target);
+                const nextElement = formElements[currentIndex + 1];
+                if (nextElement) {
+                    nextElement.focus();
+                } else {
+                    e.target.blur(); // 마지막 요소면 포커스 해제
+                }
+            } else if (e.key === 'Escape') {
+                e.target.blur();
+            }
+        });
     };
     element.addEventListener('click', clickHandler);
 }
@@ -660,7 +850,7 @@ function createPriceSubgroup(container, subgroupData, groupId) {
     const subGroupDiv = document.createElement('div');
     subGroupDiv.className = 'dynamic-section price-subgroup';
     subGroupDiv.id = subgroupData.id;
-    subGroupDiv.innerHTML = `<button type="button" class="delete-dynamic-section-btn" title="이 요금 그룹 삭제"><i class="fas fa-trash-alt"></i></button><input type="text" class="input-field mb-2" placeholder="견적설명 (예: 인천출발, A객실)" value="${subgroupData.title || ''}"><table class="price-table"><thead><tr><th style="width:25%">내역</th><th>1인당금액</th><th>인원</th><th>총금액</th><th style="width:30%">비고</th><th style="width:50px">삭제</th></tr></thead><tbody></tbody><tfoot><tr><td colspan="3" class="text-right font-bold pr-2">총 합계</td><td class="grand-total">0</td><td colspan="2"><button type="button" class="add-row-btn"><i class="fas fa-plus mr-1"></i>행 추가</button></td></tr></tfoot></table>`;
+    subGroupDiv.innerHTML = `<button type="button" class="delete-dynamic-section-btn" title="이 요금 그룹 삭제"><i class="fas fa-trash-alt"></i></button><input type="text" class="input-field mb-2 price-subgroup-title" placeholder="견적설명 (예: 인천출발, A객실)" value="${subgroupData.title || ''}"><table class="price-table"><thead><tr><th style="width:25%">내역</th><th>1인당금액</th><th>인원</th><th>총금액</th><th style="width:30%">비고</th><th style="width:50px">삭제</th></tr></thead><tbody></tbody><tfoot><tr><td colspan="3" class="text-right font-bold pr-2">총 합계</td><td class="grand-total">0</td><td colspan="2"><button type="button" class="add-row-btn"><i class="fas fa-plus mr-1"></i>행 추가</button></td></tr></tfoot></table>`;
     const tbody = subGroupDiv.querySelector('tbody');
     subgroupData.rows.forEach(rowData => addPriceRow(tbody, rowData, subgroupData, subGroupDiv, groupId));
     updateGrandTotal(subGroupDiv, groupId);
@@ -685,7 +875,7 @@ function addPriceRow(tbody, rowData, subgroupData, subGroupDiv, groupId) {
         updateGrandTotal(subGroupDiv, groupId);
     };
     tr.querySelectorAll('input:not([readonly])').forEach(input => input.addEventListener('input', e => { rowData[e.target.dataset.field] = e.target.value.replace(/,/g, ''); updateRow(); }));
-    tr.querySelector('.delete-row-btn').addEventListener('click', () => { if (subgroupData.rows.length > 1) { const rowIndex = Array.from(tbody.children).indexOf(tr); subgroupData.rows.splice(rowIndex, 1); tr.remove(); updateGrandTotal(subGroupDiv, groupId); } else { alert('최소 한 개의 요금 항목은 유지해야 합니다.'); } });
+    tr.querySelector('.delete-row-btn').addEventListener('click', () => { if (subgroupData.rows.length > 1) { const rowIndex = Array.from(tbody.children).indexOf(tr); subgroupData.rows.splice(rowIndex, 1); tr.remove(); updateGrandTotal(subGroupDiv, groupId); } else { showToastMessage('최소 한 개의 요금 항목은 유지해야 합니다.', true); } }); // [수정] alert 대신 toast
     updateRow();
 }
 
@@ -696,12 +886,21 @@ function updateGrandTotal(subGroupDiv, groupId) {
     subGroupDiv.querySelector('.grand-total').textContent = grandTotal.toLocaleString();
 }
 
-function generateInclusionExclusionInlineHtml(inclusionText, exclusionText) { const i = inclusionText ? inclusionText.replace(/\n/g, '<br>') : ''; const e = exclusionText ? exclusionText.replace(/\n/g, '<br>') : ''; return `<table style="width:100%;border-collapse:collapse;font-family:sans-serif;font-size:12px"><tbody><tr><td style="vertical-align:top;width:50%;padding-right:10px"><h3 style="font-size:16px;font-weight:600;margin-bottom:8px">포함</h3><div style="padding:8px;border:1px solid #eee;min-height:100px">${i}</div></td><td style="vertical-align:top;width:50%;padding-left:10px"><h3 style="font-size:16px;font-weight:600;margin-bottom:8px">불포함</h3><div style="padding:8px;border:1px solid #eee;min-height:100px">${e}</div></td></tr></tbody></table>`; }
+function generateInclusionExclusionInlineHtml(inclusionText, exclusionText) { 
+    const i = inclusionText ? inclusionText.replace(/\n/g, '<br>') : ''; 
+    const e = exclusionText ? exclusionText.replace(/\n/g, '<br>') : ''; 
+    return `<table style="width:100%;border-collapse:collapse;font-family:sans-serif;font-size:12px"><tbody><tr><td style="vertical-align:top;width:50%;padding-right:10px"><h3 style="font-size:16px;font-weight:600;margin-bottom:8px">포함</h3><div style="padding:8px;border:1px solid #eee;min-height:100px">${i}</div></td><td style="vertical-align:top;width:50%;padding-left:10px"><h3 style="font-size:16px;font-weight:600;margin-bottom:8px">불포함</h3><div style="padding:8px;border:1px solid #eee;min-height:100px">${e}</div></td></tr></tbody></table>`; 
+}
 
+// [수정] 요금 안내 섹션 복사 시 견적 설명 입력창 함께 복사
 function generatePriceInfoInlineHtml(priceData) {
     let html = '';
     if (priceData) {
         priceData.forEach(subgroup => {
+            // [추가] 견적 설명(subgroup.title)을 h4 태그로 추가
+            if (subgroup.title) {
+                html += `<h4 style="font-size:14px;font-weight:600;margin-bottom:8px">${subgroup.title}</h4>`;
+            }
             html += `<table style="width:100%;border-collapse:collapse;font-family:sans-serif;font-size:12px;margin-bottom:16px"><thead><tr style="background-color:#f9fafb"><th style="border:1px solid #ddd;padding:8px;text-align:center">내역</th><th style="border:1px solid #ddd;padding:8px;text-align:center">1인당 금액</th><th style="border:1px solid #ddd;padding:8px;text-align:center">인원</th><th style="border:1px solid #ddd;padding:8px;text-align:center">총 금액</th><th style="border:1px solid #ddd;padding:8px;text-align:center">비고</th></tr></thead><tbody>`;
             let grandTotal = 0;
             subgroup.rows.forEach(row => { const p = parseFloat(row.price) || 0; const c = parseInt(row.count) || 0; const t = p * c; grandTotal += t; html += `<tr><td style="border:1px solid #ddd;padding:8px">${row.item || ''}</td><td style="border:1px solid #ddd;padding:8px;text-align:right">${p.toLocaleString()}</td><td style="border:1px solid #ddd;padding:8px;text-align:center">${c}</td><td style="border:1px solid #ddd;padding:8px;text-align:right">${t.toLocaleString()}</td><td style="border:1px solid #ddd;padding:8px">${row.remarks || ''}</td></tr>`; });
@@ -723,6 +922,57 @@ function generateFlightScheduleInlineHtml(flightData) {
     return html; 
 }
 
+// [신규] 모든 입력 필드에 Enter 키 리스너를 설정하는 함수
+function setupEnterKeyListenerForForm() {
+    const form = document.getElementById('quoteForm');
+    if (!form) return;
+
+    // 모든 포커스 가능한 요소들을 가져옵니다.
+    // 'a[href]', 'button', 'input', 'textarea', 'select', '[tabindex]:not([tabindex="-1"])'
+    const focusableElements = form.querySelectorAll('input, textarea, button:not([type="submit"]):not([type="reset"]), select');
+
+    focusableElements.forEach((element, index) => {
+        // 기존 리스너가 있다면 제거 (중복 방지)
+        element.removeEventListener('keydown', handleEnterKey);
+        // 새 리스너 추가
+        element.addEventListener('keydown', handleEnterKey);
+    });
+}
+
+// [신규] Enter 키 핸들러
+function handleEnterKey(e) {
+    if (e.key === 'Enter') {
+        e.preventDefault(); // 기본 폼 제출 동작 방지
+
+        const formElements = Array.from(document.getElementById('quoteForm').querySelectorAll('input, textarea, button:not([type="submit"]):not([type="reset"]), select'));
+        const currentIndex = formElements.indexOf(e.target);
+
+        // 다음 포커스 가능한 요소를 찾습니다.
+        let nextIndex = currentIndex + 1;
+        let nextElement = formElements[nextIndex];
+
+        // 다음 요소가 없으면, 현재 탭 내에서 다음 계산기나 다른 섹션으로 이동하는 로직을 고려할 수 있으나,
+        // 여기서는 단순하게 다음 포커스 가능한 요소로 이동하도록 구현합니다.
+        // 예를 들어, 모든 인풋이 끝났다면, Submit 버튼으로 이동하거나, 아니면 그냥 blur 처리합니다.
+        while (nextElement && (nextElement.disabled || nextElement.readOnly || nextElement.offsetParent === null)) {
+            nextIndex++;
+            nextElement = formElements[nextIndex];
+        }
+
+        if (nextElement) {
+            nextElement.focus();
+            if (nextElement.tagName === 'INPUT' || nextElement.tagName === 'TEXTAREA') {
+                nextElement.select(); // 텍스트 필드는 전체 선택
+            }
+        } else {
+            // 폼의 마지막 요소에 도달했을 경우, 다른 동작을 정의할 수 있습니다.
+            // 예: submit 버튼으로 포커스 이동, 또는 아무것도 하지 않기.
+            e.target.blur();
+        }
+    }
+}
+
+
 // =======================================================================
 // 5. 시스템 시작 (DOM 로드 후 실행)
 // =======================================================================
@@ -740,14 +990,24 @@ function restoreState(data) {
         Object.keys(quoteGroupsData).forEach(id => createGroupUI(id));
     } else { addNewGroup(); }
     switchTab(data.activeGroupId || (Object.keys(quoteGroupsData).length > 0 ? Object.keys(quoteGroupsData)[0] : null));
+    setupEnterKeyListenerForForm(); // [추가] 상태 복원 후 엔터 키 리스너 설정
 }
 
 function initializeNewSession() {
     createCustomerCard();
     addNewGroup();
+    setupEnterKeyListenerForForm(); // [추가] 새 세션 시작 시 엔터 키 리스너 설정
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    // [신규] 최근 파일 모달 관련 DOM 요소 초기화
+    recentFilesModal = document.getElementById('recentFilesModal');
+    recentFileSearchInput = document.getElementById('recentFileSearchInput');
+    recentFileListUl = document.getElementById('recentFileList');
+    loadingRecentFileListMsg = document.getElementById('loadingRecentFileListMsg');
+    cancelRecentFilesModalButton = document.getElementById('cancelRecentFilesModalButton');
+    closeRecentFilesModalButton = document.getElementById('closeRecentFilesModalButton');
+
     const restoredDataScript = document.getElementById('restored-data');
     let restoredData = null;
     if (restoredDataScript && restoredDataScript.textContent.trim()) {
@@ -769,6 +1029,26 @@ document.addEventListener('DOMContentLoaded', () => {
     if (loadFileLabel) { loadFileLabel.addEventListener('click', (event) => { event.preventDefault(); loadFile(); }); }
     document.getElementById('quoteForm').addEventListener('reset', (e) => { e.preventDefault(); if (confirm("작성중인 모든 내용을 삭제하고 새로 시작하시겠습니까?")) { window.location.reload(); } });
     
+    // [신규] 최근 파일 버튼 이벤트 리스너
+    const recentFilesBtn = document.getElementById('recentFilesBtn');
+    if (recentFilesBtn) {
+        recentFilesBtn.addEventListener('click', openRecentFilesModal);
+    }
+    if (cancelRecentFilesModalButton) {
+        cancelRecentFilesModalButton.addEventListener('click', () => {
+            if(recentFilesModal) recentFilesModal.classList.add('hidden');
+        });
+    }
+    if (closeRecentFilesModalButton) {
+        closeRecentFilesModalButton.addEventListener('click', () => {
+            if(recentFilesModal) recentFilesModal.classList.add('hidden');
+        });
+    }
+    if (recentFileSearchInput) {
+        recentFileSearchInput.addEventListener('input', renderRecentFileList);
+    }
+
+
     let isResizing = false;
     let pnrPaneToResize = null;
     let splitContainerToResize = null;
@@ -781,7 +1061,9 @@ document.addEventListener('DOMContentLoaded', () => {
         // 다른 입력창에 타이핑하는 것을 방해하지 않기 위해,
         // 특정 요소(INPUT, TEXTAREA)에 포커스가 있을 때는 단축키가 동작하지 않도록 함
         if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') {
-            return;
+            // [추가] 엔터키 처리 로직이 이미 makeEditable 함수와 setupEnterKeyListenerForForm 함수에 의해 관리되므로
+            // 여기서 중복 처리하지 않음.
+            return; 
         }
 
         // Shift 키가 눌렸을 때만 동작
@@ -803,6 +1085,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 case 'KeyF':
                     event.preventDefault();
                     document.querySelector('label[for="loadFile"]').click();
+                    break;
+                
+                // [추가] Shift + R: 최근 파일 불러오기
+                case 'KeyR':
+                    event.preventDefault();
+                    if (recentFilesBtn) {
+                        recentFilesBtn.click();
+                    }
                     break;
             }
         }
