@@ -1,3 +1,4 @@
+/* style.css */
 body {
     font-family: 'Inter', sans-serif;
     font-size: 12px;
@@ -90,8 +91,21 @@ body {
 .totals-summary-section .calculated-field { @apply text-base font-semibold text-indigo-700 bg-transparent p-0; }
 
 
-.quote-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-.quote-table th, .quote-table td { border: 1px solid #e5e7eb; padding: 0; vertical-align: middle; text-align: left; }
+.quote-table { 
+    width: 100%; 
+    border-collapse: collapse; 
+    table-layout: fixed; /* [수정] 테이블 레이아웃 고정 */
+}
+.quote-table th, .quote-table td { 
+    border: 1px solid #e5e7eb; 
+    padding: 0; 
+    vertical-align: middle; 
+    text-align: left;
+    /* [수정] 내용이 길 경우 말줄임표 처리 */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
 .quote-table th { background-color: #f9fafb; font-weight: 600; padding: 0.5rem; }
 .quote-table th:first-child, .quote-table td:first-child { min-width: 100px; padding: 0.25rem 0.5rem;}
 .quote-table th .remove-col-btn { @apply absolute top-1 right-1 text-gray-400 hover:text-red-600 text-xs; }
