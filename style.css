@@ -9,7 +9,7 @@ body {
 .btn i.fas { @apply mr-2; }
 .btn-primary { @apply bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500; }
 .btn-secondary { @apply bg-gray-600 hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500; }
-.btn-sm { @apply px-2 py-1 text-base; }
+.btn-sm { @apply px-2 py-1 text-lg; }
 .btn-outline { @apply bg-white border-gray-300 text-gray-700 hover:bg-gray-50; }
 
 /* === 견적 그룹 버튼 색상 === */
