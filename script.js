@@ -1,16 +1,10 @@
 // =======================================================================
 // 1. 전역 변수 및 설정
 // =======================================================================
-let quoteGroupsData = {};
+let quoteGroupsData = {}; // 모든 견적 그룹의 데이터를 저장하는 핵심 객체
 let groupCounter = 0;
 let activeGroupId = null;
 let currentFileHandle = null;
-
-const DB_NAME = 'QuoteAppDB';
-const DB_VERSION = 2;
-const STORE_NAME = 'recentFiles';
-const INDEX_NAME = 'name_index';
-const MAX_RECENT_FILES = 30;
 
 const ROW_DEFINITIONS = [
     { id: 'airfare', label: '항공', type: 'costInput' }, { id: 'hotel', label: '호텔', type: 'costInput' },
@@ -21,101 +15,7 @@ const ROW_DEFINITIONS = [
 ];
 
 // =======================================================================
-// 2. IndexedDB 헬퍼 함수
-// =======================================================================
-function openDB() {
-    return new Promise((resolve, reject) => {
-        const request = indexedDB.open(DB_NAME, DB_VERSION);
-        request.onupgradeneeded = (event) => {
-            const db = event.target.result;
-            let store;
-            if (!db.objectStoreNames.contains(STORE_NAME)) {
-                store = db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
-            } else {
-                store = event.target.transaction.objectStore(STORE_NAME);
-            }
-            if (!store.indexNames.contains(INDEX_NAME)) {
-                store.createIndex(INDEX_NAME, 'name', { unique: true });
-            }
-        };
-        request.onsuccess = (event) => resolve(event.target.result);
-        request.onerror = (event) => reject(event.target.error);
-    });
-}
-
-async function addRecentFile(fileHandle) {
-    if (!fileHandle) return;
-    try {
-        const db = await openDB();
-        const tx = db.transaction(STORE_NAME, 'readwrite');
-        const store = tx.objectStore(STORE_NAME);
-        const index = store.index(INDEX_NAME);
-
-        const existingFile = await new Promise((resolve, reject) => {
-            const request = index.get(fileHandle.name);
-            request.onsuccess = () => resolve(request.result);
-            request.onerror = () => reject(request.error);
-        });
-
-        const newItem = {
-            name: fileHandle.name,
-            handle: fileHandle,
-            timestamp: new Date()
-        };
-
-        if (existingFile) {
-            newItem.id = existingFile.id;
-        }
-
-        store.put(newItem);
-
-        const allFiles = await new Promise((resolve, reject) => {
-            const request = store.getAll();
-            request.onsuccess = () => resolve(request.result);
-            request.onerror = () => reject(request.error);
-        });
-
-        if (allFiles.length > MAX_RECENT_FILES) {
-            allFiles.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-            store.delete(allFiles[0].id);
-        }
-
-        await tx.done;
-    } catch (error) {
-        console.error("최근 파일 추가 실패:", error);
-    }
-}
-
-
-async function getRecentFiles() {
-    const db = await openDB();
-    const tx = db.transaction(STORE_NAME, 'readonly');
-    const store = tx.objectStore(STORE_NAME);
-    
-    const files = await new Promise((resolve, reject) => {
-        const request = store.getAll();
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-    });
-
-    await tx.done;
-
-    return files.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-}
-
-async function clearRecentFiles() {
-    if (!confirm('최근 항목 목록을 정말로 비우시겠습니까? 이 작업은 되돌릴 수 없습니다.')) return;
-    const db = await openDB();
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    await tx.objectStore(STORE_NAME).clear();
-    await tx.done;
-    alert('최근 항목 목록을 비웠습니다.');
-    await populateRecentFilesModal();
-}
-
-
-// =======================================================================
-// 3. GDS 파서 연동 함수
+// 2. GDS 파서 연동 함수
 // =======================================================================
 function addFlightsFromParser(parsedFlights) {
     if (!parsedFlights || parsedFlights.length === 0) return;
@@ -134,7 +34,7 @@ function addFlightsFromParser(parsedFlights) {
 }
 
 // =======================================================================
-// 4. 핵심 기능 함수
+// 3. 핵심 기능 함수
 // =======================================================================
 
 // --- 고객 정보 ---
@@ -148,6 +48,7 @@ function createCustomerCard(initialData = { name: '', phone: '', email: '' }) {
     card.innerHTML = `<button type="button" class="absolute top-1 right-1 text-gray-400 hover:text-red-500 text-xs remove-customer-btn p-1" title="고객 삭제"><i class="fas fa-times"></i></button><div class="space-y-3 text-sm"><div class="flex items-center gap-2"><label for="customerName_${cardId}" class="font-medium text-gray-800 w-12 text-left flex-shrink-0">고객명</label><input type="text" id="customerName_${cardId}" class="input-field customer-name" data-field="name" value="${initialData.name}"></div><div class="flex items-center gap-2"><label for="customerPhone_${cardId}" class="font-medium text-gray-800 w-12 text-left flex-shrink-0">연락처</label><input type="tel" id="customerPhone_${cardId}" class="input-field customer-phone" data-field="phone" value="${initialData.phone}"></div><div class="flex items-center gap-2"><label for="customerEmail_${cardId}" class="font-medium text-gray-800 w-12 text-left flex-shrink-0">이메일</label><input type="email" id="customerEmail_${cardId}" class="input-field customer-email" data-field="email" value="${initialData.email}"></div></div>`;
     container.appendChild(card);
 
+    // [수정] 고객 정보 input에 더블클릭 복사 기능 추가
     card.querySelectorAll('input').forEach(input => {
         input.addEventListener('dblclick', (event) => {
             const label = event.target.previousElementSibling.textContent;
@@ -180,6 +81,7 @@ const formatCurrency = (amount) => new Intl.NumberFormat('ko-KR').format(Math.ro
 const formatPercentage = (value) => (isNaN(value) || !isFinite(value) ? 0 : value * 100).toFixed(2) + ' %';
 const copyHtmlToClipboard = (htmlString) => { if (!htmlString || htmlString.trim() === "") { alert('복사할 내용이 없습니다.'); return; } navigator.clipboard.writeText(htmlString).then(() => alert('HTML 소스 코드가 클립보드에 복사되었습니다.')).catch(err => { console.error('클립보드 복사 실패:', err); alert('복사에 실패했습니다.'); }); };
 
+// [신규] 텍스트를 클립보드에 복사하고 알림을 보여주는 함수
 function copyToClipboard(text, fieldName = '텍스트') {
     if (!text || text.trim() === "") {
         alert('복사할 내용이 없습니다.');
@@ -193,7 +95,7 @@ function copyToClipboard(text, fieldName = '텍스트') {
     });
 }
 
-// --- 저장 및 불러오기 (최종 수정) ---
+// --- 저장 및 불러오기 ---
 function saveAllCalculatorsInGroup(groupId) {
     if (!groupId || !quoteGroupsData[groupId]) return;
     const groupEl = document.getElementById(`group-content-${groupId}`);
@@ -213,150 +115,85 @@ function saveAllCalculatorsInGroup(groupId) {
     });
 }
 
-async function getSaveDataBlob(doc) {
+async function getSaveDataBlob() {
     if (activeGroupId) saveAllCalculatorsInGroup(activeGroupId);
     Object.keys(quoteGroupsData).forEach(id => { if (id !== activeGroupId) saveAllCalculatorsInGroup(id); });
     const allData = { quoteGroupsData, groupCounter, activeGroupId, memoText: document.getElementById('memoText').value, customerInfo: getCustomerData() };
-    
-    doc.querySelectorAll('script').forEach(script => {
-        if (script.textContent.includes('Live reload enabled.')) {
-            script.remove();
-        }
-    });
+    const doc = document.cloneNode(true);
 
     try {
-        const styleText = await (await fetch('./style.css')).text();
-        const scriptText = await (await fetch('./script.js')).text();
+        const styleResponse = await fetch('./style.css');
+        const styleText = await styleResponse.text();
+        const scriptResponse = await fetch('./script.js');
+        const scriptText = await scriptResponse.text();
         
-        doc.head.querySelector('link[href="style.css"]')?.replaceWith(Object.assign(document.createElement('style'), { textContent: styleText }));
-        doc.body.querySelector('script[src="script.js"]')?.replaceWith(Object.assign(document.createElement('script'), { textContent: scriptText }));
+        const styleTag = document.createElement('style');
+        styleTag.textContent = styleText;
+        doc.head.querySelector('link[href="style.css"]')?.replaceWith(styleTag);
+
+        const scriptTag = document.createElement('script');
+        scriptTag.textContent = scriptText;
+        doc.body.querySelector('script[src="script.js"]')?.replaceWith(scriptTag);
         
         const dataScriptTag = doc.getElementById('restored-data');
         if (dataScriptTag) { dataScriptTag.textContent = JSON.stringify(allData); }
         
         return new Blob([doc.documentElement.outerHTML], { type: 'text/html' });
     } catch (error) {
-        console.error("CSS 또는 JS 파일 포함 중 오류 발생:", error);
+        console.error("CSS 또는 JS 파일을 포함하는 중 오류 발생:", error);
         alert("저장 준비 중 오류가 발생했습니다. 외부 파일을 읽을 수 없습니다.");
         return null;
     }
 }
 
 async function saveFile(isSaveAs = false, clickedButton = null) {
-    if (window.location.protocol === 'file:') {
-        isSaveAs = true;
-    }
-
-    const docToSave = document.cloneNode(true);
-
-    const buttons = document.querySelectorAll('#header-buttons button');
+    const saveBtn = document.getElementById('saveBtn');
+    const saveAsBtn = document.getElementById('saveAsBtn');
     const originalBtnHTML = clickedButton ? clickedButton.innerHTML : '';
-    
-    buttons.forEach(btn => btn.disabled = true);
+    saveBtn.disabled = true;
+    saveAsBtn.disabled = true;
     if (clickedButton) { clickedButton.innerHTML = `<i class="fas fa-spinner fa-spin mr-2"></i>저장 중...`; }
-
     try {
-        const blob = await getSaveDataBlob(docToSave); 
+        const blob = await getSaveDataBlob();
         if (!blob) throw new Error("Blob 생성 실패");
-
         if (isSaveAs || !currentFileHandle) {
-            const newHandle = await window.showSaveFilePicker({
-                suggestedName: `견적서_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}.html`,
-                types: [{ description: 'HTML 파일', accept: { 'text/html': ['.html'] } }]
-            });
+            const newHandle = await window.showSaveFilePicker({ suggestedName: `견적서_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}.html`, types: [{ description: 'HTML 파일', accept: { 'text/html': ['.html'] } }] });
+            const writableStream = await newHandle.createWritable();
+            await writableStream.write(blob);
+            await writableStream.close();
             currentFileHandle = newHandle;
+            alert('파일이 성공적으로 저장되었습니다.');
+        } else {
+            const writableStream = await currentFileHandle.createWritable();
+            await writableStream.write(blob);
+            await writableStream.close();
+            alert('변경사항이 성공적으로 저장되었습니다.');
         }
-
-        const writableStream = await currentFileHandle.createWritable();
-        await writableStream.write(blob);
-        await writableStream.close();
-        
-        if (window.location.protocol !== 'file:') {
-            await addRecentFile(currentFileHandle);
-        }
-        
-        alert('파일이 성공적으로 저장되었습니다.');
-        
     } catch (err) {
-        if (err.name !== 'AbortError') { 
-            console.error('파일 저장 실패:', err); 
-            alert('파일 저장에 실패했습니다.'); 
-        }
+        if (err.name !== 'AbortError') { console.error('파일 저장 실패:', err); alert('파일 저장에 실패했습니다.'); }
     } finally {
-        buttons.forEach(btn => btn.disabled = false);
+        saveBtn.disabled = false;
+        saveAsBtn.disabled = false;
         if (clickedButton) { clickedButton.innerHTML = originalBtnHTML; }
     }
 }
 
-
-async function processFileContent(fileContents) {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(fileContents, 'text/html');
-    const restoredDataScript = doc.getElementById('restored-data');
-    if (restoredDataScript && restoredDataScript.textContent) {
-        const restoredData = JSON.parse(restoredDataScript.textContent);
-        restoreState(restoredData);
-        return true;
-    }
-    alert('유효한 데이터가 포함된 견적서 파일이 아닙니다.');
-    return false;
-}
-
-async function loadFileFromHandle(fileHandle) {
-    try {
-        if (await fileHandle.queryPermission({mode: 'read'}) !== 'granted') {
-            if (await fileHandle.requestPermission({mode: 'read'}) !== 'granted') {
-                alert('파일에 접근할 수 있는 권한이 필요합니다.');
-                return;
-            }
-        }
-        const file = await fileHandle.getFile();
-        const contents = await file.text();
-        if (await processFileContent(contents)) {
-            currentFileHandle = fileHandle;
-            if (window.location.protocol !== 'file:') {
-                await addRecentFile(fileHandle);
-            }
-            document.getElementById('recentFilesModal').classList.add('hidden');
-        }
-    } catch (err) {
-        console.error("파일 불러오기 실패:", err);
-        alert(`'${fileHandle.name}' 파일을 불러올 수 없습니다. 파일이 이동되었거나 삭제되었을 수 있습니다.`);
-    }
-}
-
-async function browseAndLoadFile() {
+async function loadFile() {
     try {
         const [fileHandle] = await window.showOpenFilePicker({ types: [{ description: 'HTML 파일', accept: { 'text/html': ['.html'] } }] });
-        await loadFileFromHandle(fileHandle);
+        currentFileHandle = fileHandle;
+        const file = await fileHandle.getFile();
+        const contents = await file.text();
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(contents, 'text/html');
+        const restoredDataScript = doc.getElementById('restored-data');
+        if (restoredDataScript && restoredDataScript.textContent) {
+            const restoredData = JSON.parse(restoredDataScript.textContent);
+            restoreState(restoredData);
+        } else { alert('유효한 데이터가 포함된 견적서 파일이 아닙니다.'); }
     } catch (err) {
-        if (err.name !== 'AbortError') { console.error('파일 열기 실패:', err); }
+        if (err.name !== 'AbortError') { console.error('파일 열기 실패:', err); alert('파일을 열지 못했습니다.'); }
     }
-}
-
-async function populateRecentFilesModal() {
-    const recentFiles = await getRecentFiles();
-    const listElement = document.getElementById('recentFilesList');
-    listElement.innerHTML = '';
-
-    if (recentFiles.length === 0) {
-        listElement.innerHTML = `<li class="p-4 text-center text-gray-500">최근에 사용한 항목이 없습니다.</li>`;
-        return;
-    }
-    
-    recentFiles.forEach(fileInfo => {
-        const li = document.createElement('li');
-        li.innerHTML = `<span class="file-name">${fileInfo.name}</span><span class="file-date">마지막 사용: ${new Date(fileInfo.timestamp).toLocaleString('ko-KR')}</span>`;
-        li.addEventListener('click', () => {
-            loadFileFromHandle(fileInfo.handle);
-        });
-        listElement.appendChild(li);
-    });
-}
-
-async function showRecentFilesModal() {
-    await populateRecentFilesModal();
-    document.getElementById('recentFilesModal').classList.remove('hidden');
 }
 
 // --- 견적 그룹 관리 ---
@@ -391,11 +228,12 @@ function deleteActiveGroup() { if (activeGroupId) { deleteGroup(activeGroupId); 
 
 function copyActiveGroup() {
     if (!activeGroupId) return;
-    alert("현재 탭의 모든 정보가 복사됩니다.");
+    alert("현재 탭의 모든 정보가 복사됩니다.\n(단, 호텔카드와 일정표 내용은 기술적 제약으로 인해 복사되지 않습니다.)");
     saveAllCalculatorsInGroup(activeGroupId);
     const newGroupData = JSON.parse(JSON.stringify(quoteGroupsData[activeGroupId]));
     groupCounter++;
     newGroupData.id = groupCounter;
+    quoteGroupsData[groupCounter] = newGroupData;
     createGroupUI(groupCounter);
     switchTab(groupCounter);
 }
@@ -426,15 +264,18 @@ function createGroupUI(groupId) {
 }
 
 function initializeGroup(groupEl, groupId) {
+    // [수정] iframe 태그에 allow="clipboard-write" 속성을 추가합니다.
     groupEl.innerHTML = `<div class="flex gap-6"> 
-        <div class="w-1/2 flex flex-col min-w-0"> 
+        <div class="w-1/2 flex flex-col"> 
             <div id="calculators-wrapper-${groupId}" class="space-y-4"></div> 
             <div class="mt-4"><button type="button" class="btn btn-outline add-calculator-btn w-full"><i class="fas fa-plus mr-2"></i>견적 계산 추가</button></div> 
         </div> 
         <div class="w-1/2 space-y-6 right-panel-container"> 
-            <section class="p-6 border border-gray-200 rounded-lg bg-gray-50"><div class="flex justify-between items-center mb-4"><h3 class="text-xl font-semibold text-gray-800">항공 스케줄</h3><div class="flex items-center space-x-2"><button type="button" class="btn btn-sm btn-secondary copy-flight-schedule-btn" title="항공 스케줄 HTML 복사"><i class="fas fa-clipboard"></i> 복사</button><button type="button" class="btn btn-sm btn-secondary parse-gds-btn">GDS 파싱</button><button type="button" class="btn btn-sm btn-secondary add-flight-subgroup-btn"><i class="fas fa-plus mr-1"></i> 스케줄 추가</button></div></div><div class="space-y-4 flight-schedule-container"></div></section> 
-            <section class="p-6 border border-gray-200 rounded-lg bg-gray-50"><div class="flex justify-between items-center mb-4"><h3 class="text-xl font-semibold text-gray-800">요금 안내</h3><div class="flex items-center space-x-2"><button type="button" class="btn btn-sm btn-secondary copy-price-info-btn" title="요금 안내 HTML 복사"><i class="fas fa-clipboard"></i> 복사</button><button type="button" class="btn btn-sm btn-secondary add-price-subgroup-btn"><i class="fas fa-plus mr-1"></i> 요금 그룹 추가</button></div></div><div class="space-y-4 price-info-container"></div></section> 
-            <section class="p-6 border border-gray-200 rounded-lg bg-gray-50"><div class="flex justify-between items-center mb-4"><h3 class="text-xl font-semibold text-gray-800">포함/불포함 사항</h3><button type="button" class="btn btn-sm btn-secondary copy-inclusion-exclusion-btn" title="포함/불포함 HTML 복사"><i class="fas fa-clipboard"></i> 복사</button></div><div class="flex gap-4"><div class="w-1/2 flex flex-col"><h3 class="font-medium mb-1">포함</h3><textarea class="input-field flex-grow inclusion-text" rows="5"></textarea></div><div class="w-1/2 flex flex-col"><h3 class="font-medium mb-1">불포함</h3><textarea class="input-field flex-grow exclusion-text" rows="5"></textarea></div></div></section> 
+            <section class="p-6 border border-gray-200 rounded-lg bg-gray-50"><div class="flex justify-between items-center mb-4"><h2 class="text-xl font-semibold text-gray-800">항공 스케줄</h2><div class="flex items-center space-x-2"><button type="button" class="btn btn-sm btn-secondary copy-flight-schedule-btn" title="항공 스케줄 HTML 복사"><i class="fas fa-clipboard"></i> 복사</button><button type="button" class="btn btn-sm btn-secondary parse-gds-btn">GDS 파싱</button><button type="button" class="btn btn-sm btn-secondary add-flight-subgroup-btn"><i class="fas fa-plus mr-1"></i> 스케줄 추가</button></div></div><div class="space-y-4 flight-schedule-container"></div></section> 
+            <section class="p-6 border border-gray-200 rounded-lg bg-gray-50"><div class="flex justify-between items-center mb-4"><h2 class="text-xl font-semibold text-gray-800">요금 안내</h2><div class="flex items-center space-x-2"><button type="button" class="btn btn-sm btn-secondary copy-price-info-btn" title="요금 안내 HTML 복사"><i class="fas fa-clipboard"></i> 복사</button><button type="button" class="btn btn-sm btn-secondary add-price-subgroup-btn"><i class="fas fa-plus mr-1"></i> 요금 그룹 추가</button></div></div><div class="space-y-4 price-info-container"></div></section> 
+            <section class="p-6 border border-gray-200 rounded-lg bg-gray-50"><div class="flex justify-between items-center mb-4"><h2 class="text-xl font-semibold text-gray-800">포함/불포함 사항</h2><button type="button" class="btn btn-sm btn-secondary copy-inclusion-exclusion-btn" title="포함/불포함 HTML 복사"><i class="fas fa-clipboard"></i> 복사</button></div><div class="flex gap-4"><div class="w-1/2 flex flex-col"><h3 class="font-medium mb-1">포함</h3><textarea class="input-field flex-grow inclusion-text" rows="5"></textarea></div><div class="w-1/2 flex flex-col"><h3 class="font-medium mb-1">불포함</h3><textarea class="input-field flex-grow exclusion-text" rows="5"></textarea></div></div></section> 
+            <section class="p-6 border border-gray-200 rounded-lg bg-gray-50"><h2 class="text-xl font-semibold text-gray-800 mb-4">호텔카드 메이커</h2><iframe src="https://kaknakiak.github.io/invoice/hotel_maker/index.html" style="width: 100%; height: 480px; border: 1px solid #ccc; border-radius: 0.25rem;" allow="clipboard-write"></iframe></section> 
+            <section class="p-6 border border-gray-200 rounded-lg bg-gray-50"><h2 class="text-xl font-semibold text-gray-800 mb-4">상세 일정표</h2><iframe src="https://kaknakiak.github.io/invoice/itinerary_planner/index.html" style="width: 100%; height: 800px; border: 1px solid #ccc; border-radius: 0.25rem;" allow="clipboard-write"></iframe></section> 
         </div> 
     </div>`;
 
@@ -479,8 +320,10 @@ function initializeGroup(groupEl, groupId) {
         createFlightSubgroup(flightContainer, sg, groupId); 
     });
     
+    // ▼▼▼ 여기만 수정 ▼▼▼
     groupEl.querySelector('.add-price-subgroup-btn').addEventListener('click', () => { 
         if (!groupData.priceInfo) groupData.priceInfo = [];
+        // 기본 3개 항목(성인/소아/유아)으로 rows 생성
         const sg = { 
             id: `price_sub_${Date.now()}`, 
             title: "", 
@@ -493,6 +336,7 @@ function initializeGroup(groupEl, groupId) {
         groupData.priceInfo.push(sg); 
         createPriceSubgroup(priceContainer, sg, groupId); 
     });
+    // ▲▲▲
 
     groupEl.querySelector('.copy-flight-schedule-btn').addEventListener('click', () => copyHtmlToClipboard(generateFlightScheduleInlineHtml(groupData.flightSchedule)));
     groupEl.querySelector('.copy-price-info-btn').addEventListener('click', () => copyHtmlToClipboard(generatePriceInfoInlineHtml(groupData.priceInfo)));
@@ -503,7 +347,7 @@ function initializeGroup(groupEl, groupId) {
 
 function buildCalculatorDOM(calcContainer) {
     const content = document.createElement('div');
-    content.innerHTML = `<div class="split-container"><div class="pnr-pane"><label class="label-text font-semibold mb-2">PNR 정보</label><textarea class="w-full flex-grow px-3 py-2 border border-gray-300 rounded-md shadow-sm resize-none" placeholder="PNR 정보를 여기에 붙여넣으세요."></textarea></div><div class="resizer-handle"></div><div class="quote-pane"><div class="table-container"><table class="quote-table"><thead><tr class="header-row"><th><button type="button" class="btn btn-sm btn-primary add-person-type-btn"><i class="fas fa-plus"></i> 항목 추가</button></th></tr><tr class="count-row"><th></th></tr></thead><tbody></tbody><tfoot></tfoot></table></div><div class="totals-summary-section"></div></div></div>`;
+    content.innerHTML = `<div class="split-container"><div class="pnr-pane"><label class="label-text font-semibold mb-2">PNR 정보</label><textarea class="w-full flex-grow px-3 py-2 border border-gray-300 rounded-md shadow-sm resize-none" placeholder="PNR 정보를 여기에 붙여넣으세요."></textarea></div><div class="resizer-handle"></div><div class="quote-pane"><div class="table-container"><table class="quote-table"><thead><tr class="header-row"><th><button type="button" class="btn btn-sm btn-primary add-person-type-btn"><i class="fas fa-plus"></i> 항목 추가</button></th></tr><tr class="count-row"><th></th></tr></thead><tbody></tbody><tfoot></tfoot></table></div></div></div>`;
     const calculatorElement = content.firstElementChild;
     calcContainer.appendChild(calculatorElement);
     calculatorElement.querySelector('.add-person-type-btn').addEventListener('click', () => addPersonTypeColumn(calcContainer, '아동', 1));
@@ -530,13 +374,12 @@ function createCalculatorInstance(wrapper, groupId, calcData) {
     deleteBtn.className = 'absolute top-2 right-2 text-gray-400 hover:text-red-600 z-10';
     deleteBtn.innerHTML = '<i class="fas fa-times-circle"></i>';
     deleteBtn.title = '이 계산기 삭제';
-    deleteBtn.addEventListener('click', (e) => { e.stopPropagation(); if (confirm('이 견적 계산기를 삭제하시겠습니까?')) { const groupData = quoteGroupsData[groupId]; if (groupData) { groupData.calculators = groupData.calculators.filter(c => c.id !== calcData.id); } instanceContainer.remove(); updateTotalsSummary(); } });
+    deleteBtn.addEventListener('click', (e) => { e.stopPropagation(); if (confirm('이 견적 계산기를 삭제하시겠습니까?')) { const groupData = quoteGroupsData[groupId]; if (groupData) { groupData.calculators = groupData.calculators.filter(c => c.id !== calcData.id); } instanceContainer.remove(); } });
     instanceContainer.appendChild(deleteBtn);
     wrapper.appendChild(instanceContainer);
     buildCalculatorDOM(instanceContainer);
     if (calcData && calcData.tableHTML) { restoreCalculatorState(instanceContainer, calcData); }
     else { addPersonTypeColumn(instanceContainer, '성인', 1); }
-    updateTotalsSummary();
 }
 
 function restoreCalculatorState(instanceContainer, calcData) {
@@ -550,19 +393,18 @@ function restoreCalculatorState(instanceContainer, calcData) {
     } else {
         addPersonTypeColumn(instanceContainer, '성인', 1);
     }
-    calculateAllInInstance(instanceContainer);
+    calculateAll(instanceContainer);
 }
 
 function rebindCalculatorEventListeners(calcContainer) {
-    const calcAll = () => {
-        calculateAllInInstance(calcContainer);
-        updateTotalsSummary();
-    };
+    const calcAll = () => calculateAll(calcContainer);
 
+    // 모든 input 필드에 실시간 계산 이벤트 연결
     calcContainer.querySelectorAll('input').forEach(el => {
         el.addEventListener('input', calcAll);
     });
 
+    // 모든 span에 '수정 가능' 기능 연결
     calcContainer.querySelectorAll('.person-type-name-span').forEach(span => {
         makeEditable(span, 'text', calcAll);
     });
@@ -573,6 +415,7 @@ function rebindCalculatorEventListeners(calcContainer) {
         makeEditable(span, 'text', () => {});
     });
 
+    // 모든 삭제 버튼 기능 연결
     calcContainer.querySelectorAll('th .remove-col-btn').forEach((btn) => {
         const headerCell = btn.closest('th');
         if (!headerCell) return;
@@ -580,6 +423,7 @@ function rebindCalculatorEventListeners(calcContainer) {
         btn.addEventListener('click', () => { 
             if (!confirm('해당 항목을 삭제하시겠습니까?')) return; 
             calcContainer.querySelectorAll('.quote-table tr').forEach(row => row.cells[colIndex]?.remove()); 
+            updateSummaryRow(calcContainer); 
             calcAll(); 
         });
     });
@@ -592,6 +436,7 @@ function rebindCalculatorEventListeners(calcContainer) {
         });
     });
 
+    // 모든 추가 버튼 기능 연결
     const addPersonBtn = calcContainer.querySelector('.add-person-type-btn');
     if (addPersonBtn) {
         addPersonBtn.addEventListener('click', () => addPersonTypeColumn(calcContainer, '아동', 1));
@@ -601,27 +446,37 @@ function rebindCalculatorEventListeners(calcContainer) {
         addRowBtn.addEventListener('click', () => addDynamicCostRow(calcContainer));
     }
     
+    // ▼▼▼ [신규] 수식 계산 결과 툴팁 기능 추가 ▼▼▼
     calcContainer.querySelectorAll('.cost-item, .sales-price').forEach(input => {
         const updateTooltip = () => {
             const expression = input.value;
+            // 수식 기호(+, -, *, /)가 있을 때만 툴팁을 표시
             if (expression && /[+\-*/]/.test(expression)) {
                 const result = evaluateMath(expression);
+                // HTML title 속성을 이용해 브라우저 기본 툴팁을 생성
                 input.title = ` ${new Intl.NumberFormat('ko-KR').format(Math.round(result))}`;
             } else {
+                // 수식이 아니면 툴팁을 제거
                 input.title = '';
             }
         };
 
+        // 마우스를 올리거나, 키보드로 포커스했을 때 툴팁을 업데이트
         input.addEventListener('mouseover', updateTooltip);
         input.addEventListener('focus', updateTooltip);
     });
 
+    // ▼▼▼ [신규] 상품가 입력란에 더블클릭 복사 기능 추가 ▼▼▼
     calcContainer.querySelectorAll('.sales-price').forEach(input => {
         input.addEventListener('dblclick', (event) => {
+            // 수식이 입력된 경우 계산된 값을 복사합니다.
             const calculatedValue = evaluateMath(event.target.value).toString();
             copyToClipboard(calculatedValue, '상품가');
         });
     });
+    // ▲▲▲ 신규 기능 추가 끝 ▲▲▲
+
+    updateSummaryRow(calcContainer);
 }
 
 function makeEditable(element, inputType, onBlurCallback) {
@@ -662,10 +517,7 @@ function getCellContent(rowId, colIndex, type) {
 
 function setupColumnEventListeners(calcContainer, colIndex, headerCell, countCell) {
     if (!headerCell || !countCell) return;
-    const calcAllForGroup = () => {
-        calculateAllInInstance(calcContainer);
-        updateTotalsSummary();
-    };
+    const calcAllForGroup = () => calculateAll(calcContainer);
     makeEditable(headerCell.querySelector('.person-type-name-span'), 'text', calcAllForGroup);
     makeEditable(countCell.querySelector('.person-count-span'), 'number', calcAllForGroup);
     const removeBtn = headerCell.querySelector('.remove-col-btn');
@@ -673,6 +525,7 @@ function setupColumnEventListeners(calcContainer, colIndex, headerCell, countCel
         removeBtn.addEventListener('click', () => {
             if (!confirm(`'${headerCell.textContent.trim()}' 항목을 삭제하시겠습니까?`)) return;
             calcContainer.querySelectorAll('.quote-table tr').forEach(row => { if (row.cells.length > colIndex) row.deleteCell(colIndex); });
+            updateSummaryRow(calcContainer);
             calcAllForGroup();
         });
     }
@@ -701,9 +554,9 @@ function addPersonTypeColumn(calcContainer, typeName = '성인', count = 1) {
         const rowDef = ROW_DEFINITIONS.find(r => r.id === rowId) || { type: 'costInput' };
         tr.insertCell(-1).innerHTML = getCellContent(rowId, colIndex, rowDef.type);
     });
+    updateSummaryRow(calcContainer);
     setupColumnEventListeners(calcContainer, colIndex, headerCell, countCell);
-    calculateAllInInstance(calcContainer);
-    updateTotalsSummary();
+    calculateAll(calcContainer);
 }
 
 function addDynamicCostRow(calcContainer, label = '신규 항목') {
@@ -722,17 +575,34 @@ function addDynamicCostRow(calcContainer, label = '신규 항목') {
         newRow.insertCell(i).innerHTML = getCellContent(rowId, i, 'costInput');
     }
     rebindCalculatorEventListeners(calcContainer);
-    calculateAllInInstance(calcContainer);
-    updateTotalsSummary();
+    calculateAll(calcContainer);
 }
 
-function calculateAllInInstance(calcContainer) {
+function updateSummaryRow(calcContainer) {
+    const table = calcContainer.querySelector('.quote-table');
+    if (!table) return;
+    let tfoot = table.querySelector('tfoot');
+    if (!tfoot) { tfoot = document.createElement('tfoot'); table.appendChild(tfoot); }
+    tfoot.innerHTML = '';
+    const headerRow = table.querySelector('.header-row');
+    if (!headerRow || headerRow.cells.length <= 1) return;
+    const summaryRow = tfoot.insertRow();
+    summaryRow.insertCell(0).innerHTML = '<div class="p-2 font-bold text-center">전체 합계</div>';
+    const summaryCell = summaryRow.insertCell(1);
+    summaryCell.colSpan = headerRow.cells.length - 1;
+    summaryCell.innerHTML = `<div class="totals-summary-section flex items-center justify-around p-1"><div class="text-center mx-2"><span class="text-base font-medium text-gray-600">전체상품가 </span><span class="text-lg font-bold text-indigo-700 totalSalesPrice">0 원</span></div><div class="text-center mx-2"><span class="text-base font-medium text-gray-600">전체수익 </span><span class="text-lg font-bold text-indigo-700 totalProfit">0 원</span></div><div class="text-center mx-2"><span class="text-base font-medium text-gray-600">전체수익률 </span><span class="text-lg font-bold text-indigo-700 totalProfitMargin">0.00 %</span></div></div>`;
+    summaryRow.cells[0].style.borderTop = "2px solid #a0aec0";
+    summaryCell.style.borderTop = "2px solid #a0aec0";
+}
+
+function calculateAll(calcContainer) {
     if (!calcContainer) return;
     const table = calcContainer.querySelector('.quote-table');
     if (!table) return;
-    
-    // 이 인스턴스에 대한 계산 결과 업데이트
-    for (let i = 1; i < table.querySelector('.header-row').cells.length; i++) {
+    const headerRow = table.querySelector('.header-row');
+    if (!headerRow) return;
+    let grandTotalSales = 0, grandTotalProfit = 0;
+    for (let i = 1; i < headerRow.cells.length; i++) {
         const countCell = table.querySelector(`.count-row th:nth-child(${i + 1})`);
         const count = countCell ? parseInt(countCell.textContent.replace(/,/g, ''), 10) || 0 : 0;
         let netCost = 0;
@@ -741,11 +611,18 @@ function calculateAllInInstance(calcContainer) {
         const salesPrice = salesPriceInput ? evaluateMath(salesPriceInput.value) : 0;
         const profitPerPerson = salesPrice - netCost;
         const profitMargin = salesPrice > 0 ? (profitPerPerson / salesPrice) : 0;
-
         updateCalculatedCell(table, i, 'netCost', formatCurrency(netCost));
         updateCalculatedCell(table, i, 'profitPerPerson', formatCurrency(profitPerPerson));
         updateCalculatedCell(table, i, 'profitMargin', formatPercentage(profitMargin));
+        grandTotalSales += salesPrice * count;
+        grandTotalProfit += profitPerPerson * count;
     }
+    const grandTotalProfitMargin = grandTotalSales > 0 ? (grandTotalProfit / grandTotalSales) : 0;
+    const summarySection = calcContainer.querySelector('.totals-summary-section');
+    if (!summarySection) return;
+    summarySection.querySelector('.totalSalesPrice').textContent = formatCurrency(grandTotalSales);
+    summarySection.querySelector('.totalProfit').textContent = formatCurrency(grandTotalProfit);
+    summarySection.querySelector('.totalProfitMargin').textContent = formatPercentage(grandTotalProfitMargin);
 }
 
 function updateCalculatedCell(table, colIndex, rowId, value) {
@@ -756,43 +633,95 @@ function updateCalculatedCell(table, colIndex, rowId, value) {
     }
 }
 
-function updateTotalsSummary() {
-    let grandTotalSales = 0;
-    let grandTotalProfit = 0;
-
-    document.querySelectorAll('.calculator-instance').forEach(instance => {
-        const table = instance.querySelector('.quote-table');
-        if (!table) return;
-
-        for (let i = 1; i < table.querySelector('.header-row').cells.length; i++) {
-            const countCell = table.querySelector(`.count-row th:nth-child(${i + 1})`);
-            const count = countCell ? parseInt(countCell.textContent.replace(/,/g, ''), 10) || 0 : 0;
-            
-            let netCost = 0;
-            instance.querySelectorAll(`tbody tr td:nth-child(${i + 1}) .cost-item`).forEach(input => {
-                netCost += evaluateMath(input.value);
-            });
-            
-            const salesPriceInput = instance.querySelector(`tbody tr td:nth-child(${i + 1}) .sales-price`);
-            const salesPrice = salesPriceInput ? evaluateMath(salesPriceInput.value) : 0;
-            
-            const profitPerPerson = salesPrice - netCost;
-
-            grandTotalSales += salesPrice * count;
-            grandTotalProfit += profitPerPerson * count;
-        }
-    });
-
-    const grandTotalProfitMargin = grandTotalSales > 0 ? (grandTotalProfit / grandTotalSales) * 100 : 0;
-
-    const summaryContainer = document.querySelector('.totals-summary-section'); 
-    if (summaryContainer) {
-        summaryContainer.querySelector('.totalSalesPrice').textContent = formatCurrency(grandTotalSales);
-        summaryContainer.querySelector('.totalProfit').textContent = formatCurrency(grandTotalProfit);
-        summaryContainer.querySelector('.totalProfitMargin').textContent = grandTotalProfitMargin.toFixed(2) + ' %';
-    }
+// --- 오른쪽 패널 관련 함수들 ---
+function createFlightSubgroup(container, subgroupData, groupId) {
+    const subGroupDiv = document.createElement('div');
+    subGroupDiv.className = 'dynamic-section flight-schedule-subgroup';
+    subGroupDiv.id = subgroupData.id;
+    subGroupDiv.innerHTML = `<button type="button" class="delete-dynamic-section-btn" title="이 스케줄 그룹 삭제"><i class="fas fa-trash-alt"></i></button><div class="mb-2"><input type="text" class="input-field" placeholder="항공사 (예: 이스타항공)" value="${subgroupData.title || ''}"></div><div class="overflow-x-auto"><table class="flight-schedule-table"><thead><tr><th>편명</th><th>출발일</th><th>출발지</th><th>출발시간</th><th>도착일</th><th>도착지</th><th>도착시간</th><th style="width: 50px;">삭제</th></tr></thead><tbody></tbody></table></div><div class="add-row-btn-container pt-2"><button type="button" class="add-row-btn"><i class="fas fa-plus mr-1"></i> 행 추가</button></div>`;
+    const tbody = subGroupDiv.querySelector('tbody');
+    subgroupData.rows.forEach(rowData => addFlightRow(tbody, rowData, subgroupData));
+    subGroupDiv.querySelector('.delete-dynamic-section-btn').addEventListener('click', () => { if (confirm('이 항공 스케줄 그룹을 삭제하시겠습니까?')) { quoteGroupsData[groupId].flightSchedule = quoteGroupsData[groupId].flightSchedule.filter(g => g.id !== subgroupData.id); subGroupDiv.remove(); } });
+    subGroupDiv.querySelector('input[type="text"]').addEventListener('input', e => { subgroupData.title = e.target.value; });
+    subGroupDiv.querySelector('.add-row-btn').addEventListener('click', () => { const newRowData = {}; subgroupData.rows.push(newRowData); addFlightRow(tbody, newRowData, subgroupData); });
+    container.appendChild(subGroupDiv);
 }
 
+function addFlightRow(tbody, rowData, subgroupData) {
+    const tr = document.createElement('tr');
+    const fields = [{ key: 'flightNum', placeholder: 'ZE561' }, { key: 'depDate', placeholder: '07/09' }, { key: 'originCity', placeholder: 'ICN' }, { key: 'depTime', placeholder: '20:55' }, { key: 'arrDate', placeholder: '07/09' }, { key: 'destCity', placeholder: 'CXR' }, { key: 'arrTime', placeholder: '23:55' }];
+    tr.innerHTML = fields.map(f => `<td><input type="text" class="flight-schedule-input" data-field="${f.key}" value="${rowData[f.key] || ''}" placeholder="${f.placeholder}"></td>`).join('') + `<td class="text-center"><button type="button" class="delete-row-btn" title="이 행 삭제"><i class="fas fa-trash"></i></button></td>`;
+    tbody.appendChild(tr);
+    tr.querySelectorAll('input').forEach(input => input.addEventListener('input', e => { const field = e.target.dataset.field; rowData[field] = e.target.value; }));
+    tr.querySelector('.delete-row-btn').addEventListener('click', () => { const rowIndex = Array.from(tbody.children).indexOf(tr); subgroupData.rows.splice(rowIndex, 1); tr.remove(); });
+}
+
+function createPriceSubgroup(container, subgroupData, groupId) {
+    const subGroupDiv = document.createElement('div');
+    subGroupDiv.className = 'dynamic-section price-subgroup';
+    subGroupDiv.id = subgroupData.id;
+    subGroupDiv.innerHTML = `<button type="button" class="delete-dynamic-section-btn" title="이 요금 그룹 삭제"><i class="fas fa-trash-alt"></i></button><input type="text" class="input-field mb-2" placeholder="견적설명 (예: 인천출발, A객실)" value="${subgroupData.title || ''}"><table class="price-table"><thead><tr><th style="width:25%">내역</th><th>1인당금액</th><th>인원</th><th>총금액</th><th style="width:30%">비고</th><th style="width:50px">삭제</th></tr></thead><tbody></tbody><tfoot><tr><td colspan="3" class="text-right font-bold pr-2">총 합계</td><td class="grand-total">0</td><td colspan="2"><button type="button" class="add-row-btn"><i class="fas fa-plus mr-1"></i>행 추가</button></td></tr></tfoot></table>`;
+    const tbody = subGroupDiv.querySelector('tbody');
+    subgroupData.rows.forEach(rowData => addPriceRow(tbody, rowData, subgroupData, subGroupDiv, groupId));
+    updateGrandTotal(subGroupDiv, groupId);
+    subGroupDiv.querySelector('.delete-dynamic-section-btn').addEventListener('click', () => { if (confirm('이 요금 그룹을 삭제하시겠습니까?')) { quoteGroupsData[groupId].priceInfo = quoteGroupsData[groupId].priceInfo.filter(g => g.id !== subgroupData.id); subGroupDiv.remove(); } });
+    subGroupDiv.querySelector('input.input-field').addEventListener('input', e => { subgroupData.title = e.target.value; });
+    subGroupDiv.querySelector('.add-row-btn').addEventListener('click', () => { const newRow = { item: "", price: 0, count: 1, remarks: "" }; subgroupData.rows.push(newRow); addPriceRow(tbody, newRow, subgroupData, subGroupDiv, groupId); });
+    container.appendChild(subGroupDiv);
+}
+
+function addPriceRow(tbody, rowData, subgroupData, subGroupDiv, groupId) {
+    const tr = document.createElement('tr');
+    const fields = [{ key: 'item', align: 'center' }, { key: 'price', align: 'center' }, { key: 'count', align: 'center' }, { key: 'total', align: 'center', readonly: true }, { key: 'remarks', align: 'center' }];
+    tr.innerHTML = fields.map(f => `<td><input type="text" class="text-${f.align}" data-field="${f.key}" value="${rowData[f.key] || ''}" ${f.readonly ? 'readonly' : ''}></td>`).join('') + `<td><button type="button" class="delete-row-btn"><i class="fas fa-trash"></i></button></td>`;
+    tbody.appendChild(tr);
+    const updateRow = () => {
+        const price = parseFloat(rowData.price) || 0;
+        const count = parseInt(rowData.count) || 0;
+        const total = price * count;
+        rowData.total = total;
+        const totalInput = tr.querySelector('[data-field="total"]');
+        if (totalInput) totalInput.value = total.toLocaleString();
+        updateGrandTotal(subGroupDiv, groupId);
+    };
+    tr.querySelectorAll('input:not([readonly])').forEach(input => input.addEventListener('input', e => { rowData[e.target.dataset.field] = e.target.value.replace(/,/g, ''); updateRow(); }));
+    tr.querySelector('.delete-row-btn').addEventListener('click', () => { if (subgroupData.rows.length > 1) { const rowIndex = Array.from(tbody.children).indexOf(tr); subgroupData.rows.splice(rowIndex, 1); tr.remove(); updateGrandTotal(subGroupDiv, groupId); } else { alert('최소 한 개의 요금 항목은 유지해야 합니다.'); } });
+    updateRow();
+}
+
+function updateGrandTotal(subGroupDiv, groupId) {
+    const subgroupData = quoteGroupsData[groupId]?.priceInfo.find(g => g.id === subGroupDiv.id);
+    if (!subgroupData) return;
+    const grandTotal = subgroupData.rows.reduce((sum, row) => (sum + (parseFloat(row.price) || 0) * (parseInt(row.count) || 0)), 0);
+    subGroupDiv.querySelector('.grand-total').textContent = grandTotal.toLocaleString();
+}
+
+function generateInclusionExclusionInlineHtml(inclusionText, exclusionText) { const i = inclusionText ? inclusionText.replace(/\n/g, '<br>') : ''; const e = exclusionText ? exclusionText.replace(/\n/g, '<br>') : ''; return `<table style="width:100%;border-collapse:collapse;font-family:sans-serif;font-size:12px"><tbody><tr><td style="vertical-align:top;width:50%;padding-right:10px"><h3 style="font-size:16px;font-weight:600;margin-bottom:8px">포함</h3><div style="padding:8px;border:1px solid #eee;min-height:100px">${i}</div></td><td style="vertical-align:top;width:50%;padding-left:10px"><h3 style="font-size:16px;font-weight:600;margin-bottom:8px">불포함</h3><div style="padding:8px;border:1px solid #eee;min-height:100px">${e}</div></td></tr></tbody></table>`; }
+
+function generatePriceInfoInlineHtml(priceData) {
+    let html = '';
+    if (priceData) {
+        priceData.forEach(subgroup => {
+            html += `<table style="width:100%;border-collapse:collapse;font-family:sans-serif;font-size:12px;margin-bottom:16px"><thead><tr style="background-color:#f9fafb"><th style="border:1px solid #ddd;padding:8px;text-align:center">내역</th><th style="border:1px solid #ddd;padding:8px;text-align:center">1인당 금액</th><th style="border:1px solid #ddd;padding:8px;text-align:center">인원</th><th style="border:1px solid #ddd;padding:8px;text-align:center">총 금액</th><th style="border:1px solid #ddd;padding:8px;text-align:center">비고</th></tr></thead><tbody>`;
+            let grandTotal = 0;
+            subgroup.rows.forEach(row => { const p = parseFloat(row.price) || 0; const c = parseInt(row.count) || 0; const t = p * c; grandTotal += t; html += `<tr><td style="border:1px solid #ddd;padding:8px">${row.item || ''}</td><td style="border:1px solid #ddd;padding:8px;text-align:right">${p.toLocaleString()}</td><td style="border:1px solid #ddd;padding:8px;text-align:center">${c}</td><td style="border:1px solid #ddd;padding:8px;text-align:right">${t.toLocaleString()}</td><td style="border:1px solid #ddd;padding:8px">${row.remarks || ''}</td></tr>`; });
+            html += `</tbody><tfoot><tr style="font-weight:bold"><td colspan="3" style="border:1px solid #ddd;padding:8px;text-align:right">총 합계</td><td style="border:1px solid #ddd;padding:8px;text-align:right">${grandTotal.toLocaleString()}</td><td style="border:1px solid #ddd;padding:8px"></td></tr></tfoot></table>`;
+        });
+    }
+    return html;
+}
+
+function generateFlightScheduleInlineHtml(flightData) { 
+    let html = ''; 
+    if(flightData) {
+        flightData.forEach(subgroup => { 
+            html += `<h4 style="font-size:14px;font-weight:600;margin-bottom:8px">${subgroup.title || '항공 스케줄'}</h4><table style="width:100%;border-collapse:collapse;font-family:sans-serif;font-size:12px;margin-bottom:16px"><thead><tr style="background-color:#f9fafb"><th style="border:1px solid #ddd;padding:8px;text-align:left">편명</th><th style="border:1px solid #ddd;padding:8px;text-align:left">출발일</th><th style="border:1px solid #ddd;padding:8px;text-align:left">출발지</th><th style="border:1px solid #ddd;padding:8px;text-align:left">출발시간</th><th style="border:1px solid #ddd;padding:8px;text-align:left">도착일</th><th style="border:1px solid #ddd;padding:8px;text-align:left">도착지</th><th style="border:1px solid #ddd;padding:8px;text-align:left">도착시간</th></tr></thead><tbody>`; 
+            subgroup.rows.forEach(row => { html += `<tr><td style="border:1px solid #ddd;padding:8px">${row.flightNum || ''}</td><td style="border:1px solid #ddd;padding:8px">${row.depDate || ''}</td><td style="border:1px solid #ddd;padding:8px">${row.originCity || ''}</td><td style="border:1px solid #ddd;padding:8px">${row.depTime || ''}</td><td style="border:1px solid #ddd;padding:8px">${row.arrDate || ''}</td><td style="border:1px solid #ddd;padding:8px">${row.destCity || ''}</td><td style="border:1px solid #ddd;padding:8px">${row.arrTime || ''}</td></tr>`; }); 
+            html += `</tbody></table>`; 
+        }); 
+    }
+    return html; 
+}
 
 // =======================================================================
 // 5. 시스템 시작 (DOM 로드 후 실행)
@@ -819,25 +748,6 @@ function initializeNewSession() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    // 로컬 파일에서 열었을 때, 특정 버튼들을 비활성화하고 안내 문구를 표시합니다.
-    if (window.location.protocol === 'file:') {
-        const headerButtons = document.getElementById('header-buttons');
-        if (headerButtons) {
-            // '저장'과 '다른 이름으로 저장' 버튼만 남기고 나머지는 제거하거나 비활성화 할 수 있습니다.
-            // 여기서는 간단하게 안내 문구로 교체합니다.
-            const saveBtn = headerButtons.querySelector('#saveBtn');
-            const saveAsBtn = headerButtons.querySelector('#saveAsBtn');
-            headerButtons.innerHTML = ''; // 기존 버튼 모두 삭제
-            if(saveBtn) headerButtons.appendChild(saveBtn); // 저장 버튼 다시 추가
-            if(saveAsBtn) headerButtons.appendChild(saveAsBtn); // 다른 이름으로 저장 버튼 다시 추가
-            
-            const notice = document.createElement('span');
-            notice.className = 'text-sm font-semibold text-red-600 ml-4';
-            notice.textContent = '로컬 파일 모드';
-            headerButtons.appendChild(notice);
-        }
-    }
-    
     const restoredDataScript = document.getElementById('restored-data');
     let restoredData = null;
     if (restoredDataScript && restoredDataScript.textContent.trim()) {
@@ -849,37 +759,15 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
         initializeNewSession();
     }
-    
     document.getElementById('addCustomerBtn').addEventListener('click', () => createCustomerCard());
     document.getElementById('newGroupBtn').addEventListener('click', addNewGroup);
     document.getElementById('copyGroupBtn').addEventListener('click', copyActiveGroup);
     document.getElementById('deleteGroupBtn').addEventListener('click', deleteActiveGroup);
-    
-    const recentFilesBtn = document.getElementById('recentFilesBtn');
-    if (recentFilesBtn) recentFilesBtn.addEventListener('click', showRecentFilesModal);
-    
-    const openFileBtn = document.getElementById('openFileBtn');
-    if(openFileBtn) openFileBtn.addEventListener('click', browseAndLoadFile);
-
     document.getElementById('saveBtn').addEventListener('click', (event) => saveFile(false, event.currentTarget));
     document.getElementById('saveAsBtn').addEventListener('click', (event) => saveFile(true, event.currentTarget));
-    
-    const closeRecentFilesModalBtn = document.getElementById('closeRecentFilesModal');
-    if(closeRecentFilesModalBtn) closeRecentFilesModalBtn.addEventListener('click', () => document.getElementById('recentFilesModal').classList.add('hidden'));
-
-    const browseFileBtn = document.getElementById('browseFileBtn');
-    if(browseFileBtn) browseFileBtn.addEventListener('click', browseAndLoadFile);
-
-    const clearRecentListBtn = document.getElementById('clearRecentListBtn');
-    if(clearRecentListBtn) clearRecentListBtn.addEventListener('click', clearRecentFiles);
-
-    const quoteForm = document.getElementById('quoteForm');
-    if(quoteForm) {
-        // submit 이벤트는 이제 사용하지 않으므로 제거하거나 주석 처리합니다.
-        // quoteForm.addEventListener('submit', (e) => { e.preventDefault(); document.getElementById('saveBtn').click(); });
-        const resetBtn = quoteForm.querySelector('button[type="reset"]');
-        if(resetBtn) resetBtn.addEventListener('click', (e) => { e.preventDefault(); if (confirm("작성중인 모든 내용을 삭제하고 새로 시작하시겠습니까?")) { window.location.reload(); } });
-    }
+    const loadFileLabel = document.querySelector('label[for="loadFile"]');
+    if (loadFileLabel) { loadFileLabel.addEventListener('click', (event) => { event.preventDefault(); loadFile(); }); }
+    document.getElementById('quoteForm').addEventListener('reset', (e) => { e.preventDefault(); if (confirm("작성중인 모든 내용을 삭제하고 새로 시작하시겠습니까?")) { window.location.reload(); } });
     
     let isResizing = false;
     let pnrPaneToResize = null;
@@ -888,26 +776,37 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('mousemove', (e) => { if (!isResizing) return; const rect = splitContainerToResize.getBoundingClientRect(); let newWidth = e.clientX - rect.left; if (newWidth < 150) newWidth = 150; if (newWidth > rect.width - 350) newWidth = rect.width - 350; pnrPaneToResize.style.width = newWidth + 'px'; });
     document.addEventListener('mouseup', () => { if (isResizing) { isResizing = false; pnrPaneToResize = null; splitContainerToResize = null; document.body.style.cursor = 'default'; } });
 
+    // --- [신규] 단축키 기능 추가 ---
     document.addEventListener('keydown', (event) => {
+        // 다른 입력창에 타이핑하는 것을 방해하지 않기 위해,
+        // 특정 요소(INPUT, TEXTAREA)에 포커스가 있을 때는 단축키가 동작하지 않도록 함
+        if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') {
+            return;
+        }
+
+        // Shift 키가 눌렸을 때만 동작
         if (event.shiftKey) {
             switch (event.code) {
-                case 'KeyR':
-                    event.preventDefault();
-                    document.getElementById('recentFilesBtn')?.click();
-                    break;
-                case 'KeyF':
-                    event.preventDefault();
-                    document.getElementById('openFileBtn')?.click();
-                    break;
+                // Shift + S: 저장
                 case 'KeyS':
-                    event.preventDefault();
+                    event.preventDefault(); // 브라우저 기본 저장 동작 방지
                     document.getElementById('saveBtn').click();
                     break;
+
+                // Shift + W: 다른 이름으로 저장
                 case 'KeyW':
                     event.preventDefault();
                     document.getElementById('saveAsBtn').click();
                     break;
+                
+                // Shift + F: 불러오기
+                case 'KeyF':
+                    event.preventDefault();
+                    document.querySelector('label[for="loadFile"]').click();
+                    break;
             }
         }
     });
+    // ▲▲▲ 여기까지 추가 ▲▲▲
+
 });
