@@ -8,7 +8,6 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link rel="stylesheet" href="style.css">
     <script id="restored-data" type="application/json"></script>
-    <!-- [추가] PWA 관련 메타 및 manifest -->
     <meta name="theme-color" content="#4f46e5"/>
     <link rel="manifest" href="manifest.json">
 </head>
@@ -20,11 +19,11 @@
                 <button type="button" id="saveBtn" class="btn btn-sm btn-secondary"><i class="fas fa-save"></i> 저장(Shift + S)</button>
                 <button type="button" id="saveAsBtn" class="btn btn-sm btn-secondary"><i class="fas fa-file-export"></i> 다른 이름으로 저장(Shift + W)</button>
                 <label for="loadFile" class="btn btn-sm btn-secondary cursor-pointer"><i class="fas fa-folder-open"></i> 불러오기(Shift + F)</label>
-                <input type="file" id="loadFile" class="hidden" accept=".html">
+                <button type="button" id="recentFilesBtn" class="btn btn-sm btn-secondary"><i class="fas fa-history"></i> 최근 파일(Shift + R)</button>
             </div>
         </header>
 
-        <form id="quoteForm">
+        <form id="quoteForm" onsubmit="return false;">
             <div class="flex gap-6 mb-8">
                 <section class="w-1/2 p-6 border border-gray-200 rounded-lg">
                     <div class="flex justify-between items-center mb-4">
@@ -74,7 +73,21 @@
             </section>
         </form>
     </div>
-    <!-- [추가] 서비스워커 등록 스크립트 -->
+    <div id="recentFilesModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50 hidden">
+        <div class="relative p-5 border w-11/12 md:w-1/2 lg:w-1/3 shadow-lg rounded-md bg-white">
+            <div class="flex justify-between items-center mb-3">
+                <h3 class="text-lg font-medium leading-6 text-gray-900">최근 로드 파일</h3>
+                <button id="closeRecentFilesModalButton" class="text-gray-400 hover:text-gray-600"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+            </div>
+            <input type="text" id="recentFileSearchInput" placeholder="파일 이름으로 검색..." class="w-full p-2 mb-3 border rounded-md focus:ring-blue-500 focus:border-blue-500">
+            <ul id="recentFileList" class="mt-2 h-60 overflow-y-auto border rounded-md divide-y divide-gray-200"></ul>
+            <div id="loadingRecentFileListMsg" class="mt-2 text-sm text-gray-500" style="display:none;">목록을 불러오는 중...</div>
+            <div class="mt-4">
+                <button id="cancelRecentFilesModalButton" class="px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md w-full shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400">닫기</button>
+            </div>
+        </div>
+    </div>
+    <div id="toast-container" class="fixed bottom-4 right-4 z-[1000]"></div>
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
