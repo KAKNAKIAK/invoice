@@ -1000,6 +1000,19 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (restoredData) { restoreState(restoredData); } 
     else { initializeNewSession(); }
+
+    // ▼▼▼ [추가] 메모 복사 버튼 이벤트 리스너를 추가했습니다. ▼▼▼
+    const copyMemoBtn = document.getElementById('copyMemoBtn');
+    if (copyMemoBtn) {
+        copyMemoBtn.addEventListener('click', () => {
+            const memoTextarea = document.getElementById('memoText');
+            if(memoTextarea) {
+                copyToClipboard(memoTextarea.value, '메모');
+            }
+        });
+    }
+    // ▲▲▲ [추가] 여기까지 ▲▲▲
+
     document.getElementById('addCustomerBtn').addEventListener('click', () => createCustomerCard());
     document.getElementById('newGroupBtn').addEventListener('click', addNewGroup);
     document.getElementById('copyGroupBtn').addEventListener('click', copyActiveGroup);
