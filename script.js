@@ -529,11 +529,11 @@ function initializeGroup(groupEl, groupId) {
                 <div class="flex gap-4">
                     <div class="w-1/2 flex flex-col">
                         <div class="flex items-center mb-1"><h3 class="font-medium">포함</h3><button type="button" class="ml-2 copy-inclusion-btn inline-copy-btn" title="포함 내역 복사"><i class="far fa-copy"></i></button></div>
-                        <textarea class="input-field flex-grow inclusion-text" rows="5"></textarea>
+                        <textarea class="w-full flex-grow px-3 py-2 border border-gray-300 rounded-md shadow-sm inclusion-text" rows="5"></textarea>
                     </div>
                     <div class="w-1/2 flex flex-col">
                         <div class="flex items-center mb-1"><h3 class="font-medium">불포함</h3><button type="button" class="ml-2 copy-exclusion-btn inline-copy-btn" title="불포함 내역 복사"><i class="far fa-copy"></i></button></div>
-                        <textarea class="input-field flex-grow exclusion-text" rows="5"></textarea>
+                        <textarea class="w-full flex-grow px-3 py-2 border border-gray-300 rounded-md shadow-sm exclusion-text" rows="5"></textarea>
                     </div>
                 </div>
             </section> 
