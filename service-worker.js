@@ -1,7 +1,6 @@
-// [수정] 캐시 이름을 변경하여 새로운 버전임을 명시합니다. (v1 -> v2)
-const CACHE_NAME = 'quote-calculator-cache-v2';
-
-// 캐시할 파일 목록은 동일합니다.
+// 캐시 이름 정의
+const CACHE_NAME = 'quote-calculator-cache-v1';
+// 캐시할 파일 목록
 const FILES_TO_CACHE = [
   './',
   './index.html',
@@ -23,42 +22,14 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
-        console.log('새로운 버전의 파일 캐싱 완료');
+        console.log('캐시 파일 저장 완료');
         return cache.addAll(FILES_TO_CACHE);
       })
-      .then(() => {
-        // [신규] 새로운 서비스 워커가 설치되면 즉시 활성화되도록 합니다.
-        return self.skipWaiting();
-      })
   );
 });
-
-// [신규] 서비스 워커 활성화 및 이전 캐시 정리 이벤트
-self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then((keyList) => {
-      return Promise.all(keyList.map((key) => {
-        // 현재 캐시 이름(CACHE_NAME)과 다른 모든 이전 버전의 캐시를 삭제합니다.
-        if (key !== CACHE_NAME) {
-          console.log('이전 버전 캐시 삭제:', key);
-          return caches.delete(key);
-        }
-      }));
-    }).then(() => {
-      // [신규] 활성화된 서비스 워커가 페이지를 즉시 제어하도록 합니다.
-      return self.clients.claim();
-    })
-  );
-});
-
 
 // 요청에 대한 응답 처리 (캐시 우선 전략)
 self.addEventListener('fetch', (event) => {
-  // GET 요청에 대해서만 캐시 전략을 사용합니다.
-  if (event.request.method !== 'GET') {
-    return;
-  }
-  
   event.respondWith(
     caches.match(event.request)
       .then((response) => {
