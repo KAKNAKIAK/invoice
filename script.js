@@ -31,10 +31,10 @@ function addFlightsFromParser(parsedFlights) {
     // [수정] 항공사 코드를 맵에서 가져오도록 수정
     const airlineCodeMap = {
         "KE": "대한항공", "OZ": "아시아나항공", "7C": "제주항공", "LJ": "진에어", "TW": "티웨이항공", "RS": "에어서울", "BX": "에어부산", "ZE": "이스타항공",
-        "NH": "전일본공수(ANA)", "JL": "일본항공", "MM": "피치항공",
+        "NH": "전일본공수(ANA)", "JL": "일본항공", "MM": "피치항공", "IB": "일본트랜스오션항공", "7G": "스타플라이어", "OC": "오키나와항공",
         "CA": "중국국제항공", "MU": "중국동방항공", "CZ": "중국남방항공", "CX": "캐세이퍼시픽",
         "CI": "중화항공", "BR": "에바항공", "SQ": "싱가포르항공", "TG": "타이항공", "VN": "베트남항공", "VJ": "비엣젯항공", "QH": "뱀부항공",
-        "PR": "필리핀항공", "MH": "말레이시아항공", "GA": "가루다인도네시아항공",
+        "PR": "필리핀항공", "MH": "말레이시아항공", "GA": "가루다인도네시아항공", 
         "EK": "에미레이트항공", "QR": "카타르항공", "EY": "에티하드항공", "SV": "사우디아항공", "TK": "터키항공",
         "AA": "아메리칸항공", "UA": "유나이티드항공", "DL": "델타항공", "HA": "하와이안항공", "AS": "알래스카항공",
         "AC": "에어캐나다", "AM": "아에로멕시코",
@@ -220,19 +220,20 @@ async function saveFile(isSaveAs = false, clickedButton = null) {
             await writableStream.write(blob);
             await writableStream.close();
             currentFileHandle = newHandle;
-            showToastMessage('파일이 성공적으로 저장되었습니다.'); // [수정] alert 대신 toast
-            saveRecentFile(newHandle.name); // [추가] 최근 파일 목록에 저장
+            document.title = newHandle.name; // [수정] '다른 이름으로 저장' 시 문서 제목을 새 파일명으로 변경
+            showToastMessage('파일이 성공적으로 저장되었습니다.');
+            saveRecentFile(newHandle.name);
         } else {
             const writableStream = await currentFileHandle.createWritable();
             await writableStream.write(blob);
             await writableStream.close();
-            showToastMessage('변경사항이 성공적으로 저장되었습니다.'); // [수정] alert 대신 toast
-            saveRecentFile(currentFileHandle.name); // [추가] 최근 파일 목록에 저장
+            showToastMessage('변경사항이 성공적으로 저장되었습니다.');
+            saveRecentFile(currentFileHandle.name);
         }
     } catch (err) {
         if (err.name !== 'AbortError') { 
             console.error('파일 저장 실패:', err); 
-            showToastMessage('파일 저장에 실패했습니다.', true); // [수정] alert 대신 toast
+            showToastMessage('파일 저장에 실패했습니다.', true);
         }
     } finally {
         saveBtn.disabled = false;
@@ -253,13 +254,14 @@ async function loadFile() {
         if (restoredDataScript && restoredDataScript.textContent) {
             const restoredData = JSON.parse(restoredDataScript.textContent);
             restoreState(restoredData);
-            showToastMessage('파일이 성공적으로 불러와졌습니다.'); // [추가] 토스트 메시지
-            saveRecentFile(fileHandle.name); // [추가] 최근 파일 목록에 저장
-        } else { showToastMessage('유효한 데이터가 포함된 견적서 파일이 아닙니다.', true); } // [수정] alert 대신 toast
+            document.title = fileHandle.name; // [수정] 파일 로드 시 문서 제목을 파일명으로 변경
+            showToastMessage('파일이 성공적으로 불러와졌습니다.');
+            saveRecentFile(fileHandle.name);
+        } else { showToastMessage('유효한 데이터가 포함된 견적서 파일이 아닙니다.', true); }
     } catch (err) {
         if (err.name !== 'AbortError') { 
             console.error('파일 열기 실패:', err); 
-            showToastMessage('파일을 열지 못했습니다.', true); // [수정] alert 대신 toast
+            showToastMessage('파일을 열지 못했습니다.', true);
         }
     }
 }
@@ -953,7 +955,7 @@ function handleEnterKey(e) {
 
         // 다음 요소가 없으면, 현재 탭 내에서 다음 계산기나 다른 섹션으로 이동하는 로직을 고려할 수 있으나,
         // 여기서는 단순하게 다음 포커스 가능한 요소로 이동하도록 구현합니다.
-        // 예를 들어, 모든 인풋이 끝났다면, Submit 버튼으로 이동하거나, 아니면 그냥 blur 처리합니다.
+        // 예를 들어, 모든 인풋이 끝났다면, Submit 버튼으로 이동, 또는 아무것도 하지 않기.
         while (nextElement && (nextElement.disabled || nextElement.readOnly || nextElement.offsetParent === null)) {
             nextIndex++;
             nextElement = formElements[nextIndex];
