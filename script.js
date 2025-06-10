@@ -503,7 +503,40 @@ function initializeGroup(groupEl, groupId) {
 
 function buildCalculatorDOM(calcContainer) {
     const content = document.createElement('div');
-    content.innerHTML = `<div class="split-container"><div class="pnr-pane"><label class="label-text font-semibold mb-2">PNR 정보</label><textarea class="w-full flex-grow px-3 py-2 border border-gray-300 rounded-md shadow-sm resize-none" placeholder="PNR 정보를 여기에 붙여넣으세요."></textarea></div><div class="resizer-handle"></div><div class="quote-pane"><div class="table-container"><table class="quote-table"><thead><tr class="header-row"><th><button type="button" class="btn btn-sm btn-primary add-person-type-btn"><i class="fas fa-plus"></i> 항목 추가</button></th></tr><tr class="count-row"><th></th></tr></thead><tbody></tbody><tfoot></tfoot></table></div><div class="totals-summary-section"></div></div></div>`;
+    // .totals-summary-section 내부에 합계를 표시할 span 태그들을 추가합니다.
+    content.innerHTML = `<div class="split-container">
+        <div class="pnr-pane">
+            <label class="label-text font-semibold mb-2">PNR 정보</label>
+            <textarea class="w-full flex-grow px-3 py-2 border border-gray-300 rounded-md shadow-sm resize-none" placeholder="PNR 정보를 여기에 붙여넣으세요."></textarea>
+        </div>
+        <div class="resizer-handle"></div>
+        <div class="quote-pane">
+            <div class="table-container">
+                <table class="quote-table">
+                    <thead>
+                        <tr class="header-row"><th><button type="button" class="btn btn-sm btn-primary add-person-type-btn"><i class="fas fa-plus"></i> 항목 추가</button></th></tr>
+                        <tr class="count-row"><th></th></tr>
+                    </thead>
+                    <tbody></tbody>
+                    <tfoot></tfoot>
+                </table>
+            </div>
+            <div class="totals-summary-section">
+                <div class="summary-item">
+                    <span class="font-semibold">총 상품가:</span>
+                    <span class="totalSalesPrice calculated-field">0 원</span>
+                </div>
+                <div class="summary-item">
+                    <span class="font-semibold">총 수익:</span>
+                    <span class="totalProfit calculated-field">0 원</span>
+                </div>
+                <div class="summary-item">
+                    <span class="font-semibold">총 수익률:</span>
+                    <span class="totalProfitMargin calculated-field">0.00 %</span>
+                </div>
+            </div>
+        </div>
+    </div>`;
     const calculatorElement = content.firstElementChild;
     calcContainer.appendChild(calculatorElement);
     calculatorElement.querySelector('.add-person-type-btn').addEventListener('click', () => addPersonTypeColumn(calcContainer, '아동', 1));
