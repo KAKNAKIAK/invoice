@@ -111,7 +111,7 @@ body {
     border: 1px solid #e5e7eb; 
     padding: 0; 
     vertical-align: middle; 
-    text-align: center; /* 'left'에서 'center'로 수정 */
+    text-align: center;
     font-size: 11px; 
 }
 .flight-schedule-table th { background-color: #f9fafb; font-weight: 600; padding: 0.4rem; }
@@ -121,7 +121,7 @@ body {
     border: none; 
     background: transparent; 
     padding: 0.4rem; 
-    text-align: center; /* input 내부 텍스트도 가운데 정렬 */
+    text-align: center;
 }
 .flight-schedule-table .delete-row-btn { background: none; border: none; color: #ef4444; cursor: pointer; width: 100%; }
 
@@ -137,3 +137,14 @@ body {
     @apply p-2 text-gray-500 rounded-full hover:bg-gray-200 hover:text-gray-700 transition-colors;
 }
 .inline-copy-btn i { @apply text-sm; }
+
+/* 최근 파일 모달 리스트 스타일 */
+#recentFilesList li {
+    @apply p-3 cursor-pointer hover:bg-indigo-50 transition-colors;
+}
+#recentFilesList li .file-name {
+    @apply font-medium text-gray-800;
+}
+#recentFilesList li .file-date {
+    @apply text-xs text-gray-500 block;
+}
