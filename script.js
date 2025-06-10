@@ -1004,6 +1004,12 @@ function setupEnterKeyListenerForForm() {
 // [신규] Enter 키 핸들러
 function handleEnterKey(e) {
     if (e.key === 'Enter') {
+        // [수정] 이벤트가 발생한 요소가 TEXTAREA인 경우, 기본 동작(줄바꿈)을 막지 않고 즉시 함수를 종료합니다.
+        if (e.target.tagName === 'TEXTAREA') {
+            return;
+        }
+
+        // TEXTAREA가 아닌 다른 요소에서는 기존과 같이 다음 요소로 포커스를 이동합니다.
         e.preventDefault(); // 기본 폼 제출 동작 방지
 
         const formElements = Array.from(document.getElementById('quoteForm').querySelectorAll('input, textarea, button:not([type="submit"]):not([type="reset"]), select'));
@@ -1013,9 +1019,6 @@ function handleEnterKey(e) {
         let nextIndex = currentIndex + 1;
         let nextElement = formElements[nextIndex];
 
-        // 다음 요소가 없으면, 현재 탭 내에서 다음 계산기나 다른 섹션으로 이동하는 로직을 고려할 수 있으나,
-        // 여기서는 단순하게 다음 포커스 가능한 요소로 이동하도록 구현합니다.
-        // 예를 들어, 모든 인풋이 끝났다면, Submit 버튼으로 이동, 또는 아무것도 하지 않기.
         while (nextElement && (nextElement.disabled || nextElement.readOnly || nextElement.offsetParent === null)) {
             nextIndex++;
             nextElement = formElements[nextIndex];
@@ -1027,8 +1030,6 @@ function handleEnterKey(e) {
                 nextElement.select(); // 텍스트 필드는 전체 선택
             }
         } else {
-            // 폼의 마지막 요소에 도달했을 경우, 다른 동작을 정의할 수 있습니다.
-            // 예: submit 버튼으로 포커스 이동, 또는 아무것도 하지 않기.
             e.target.blur();
         }
     }
