@@ -6,10 +6,6 @@ let groupCounter = 0;
 let activeGroupId = null;
 let currentFileHandle = null;
 
-// [추가] 최근 파일 목록 관리를 위한 상수
-const RECENT_FILES_STORAGE_KEY = 'recentLoadedFiles';
-const MAX_RECENT_FILES = 10; // 저장할 최대 최근 파일 개수
-
 const ROW_DEFINITIONS = [
     { id: 'airfare', label: '항공', type: 'costInput' }, { id: 'hotel', label: '호텔', type: 'costInput' },
     { id: 'ground', label: '지상', type: 'costInput' }, { id: 'insurance', label: '보험', type: 'costInput' },
@@ -18,7 +14,7 @@ const ROW_DEFINITIONS = [
     { id: 'profitPerPerson', label: '1인수익', type: 'calculated' }, { id: 'profitMargin', label: '1인수익률', type: 'calculatedPercentage' }
 ];
 
-// [신규] Firebase 연동 관련 변수 및 초기화
+// Firebase 연동 관련 변수 및 초기화
 const firebaseConfig = {
     apiKey: "AIzaSyC7eXBtNczq0ylN5UZNyZaMUH3M-6Gicvc",
     authDomain: "memo-1-e9ee8.firebaseapp.com",
@@ -28,13 +24,81 @@ const firebaseConfig = {
     appId: "1:787316238134:web:20b136703e76ff3de67597",
     measurementId: "G-WGB4VSG0MP"
 };
-
 const fbApp = firebase.initializeApp(firebaseConfig, 'memoApp');
 const db = firebase.firestore(fbApp);
-const serverTimestamp = firebase.firestore.FieldValue.serverTimestamp();
 
 // =======================================================================
-// 2. GDS 파서 연동 함수
+// 2. IndexedDB 헬퍼 함수 (파일 핸들 저장을 위해)
+// =======================================================================
+const IDB_NAME = 'FileHandlesDB';
+const IDB_STORE_NAME = 'fileHandles';
+let idbPromise;
+
+function initDB() {
+    if (idbPromise) return idbPromise;
+    idbPromise = new Promise((resolve, reject) => {
+        const request = indexedDB.open(IDB_NAME, 1);
+        request.onerror = () => reject("IndexedDB error: " + request.error);
+        request.onsuccess = () => resolve(request.result);
+        request.onupgradeneeded = event => {
+            const db = event.target.result;
+            if (!db.objectStoreNames.contains(IDB_STORE_NAME)) {
+                db.createObjectStore(IDB_STORE_NAME, { keyPath: 'name' });
+            }
+        };
+    });
+    return idbPromise;
+}
+
+async function saveFileHandle(name, handle) {
+    const db = await initDB();
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction(IDB_STORE_NAME, 'readwrite');
+        const store = transaction.objectStore(IDB_STORE_NAME);
+        const request = store.put({ name, handle, timestamp: new Date() });
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject("Failed to save file handle: " + request.error);
+    });
+}
+
+async function getFileHandle(name) {
+    const db = await initDB();
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction(IDB_STORE_NAME, 'readonly');
+        const store = transaction.objectStore(IDB_STORE_NAME);
+        const request = store.get(name);
+        request.onsuccess = () => resolve(request.result?.handle);
+        request.onerror = () => reject("Failed to get file handle: " + request.error);
+    });
+}
+
+async function getAllFileHandles() {
+    const db = await initDB();
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction(IDB_STORE_NAME, 'readonly');
+        const store = transaction.objectStore(IDB_STORE_NAME);
+        const request = store.getAll();
+        request.onsuccess = () => {
+            const sorted = request.result.sort((a, b) => b.timestamp - a.timestamp);
+            resolve(sorted);
+        };
+        request.onerror = () => reject("Failed to get all file handles: " + request.error);
+    });
+}
+
+async function deleteFileHandle(name) {
+    const db = await initDB();
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction(IDB_STORE_NAME, 'readwrite');
+        const store = transaction.objectStore(IDB_STORE_NAME);
+        const request = store.delete(name);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject("Failed to delete file handle: " + request.error);
+    });
+}
+
+// =======================================================================
+// 3. GDS 파서 연동 함수
 // =======================================================================
 function addFlightsFromParser(parsedFlights) {
     if (!parsedFlights || parsedFlights.length === 0) return;
@@ -62,7 +126,7 @@ function addFlightsFromParser(parsedFlights) {
 }
 
 // =======================================================================
-// 3. 핵심 기능 함수
+// 4. 핵심 기능 함수
 // =======================================================================
 
 // --- 고객 정보 ---
@@ -73,7 +137,7 @@ function createCustomerCard(initialData = { name: '', phone: '', email: '' }) {
     const card = document.createElement('div');
     card.className = 'p-4 border border-gray-200 rounded-lg relative flex-grow sm:flex-grow-0 sm:min-w-[300px]';
     card.id = cardId;
-    card.innerHTML = `<button type="button" class="absolute top-1 right-1 text-gray-400 hover:text-red-500 text-xs remove-customer-btn p-1" title="고객 삭제"><i class="fas fa-times"></i></button><div class="space-y-3 text-sm"><div class="flex items-center gap-2"><label for="customerName_${cardId}" class="font-medium text-gray-800 w-12 text-left flex-shrink-0">고객명</label><input type="text" id="customerName_${cardId}" class="input-field customer-name" data-field="name" value="${initialData.name}"></div><div class="flex items-center gap-2"><label for="customerPhone_${cardId}" class="font-medium text-gray-800 w-12 text-left flex-shrink-0">연락처</label><input type="tel" id="customerPhone_${cardId}" class="input-field customer-phone" data-field="phone" value="${initialData.phone}"></div><div class="flex items-center gap-2"><label for="customerEmail_${cardId}" class="font-medium text-gray-800 w-12 text-left flex-shrink-0">이메일</label><input type="email" id="customerEmail_${cardId}" class="input-field customer-email" data-field="email" value="${initialData.email}"></div></div>`;
+    card.innerHTML = `<button type="button" class="absolute top-1 right-1 text-gray-400 hover:text-red-500 text-xs remove-customer-btn p-1" title="고객 삭제"><i class="fas fa-times"></i></button><div class="space-y-3 text-sm"><div class="flex items-center gap-2"><label for="customerName_${cardId}" class="font-medium text-gray-800 w-12 text-left flex-shrink-0">고객명</label><input type="text" id="customerName_${cardId}" class="w-full flex-grow px-3 py-2 border border-gray-300 rounded-md shadow-sm" data-field="name" value="${initialData.name}"></div><div class="flex items-center gap-2"><label for="customerPhone_${cardId}" class="font-medium text-gray-800 w-12 text-left flex-shrink-0">연락처</label><input type="tel" id="customerPhone_${cardId}" class="w-full flex-grow px-3 py-2 border border-gray-300 rounded-md shadow-sm" data-field="phone" value="${initialData.phone}"></div><div class="flex items-center gap-2"><label for="customerEmail_${cardId}" class="font-medium text-gray-800 w-12 text-left flex-shrink-0">이메일</label><input type="email" id="customerEmail_${cardId}" class="w-full flex-grow px-3 py-2 border border-gray-300 rounded-md shadow-sm" data-field="email" value="${initialData.email}"></div></div>`;
     container.appendChild(card);
     card.querySelectorAll('input').forEach(input => {
         input.addEventListener('dblclick', (event) => {
@@ -104,10 +168,10 @@ function getCustomerData() {
 const evaluateMath = (expression) => { if (typeof expression !== 'string' || !expression) return 0; const s = expression.replace(/,/g, ''); if (!/^[0-9+\-*/().\s]+$/.test(s)) { return parseFloat(s) || 0; } try { return new Function('return ' + s)(); } catch (e) { return parseFloat(s) || 0; } };
 const formatCurrency = (amount) => new Intl.NumberFormat('ko-KR').format(Math.round(amount)) + ' 원';
 const formatPercentage = (value) => (isNaN(value) || !isFinite(value) ? 0 : value * 100).toFixed(2) + ' %';
-const copyHtmlToClipboard = (htmlString) => { 
-    if (!htmlString || htmlString.trim() === "") { showToastMessage('복사할 내용이 없습니다.', true); return; } 
+const copyHtmlToClipboard = (htmlString) => {
+    if (!htmlString || htmlString.trim() === "") { showToastMessage('복사할 내용이 없습니다.', true); return; }
     navigator.clipboard.writeText(htmlString).then(() => showToastMessage('HTML 소스 코드가 클립보드에 복사되었습니다.'))
-    .catch(err => { console.error('클립보드 복사 실패:', err); showToastMessage('복사에 실패했습니다.', true); }); 
+    .catch(err => { console.error('클립보드 복사 실패:', err); showToastMessage('복사에 실패했습니다.', true); });
 };
 
 function copyToClipboard(text, fieldName = '텍스트') {
@@ -161,7 +225,6 @@ async function getSaveDataBlob() {
     Object.keys(quoteGroupsData).forEach(id => { if (id !== activeGroupId) saveAllCalculatorsInGroup(id); });
     const allData = { quoteGroupsData, groupCounter, activeGroupId, memoText: document.getElementById('memoText').value, customerInfo: getCustomerData() };
     const doc = document.cloneNode(true);
-
     try {
         const styleResponse = await fetch('./style.css');
         const styleText = await styleResponse.text();
@@ -194,9 +257,9 @@ async function saveFile(isSaveAs = false, clickedButton = null) {
         const blob = await getSaveDataBlob();
         if (!blob) throw new Error("Blob 생성 실패");
         if (isSaveAs || !currentFileHandle) {
-            const newHandle = await window.showSaveFilePicker({ 
-                suggestedName: `견적서_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}.html`, 
-                types: [{ description: 'HTML 파일', accept: { 'text/html': ['.html'] } }] 
+            const newHandle = await window.showSaveFilePicker({
+                suggestedName: `견적서_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}.html`,
+                types: [{ description: 'HTML 파일', accept: { 'text/html': ['.html'] } }]
             });
             const writableStream = await newHandle.createWritable();
             await writableStream.write(blob);
@@ -204,13 +267,13 @@ async function saveFile(isSaveAs = false, clickedButton = null) {
             currentFileHandle = newHandle;
             document.title = newHandle.name;
             showToastMessage('파일이 성공적으로 저장되었습니다.');
-            saveRecentFile(newHandle.name);
+            await saveFileHandle(newHandle.name, newHandle);
         } else {
             const writableStream = await currentFileHandle.createWritable();
             await writableStream.write(blob);
             await writableStream.close();
             showToastMessage('변경사항이 성공적으로 저장되었습니다.');
-            saveRecentFile(currentFileHandle.name);
+            await saveFileHandle(currentFileHandle.name, currentFileHandle);
         }
     } catch (err) {
         if (err.name !== 'AbortError') { console.error('파일 저장 실패:', err); showToastMessage('파일 저장에 실패했습니다.', true); }
@@ -224,102 +287,119 @@ async function saveFile(isSaveAs = false, clickedButton = null) {
 async function loadFile() {
     try {
         const [fileHandle] = await window.showOpenFilePicker({ types: [{ description: 'HTML 파일', accept: { 'text/html': ['.html'] } }] });
-        currentFileHandle = fileHandle;
-        const file = await fileHandle.getFile();
-        const contents = await file.text();
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(contents, 'text/html');
-        const restoredDataScript = doc.getElementById('restored-data');
-        if (restoredDataScript && restoredDataScript.textContent) {
-            const restoredData = JSON.parse(restoredDataScript.textContent);
-            restoreState(restoredData);
-            document.title = fileHandle.name;
-            showToastMessage('파일이 성공적으로 불러와졌습니다.');
-            saveRecentFile(fileHandle.name);
-        } else { showToastMessage('유효한 데이터가 포함된 견적서 파일이 아닙니다.', true); }
+        await loadFileFromHandle(fileHandle);
+        await saveFileHandle(fileHandle.name, fileHandle);
     } catch (err) {
         if (err.name !== 'AbortError') { console.error('파일 열기 실패:', err); showToastMessage('파일을 열지 못했습니다.', true); }
     }
 }
 
+async function loadFileFromHandle(fileHandle) {
+    if ((await fileHandle.queryPermission({ mode: 'read' })) !== 'granted') {
+        if ((await fileHandle.requestPermission({ mode: 'read' })) !== 'granted') {
+            showToastMessage('파일 읽기 권한이 필요합니다.', true);
+            return;
+        }
+    }
+    currentFileHandle = fileHandle;
+    const file = await fileHandle.getFile();
+    const contents = await file.text();
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(contents, 'text/html');
+    const restoredDataScript = doc.getElementById('restored-data');
+    if (restoredDataScript && restoredDataScript.textContent) {
+        const restoredData = JSON.parse(restoredDataScript.textContent);
+        restoreState(restoredData);
+        document.title = fileHandle.name;
+        showToastMessage(`'${fileHandle.name}' 파일이 성공적으로 불러와졌습니다.`);
+    } else {
+        showToastMessage('유효한 데이터가 포함된 견적서 파일이 아닙니다.', true);
+    }
+}
+
 // --- 최근 파일 목록 관리 ---
-function saveRecentFile(fileName) {
-    let recentFiles = getRecentFiles();
-    recentFiles = recentFiles.filter(item => item !== fileName);
-    recentFiles.unshift(fileName);
-    if (recentFiles.length > MAX_RECENT_FILES) { recentFiles = recentFiles.slice(0, MAX_RECENT_FILES); }
-    localStorage.setItem(RECENT_FILES_STORAGE_KEY, JSON.stringify(recentFiles));
-}
-
-function getRecentFiles() {
-    const stored = localStorage.getItem(RECENT_FILES_STORAGE_KEY);
-    return stored ? JSON.parse(stored) : [];
-}
-
-function deleteRecentFile(fileNameToDelete) {
-    let recentFiles = getRecentFiles();
-    recentFiles = recentFiles.filter(item => item !== fileNameToDelete);
-    localStorage.setItem(RECENT_FILES_STORAGE_KEY, JSON.stringify(recentFiles));
-    renderRecentFileList();
-    showToastMessage(`'${fileNameToDelete}'이(가) 최근 파일 목록에서 삭제되었습니다.`);
-}
-
 let recentFilesModal, recentFileSearchInput, recentFileListUl, loadingRecentFileListMsg, cancelRecentFilesModalButton, closeRecentFilesModalButton;
 
 async function openRecentFilesModal() {
     if (!recentFilesModal || !recentFileListUl || !loadingRecentFileListMsg || !recentFileSearchInput) {
         showToastMessage("최근 파일 불러오기 UI가 준비되지 않았습니다.", true); return;
     }
-    loadingRecentFileListMsg.textContent = "목록을 불러오는 중...";
     loadingRecentFileListMsg.style.display = 'block';
     recentFileListUl.innerHTML = '';
     recentFileSearchInput.value = '';
     recentFilesModal.classList.remove('hidden');
-    renderRecentFileList();
+
+    const allHandles = await getAllFileHandles();
     loadingRecentFileListMsg.style.display = 'none';
+    renderRecentFileList(allHandles, '');
+    recentFileSearchInput.oninput = () => {
+        renderRecentFileList(allHandles, recentFileSearchInput.value);
+    };
 }
 
-function renderRecentFileList() {
-    if (!recentFileListUl || !recentFileSearchInput) return;
-    const searchTerm = recentFileSearchInput.value.toLowerCase();
+function renderRecentFileList(fullList, searchTerm) {
+    if (!recentFileListUl) return;
+    const lowerCaseSearchTerm = searchTerm.toLowerCase();
     recentFileListUl.innerHTML = '';
-    const allRecentFiles = getRecentFiles();
-    const filteredFiles = allRecentFiles.filter(fileName => fileName.toLowerCase().includes(searchTerm));
-    if (filteredFiles.length > 0) {
-        filteredFiles.forEach(fileName => {
+    const filteredList = fullList.filter(item => item.name.toLowerCase().includes(lowerCaseSearchTerm));
+    if (filteredList.length > 0) {
+        filteredList.forEach(item => {
             const listItem = document.createElement('li');
             listItem.className = 'flex justify-between items-center p-3 hover:bg-gray-50 cursor-pointer';
             const titleSpan = document.createElement('span');
-            titleSpan.textContent = fileName;
+            titleSpan.textContent = item.name;
             titleSpan.className = 'text-sm font-medium text-gray-900 flex-grow';
-            titleSpan.title = `"${fileName}" 파일 다시 불러오기 (클릭)`;
-            titleSpan.addEventListener('click', async () => { 
-                showToastMessage(`'${fileName}' 파일을 다시 불러옵니다. 파일 선택 대화상자가 나타나면 해당 파일을 선택해주세요.`);
-                recentFilesModal.classList.add('hidden');
-                await loadFile();
+            titleSpan.title = `"${item.name}" 파일 바로 불러오기 (클릭)`;
+            titleSpan.addEventListener('click', async () => {
+                try {
+                    const handle = await getFileHandle(item.name);
+                    if (handle) {
+                        await loadFileFromHandle(handle);
+                        recentFilesModal.classList.add('hidden');
+                    } else { showToastMessage(`'${item.name}' 파일 핸들을 찾을 수 없습니다. 다시 선택해주세요.`, true); }
+                } catch (e) { showToastMessage(`파일 로드 중 오류 발생: ${e.message}`, true); }
             });
             const deleteButton = document.createElement('button');
             deleteButton.innerHTML = `<svg class="w-5 h-5 text-gray-400 hover:text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>`;
             deleteButton.className = 'p-1 rounded-full hover:bg-red-100 ml-2';
-            deleteButton.title = `"${fileName}" 최근 파일 목록에서 삭제`;
-            deleteButton.addEventListener('click', (e) => { e.stopPropagation(); deleteRecentFile(fileName); });
+            deleteButton.title = `"${item.name}" 최근 파일 목록에서 삭제`;
+            deleteButton.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                await deleteFileHandle(item.name);
+                openRecentFilesModal();
+                showToastMessage(`'${item.name}'이(가) 최근 파일 목록에서 삭제되었습니다.`);
+            });
             listItem.appendChild(titleSpan);
             listItem.appendChild(deleteButton);
             recentFileListUl.appendChild(listItem);
         });
     } else {
-        const isLoading = loadingRecentFileListMsg && loadingRecentFileListMsg.style.display !== 'none';
-        if (!isLoading) {
-             if (searchTerm && allRecentFiles.length > 0) {
-                recentFileListUl.innerHTML = `<li class="p-3 text-sm text-gray-500 text-center">"'${recentFileSearchInput.value}'" 검색 결과가 없습니다.</li>`;
-            } else if (allRecentFiles.length === 0) {
-                recentFileListUl.innerHTML = '<li class="p-3 text-sm text-gray-500 text-center">최근 로드한 파일이 없습니다.</li>';
-            }
-        }
+        recentFileListUl.innerHTML = `<li class="p-3 text-sm text-gray-500 text-center">최근 파일이 없거나, 검색 결과가 없습니다.</li>`;
     }
 }
 
-// --- 포함/불포함 DB 연동 함수들 ---
+// --- 범용 목록 렌더링 함수 ---
+function renderFilteredList(options) {
+    const { fullList, searchTerm, listElementId, clickHandler, itemTitleField = 'name' } = options;
+    const listEl = document.getElementById(listElementId);
+    if (!listEl) return;
+    listEl.innerHTML = '';
+    const lowerCaseSearchTerm = searchTerm.toLowerCase();
+    const filteredList = fullList.filter(item => item[itemTitleField].toLowerCase().includes(lowerCaseSearchTerm));
+    if (filteredList.length > 0) {
+        filteredList.forEach(item => {
+            const li = document.createElement('li');
+            li.className = 'p-3 hover:bg-gray-100 cursor-pointer text-sm';
+            li.textContent = item[itemTitleField];
+            li.addEventListener('click', () => clickHandler(item));
+            listEl.appendChild(li);
+        });
+    } else {
+        listEl.innerHTML = '<li class="p-3 text-gray-500 text-sm text-center">검색 결과가 없습니다.</li>';
+    }
+}
+
+// --- DB 연동 함수들 ---
 async function loadAllInclusionDataSets() {
     const dataSets = [];
     try {
@@ -328,26 +408,6 @@ async function loadAllInclusionDataSets() {
         querySnapshot.forEach((doc) => { dataSets.push({ id: doc.id, ...doc.data() }); });
         return dataSets;
     } catch (error) { console.error("목록 불러오기 오류:", error); showToastMessage("목록을 불러오는 중 오류가 발생했습니다.", true); return []; }
-}
-
-function renderFilteredInclusionsList(fullList, searchTerm) {
-    const listEl = document.getElementById('inclusionsList');
-    if (!listEl) return;
-    listEl.innerHTML = '';
-    const lowerCaseSearchTerm = searchTerm.toLowerCase();
-    const filteredList = fullList.filter(item => item.name.toLowerCase().includes(lowerCaseSearchTerm));
-    if (filteredList.length > 0) {
-        filteredList.forEach(item => {
-            const li = document.createElement('li');
-            li.className = 'p-3 hover:bg-gray-100 cursor-pointer text-sm';
-            li.textContent = item.name;
-            li.addEventListener('click', () => {
-                applyInclusionData(item);
-                document.getElementById('loadInclusionsModal').classList.add('hidden');
-            });
-            listEl.appendChild(li);
-        });
-    } else { listEl.innerHTML = '<li class="p-3 text-gray-500 text-sm text-center">검색 결과가 없습니다.</li>'; }
 }
 
 async function openLoadInclusionsModal() {
@@ -362,8 +422,14 @@ async function openLoadInclusionsModal() {
     loadingMsg.style.display = 'block';
     const allSets = await loadAllInclusionDataSets();
     loadingMsg.style.display = 'none';
-    renderFilteredInclusionsList(allSets, '');
-    searchInput.oninput = () => { renderFilteredInclusionsList(allSets, searchInput.value); };
+    const clickHandler = (item) => {
+        applyInclusionData(item);
+        modal.classList.add('hidden');
+    };
+    renderFilteredList({ fullList: allSets, searchTerm: '', listElementId: 'inclusionsList', clickHandler });
+    searchInput.oninput = () => {
+        renderFilteredList({ fullList: allSets, searchTerm: searchInput.value, listElementId: 'inclusionsList', clickHandler });
+    };
 }
 
 function applyInclusionData(item) {
@@ -381,7 +447,6 @@ function applyInclusionData(item) {
     showToastMessage(`'${item.name}' 내역을 적용했습니다.`);
 }
 
-// --- 자주 쓰는 문자(메모) DB 연동 함수들 ---
 async function loadAllSnippets() {
     const dataSets = [];
     try {
@@ -390,26 +455,6 @@ async function loadAllSnippets() {
         querySnapshot.forEach((doc) => { dataSets.push({ id: doc.id, ...doc.data() }); });
         return dataSets;
     } catch (error) { console.error("자주 쓰는 문자 목록 불러오기 오류:", error); showToastMessage("자주 쓰는 문자 목록을 불러오는 중 오류가 발생했습니다.", true); return []; }
-}
-
-function renderFilteredMemoList(fullList, searchTerm) {
-    const listEl = document.getElementById('memoList');
-    if (!listEl) return;
-    listEl.innerHTML = '';
-    const lowerCaseSearchTerm = searchTerm.toLowerCase();
-    const filteredList = fullList.filter(item => item.name.toLowerCase().includes(lowerCaseSearchTerm));
-    if (filteredList.length > 0) {
-        filteredList.forEach(item => {
-            const li = document.createElement('li');
-            li.className = 'p-3 hover:bg-gray-100 cursor-pointer text-sm';
-            li.textContent = item.name;
-            li.addEventListener('click', () => {
-                applyMemoData(item);
-                document.getElementById('loadMemoModal').classList.add('hidden');
-            });
-            listEl.appendChild(li);
-        });
-    } else { listEl.innerHTML = '<li class="p-3 text-gray-500 text-sm text-center">검색 결과가 없습니다.</li>'; }
 }
 
 function applyMemoData(snippet) {
@@ -430,8 +475,14 @@ async function openLoadMemoModal() {
     loadingMsg.style.display = 'block';
     const allSnippets = await loadAllSnippets();
     loadingMsg.style.display = 'none';
-    renderFilteredMemoList(allSnippets, '');
-    searchInput.oninput = () => { renderFilteredMemoList(allSnippets, searchInput.value); };
+    const clickHandler = (item) => {
+        applyMemoData(item);
+        modal.classList.add('hidden');
+    };
+    renderFilteredList({ fullList: allSnippets, searchTerm: '', listElementId: 'memoList', clickHandler });
+    searchInput.oninput = () => {
+        renderFilteredList({ fullList: allSnippets, searchTerm: searchInput.value, listElementId: 'memoList', clickHandler });
+    };
 }
 
 // --- 견적 그룹 관리 ---
@@ -486,7 +537,7 @@ function switchTab(newGroupId) {
     activeGroupId = String(newGroupId);
     document.querySelectorAll('.quote-tab').forEach(tab => { tab.classList.toggle('active', tab.dataset.groupId == newGroupId); });
     document.querySelectorAll('.calculation-group-content').forEach(content => { content.classList.toggle('active', content.id == `group-content-${newGroupId}`); });
-    setupEnterKeyListenerForForm(); 
+    setupEnterKeyListenerForForm();
 }
 
 // --- UI 생성 및 초기화 ---
@@ -545,11 +596,11 @@ function initializeGroup(groupEl, groupId) {
     if (!groupData) return;
     const calculatorsWrapper = groupEl.querySelector(`#calculators-wrapper-${groupId}`);
     if (groupData.calculators && groupData.calculators.length > 0) { groupData.calculators.forEach(calcData => createCalculatorInstance(calculatorsWrapper, groupId, calcData)); }
-    groupEl.querySelector('.add-calculator-btn').addEventListener('click', () => { 
-        saveAllCalculatorsInGroup(groupId); 
-        const newCalcData = { id: `calc_${Date.now()}`, pnr: '', tableHTML: null }; 
-        groupData.calculators.push(newCalcData); 
-        createCalculatorInstance(calculatorsWrapper, groupId, newCalcData); 
+    groupEl.querySelector('.add-calculator-btn').addEventListener('click', () => {
+        saveAllCalculatorsInGroup(groupId);
+        const newCalcData = { id: `calc_${Date.now()}`, pnr: '', tableHTML: null };
+        groupData.calculators.push(newCalcData);
+        createCalculatorInstance(calculatorsWrapper, groupId, newCalcData);
     });
     const flightContainer = groupEl.querySelector('.flight-schedule-container');
     if (groupData.flightSchedule) { groupData.flightSchedule.forEach(subgroup => createFlightSubgroup(flightContainer, subgroup, groupId)); }
@@ -566,21 +617,21 @@ function initializeGroup(groupEl, groupId) {
     groupEl.querySelector('.copy-exclusion-btn').addEventListener('click', () => { copyToClipboard(exclusionTextEl.value, '불포함 내역'); });
     groupEl.querySelector('.load-inclusion-exclusion-db-btn').addEventListener('click', () => { openLoadInclusionsModal(); });
     groupEl.querySelector('.parse-gds-btn').addEventListener('click', () => { window.open('./gds_parser/gds_parser.html', 'GDS_Parser', `width=800,height=500,top=${(screen.height / 2) - 250},left=${(screen.width / 2) - 400}`); });
-    groupEl.querySelector('.add-flight-subgroup-btn').addEventListener('click', () => { 
+    groupEl.querySelector('.add-flight-subgroup-btn').addEventListener('click', () => {
         if (!groupData.flightSchedule) groupData.flightSchedule = [];
-        const sg = { id: `flight_sub_${Date.now()}`, title: "", rows: [{}] }; 
-        groupData.flightSchedule.push(sg); 
-        createFlightSubgroup(flightContainer, sg, groupId); 
+        const sg = { id: `flight_sub_${Date.now()}`, title: "", rows: [{}] };
+        groupData.flightSchedule.push(sg);
+        createFlightSubgroup(flightContainer, sg, groupId);
     });
-    groupEl.querySelector('.add-price-subgroup-btn').addEventListener('click', () => { 
+    groupEl.querySelector('.add-price-subgroup-btn').addEventListener('click', () => {
         if (!groupData.priceInfo) groupData.priceInfo = [];
-        const sg = { 
-            id: `price_sub_${Date.now()}`, 
-            title: "", 
-            rows: [ { item: "성인요금", price: 0, count: 1, remarks: "" }, { item: "소아요금", price: 0, count: 1, remarks: "만2~12세미만" }, { item: "유아요금", price: 0, count: 1, remarks: "만24개월미만" } ] 
-        }; 
-        groupData.priceInfo.push(sg); 
-        createPriceSubgroup(priceContainer, sg, groupId); 
+        const sg = {
+            id: `price_sub_${Date.now()}`,
+            title: "",
+            rows: [{ item: "성인요금", price: 0, count: 1, remarks: "" }, { item: "소아요금", price: 0, count: 1, remarks: "만2~12세미만" }, { item: "유아요금", price: 0, count: 1, remarks: "만24개월미만" }]
+        };
+        groupData.priceInfo.push(sg);
+        createPriceSubgroup(priceContainer, sg, groupId);
     });
     groupEl.querySelector('.copy-flight-schedule-btn').addEventListener('click', () => copyHtmlToClipboard(generateFlightScheduleInlineHtml(groupData.flightSchedule)));
     groupEl.querySelector('.copy-price-info-btn').addEventListener('click', () => copyHtmlToClipboard(generatePriceInfoInlineHtml(groupData.priceInfo)));
@@ -589,7 +640,7 @@ function initializeGroup(groupEl, groupId) {
 // --- 계산기 관련 함수들 ---
 function buildCalculatorDOM(calcContainer) {
     const content = document.createElement('div');
-    content.innerHTML = `<div class="split-container"><div class="pnr-pane"><label class="label-text font-semibold mb-2">PNR 정보</label><textarea class="w-full flex-grow px-3 py-2 border border-gray-300 rounded-md shadow-sm resize-none" placeholder="PNR 정보를 여기에 붙여넣으세요."></textarea></div><div class="resizer-handle"></div><div class="quote-pane"><div class="table-container"><table class="quote-table"><thead><tr class="header-row"><th><button type="button" class="btn btn-sm btn-primary add-person-type-btn"><i class="fas fa-plus"></i> 항목 추가</button></th></tr><tr class="count-row"><th></th></tr></thead><tbody></tbody><tfoot></tfoot></table></div></div></div>`;
+    content.innerHTML = `<div class="split-container"><div class="pnr-pane"><label class="label-text font-semibold mb-2">PNR 정보</label><textarea class="w-full flex-grow px-3 py-2 border border-gray-300 rounded-md shadow-sm" placeholder="PNR 정보를 여기에 붙여넣으세요."></textarea></div><div class="resizer-handle"></div><div class="quote-pane"><div class="table-container"><table class="quote-table"><thead><tr class="header-row"><th><button type="button" class="btn btn-sm btn-primary add-person-type-btn"><i class="fas fa-plus"></i> 항목 추가</button></th></tr><tr class="count-row"><th></th></tr></thead><tbody></tbody><tfoot></tfoot></table></div></div></div>`;
     const calculatorElement = content.firstElementChild;
     calcContainer.appendChild(calculatorElement);
     calculatorElement.querySelector('.add-person-type-btn').addEventListener('click', () => addPersonTypeColumn(calculatorElement, '아동', 1));
@@ -627,7 +678,7 @@ function restoreCalculatorState(instanceContainer, calcData) {
     const pnrTextarea = instanceContainer.querySelector('.pnr-pane textarea');
     if (pnrTextarea) pnrTextarea.value = calcData.pnr || '';
     const table = instanceContainer.querySelector('.quote-table');
-    if (table && calcData.tableHTML) { table.innerHTML = calcData.tableHTML; rebindCalculatorEventListeners(instanceContainer); } 
+    if (table && calcData.tableHTML) { table.innerHTML = calcData.tableHTML; rebindCalculatorEventListeners(instanceContainer); }
     else { addPersonTypeColumn(instanceContainer, '성인', 1); }
     calculateAll(instanceContainer);
 }
@@ -637,15 +688,15 @@ function rebindCalculatorEventListeners(calcContainer) {
     calcContainer.querySelectorAll('input').forEach(el => { el.addEventListener('input', calcAll); });
     calcContainer.querySelectorAll('.person-type-name-span').forEach(span => { makeEditable(span, 'text', calcAll); });
     calcContainer.querySelectorAll('.person-count-span').forEach(span => { makeEditable(span, 'number', calcAll); });
-    calcContainer.querySelectorAll('.dynamic-row-label-span').forEach(span => { makeEditable(span, 'text', () => {}); });
+    calcContainer.querySelectorAll('.dynamic-row-label-span').forEach(span => { makeEditable(span, 'text', () => { }); });
     calcContainer.querySelectorAll('th .remove-col-btn').forEach((btn) => {
         const headerCell = btn.closest('th');
         if (!headerCell) return;
         const colIndex = Array.from(headerCell.parentNode.children).indexOf(headerCell);
-        btn.addEventListener('click', () => { 
-            if (!confirm('해당 항목을 삭제하시겠습니까?')) return; 
-            calcContainer.querySelectorAll('.quote-table tr').forEach(row => row.cells[colIndex]?.remove()); 
-            updateSummaryRow(calcContainer); calcAll(); 
+        btn.addEventListener('click', () => {
+            if (!confirm('해당 항목을 삭제하시겠습니까?')) return;
+            calcContainer.querySelectorAll('.quote-table tr').forEach(row => row.cells[colIndex]?.remove());
+            updateSummaryRow(calcContainer); calcAll();
         });
     });
     calcContainer.querySelectorAll('.dynamic-row-delete-btn').forEach(btn => {
@@ -695,13 +746,13 @@ function makeEditable(element, inputType, onBlurCallback) {
             if (onBlurCallback) onBlurCallback();
         };
         input.addEventListener('blur', finishEditing);
-        input.addEventListener('keydown', e => { 
+        input.addEventListener('keydown', e => {
             if (e.key === 'Enter') {
                 e.preventDefault();
                 const formElements = Array.from(document.getElementById('quoteForm').querySelectorAll('input, textarea, button, select'));
                 const currentIndex = formElements.indexOf(e.target);
                 const nextElement = formElements[currentIndex + 1];
-                if (nextElement) { nextElement.focus(); } 
+                if (nextElement) { nextElement.focus(); }
                 else { e.target.blur(); }
             } else if (e.key === 'Escape') { e.target.blur(); }
         });
@@ -841,7 +892,7 @@ function createFlightSubgroup(container, subgroupData, groupId) {
     const subGroupDiv = document.createElement('div');
     subGroupDiv.className = 'dynamic-section flight-schedule-subgroup';
     subGroupDiv.id = subgroupData.id;
-    subGroupDiv.innerHTML = `<button type="button" class="delete-dynamic-section-btn" title="이 스케줄 그룹 삭제"><i class="fas fa-trash-alt"></i></button><div class="mb-2"><input type="text" class="input-field" placeholder="항공사 (예: 이스타항공)" value="${subgroupData.title || ''}"></div><div class="overflow-x-auto"><table class="flight-schedule-table"><thead><tr><th>편명</th><th>출발일</th><th>출발지</th><th>출발시간</th><th>도착일</th><th>도착지</th><th>도착시간</th><th style="width: 50px;">삭제</th></tr></thead><tbody></tbody></table></div><div class="add-row-btn-container pt-2"><button type="button" class="add-row-btn"><i class="fas fa-plus mr-1"></i> 행 추가</button></div>`;
+    subGroupDiv.innerHTML = `<button type="button" class="delete-dynamic-section-btn" title="이 스케줄 그룹 삭제"><i class="fas fa-trash-alt"></i></button><div class="mb-2"><input type="text" class="w-full flex-grow px-3 py-2 border border-gray-300 rounded-md shadow-sm" placeholder="항공사 (예: 이스타항공)" value="${subgroupData.title || ''}"></div><div class="overflow-x-auto"><table class="flight-schedule-table"><thead><tr><th>편명</th><th>출발일</th><th>출발지</th><th>출발시간</th><th>도착일</th><th>도착지</th><th>도착시간</th><th style="width: 50px;">삭제</th></tr></thead><tbody></tbody></table></div><div class="add-row-btn-container pt-2"><button type="button" class="add-row-btn"><i class="fas fa-plus mr-1"></i> 행 추가</button></div>`;
     const tbody = subGroupDiv.querySelector('tbody');
     subgroupData.rows.forEach(rowData => addFlightRow(tbody, rowData, subgroupData));
     subGroupDiv.querySelector('.delete-dynamic-section-btn').addEventListener('click', () => { if (confirm('이 항공 스케줄 그룹을 삭제하시겠습니까?')) { quoteGroupsData[groupId].flightSchedule = quoteGroupsData[groupId].flightSchedule.filter(g => g.id !== subgroupData.id); subGroupDiv.remove(); } });
@@ -863,12 +914,12 @@ function createPriceSubgroup(container, subgroupData, groupId) {
     const subGroupDiv = document.createElement('div');
     subGroupDiv.className = 'dynamic-section price-subgroup';
     subGroupDiv.id = subgroupData.id;
-    subGroupDiv.innerHTML = `<button type="button" class="delete-dynamic-section-btn" title="이 요금 그룹 삭제"><i class="fas fa-trash-alt"></i></button><input type="text" class="input-field mb-2 price-subgroup-title" placeholder="견적설명 (예: 인천출발, A객실)" value="${subgroupData.title || ''}"><table class="price-table"><thead><tr><th style="width:25%">내역</th><th>1인당금액</th><th>인원</th><th>총금액</th><th style="width:30%">비고</th><th style="width:50px">삭제</th></tr></thead><tbody></tbody><tfoot><tr><td colspan="3" class="text-right font-bold pr-2">총 합계</td><td class="grand-total">0</td><td colspan="2"><button type="button" class="add-row-btn"><i class="fas fa-plus mr-1"></i>행 추가</button></td></tr></tfoot></table>`;
+    subGroupDiv.innerHTML = `<button type="button" class="delete-dynamic-section-btn" title="이 요금 그룹 삭제"><i class="fas fa-trash-alt"></i></button><input type="text" class="w-full flex-grow px-3 py-2 border border-gray-300 rounded-md shadow-sm" placeholder="견적설명 (예: 인천출발, A객실)" value="${subgroupData.title || ''}"><table class="price-table"><thead><tr><th style="width:25%">내역</th><th>1인당금액</th><th>인원</th><th>총금액</th><th style="width:30%">비고</th><th style="width:50px">삭제</th></tr></thead><tbody></tbody><tfoot><tr><td colspan="3" class="text-right font-bold pr-2">총 합계</td><td class="grand-total">0</td><td colspan="2"><button type="button" class="add-row-btn"><i class="fas fa-plus mr-1"></i>행 추가</button></td></tr></tfoot></table>`;
     const tbody = subGroupDiv.querySelector('tbody');
     subgroupData.rows.forEach(rowData => addPriceRow(tbody, rowData, subgroupData, subGroupDiv, groupId));
     updateGrandTotal(subGroupDiv, groupId);
     subGroupDiv.querySelector('.delete-dynamic-section-btn').addEventListener('click', () => { if (confirm('이 요금 그룹을 삭제하시겠습니까?')) { quoteGroupsData[groupId].priceInfo = quoteGroupsData[groupId].priceInfo.filter(g => g.id !== subgroupData.id); subGroupDiv.remove(); } });
-    subGroupDiv.querySelector('input.input-field').addEventListener('input', e => { subgroupData.title = e.target.value; });
+    subGroupDiv.querySelector('input.w-full').addEventListener('input', e => { subgroupData.title = e.target.value; });
     subGroupDiv.querySelector('.add-row-btn').addEventListener('click', () => { const newRow = { item: "", price: 0, count: 1, remarks: "" }; subgroupData.rows.push(newRow); addPriceRow(tbody, newRow, subgroupData, subGroupDiv, groupId); });
     container.appendChild(subGroupDiv);
 }
@@ -971,9 +1022,9 @@ function restoreState(data) {
     quoteGroupsData = data.quoteGroupsData || {};
     groupCounter = data.groupCounter || 0;
     document.getElementById('memoText').value = data.memoText || '';
-    if (data.customerInfo && data.customerInfo.length > 0) { data.customerInfo.forEach(customer => createCustomerCard(customer)); } 
+    if (data.customerInfo && data.customerInfo.length > 0) { data.customerInfo.forEach(customer => createCustomerCard(customer)); }
     else { createCustomerCard(); }
-    if (Object.keys(quoteGroupsData).length > 0) { Object.keys(quoteGroupsData).forEach(id => createGroupUI(id)); } 
+    if (Object.keys(quoteGroupsData).length > 0) { Object.keys(quoteGroupsData).forEach(id => createGroupUI(id)); }
     else { addNewGroup(); }
     switchTab(data.activeGroupId || (Object.keys(quoteGroupsData).length > 0 ? Object.keys(quoteGroupsData)[0] : null));
     setupEnterKeyListenerForForm();
@@ -986,32 +1037,23 @@ function initializeNewSession() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    initDB();
+
     recentFilesModal = document.getElementById('recentFilesModal');
     recentFileSearchInput = document.getElementById('recentFileSearchInput');
     recentFileListUl = document.getElementById('recentFileList');
     loadingRecentFileListMsg = document.getElementById('loadingRecentFileListMsg');
     cancelRecentFilesModalButton = document.getElementById('cancelRecentFilesModalButton');
     closeRecentFilesModalButton = document.getElementById('closeRecentFilesModalButton');
+
     const restoredDataScript = document.getElementById('restored-data');
     let restoredData = null;
     if (restoredDataScript && restoredDataScript.textContent.trim()) {
         try { restoredData = JSON.parse(restoredDataScript.textContent); }
         catch (e) { console.error("저장된 데이터를 파싱하는 데 실패했습니다.", e); restoredData = null; }
     }
-    if (restoredData) { restoreState(restoredData); } 
+    if (restoredData) { restoreState(restoredData); }
     else { initializeNewSession(); }
-
-    // ▼▼▼ [추가] 메모 복사 버튼 이벤트 리스너를 추가했습니다. ▼▼▼
-    const copyMemoBtn = document.getElementById('copyMemoBtn');
-    if (copyMemoBtn) {
-        copyMemoBtn.addEventListener('click', () => {
-            const memoTextarea = document.getElementById('memoText');
-            if(memoTextarea) {
-                copyToClipboard(memoTextarea.value, '메모');
-            }
-        });
-    }
-    // ▲▲▲ [추가] 여기까지 ▲▲▲
 
     document.getElementById('addCustomerBtn').addEventListener('click', () => createCustomerCard());
     document.getElementById('newGroupBtn').addEventListener('click', addNewGroup);
@@ -1022,22 +1064,26 @@ document.addEventListener('DOMContentLoaded', () => {
     const loadFileLabel = document.querySelector('label[for="loadFile"]');
     if (loadFileLabel) { loadFileLabel.addEventListener('click', (event) => { event.preventDefault(); loadFile(); }); }
     document.getElementById('quoteForm').addEventListener('reset', (e) => { e.preventDefault(); if (confirm("작성중인 모든 내용을 삭제하고 새로 시작하시겠습니까?")) { window.location.reload(); } });
-    
-    // --- DB 연동 모달 핸들러 ---
+
+    document.getElementById('copyMemoBtn')?.addEventListener('click', () => {
+        const memoTextarea = document.getElementById('memoText');
+        if (memoTextarea) {
+            copyToClipboard(memoTextarea.value, '메모');
+        }
+    });
+
     document.getElementById('closeLoadInclusionsModalBtn')?.addEventListener('click', () => document.getElementById('loadInclusionsModal').classList.add('hidden'));
     document.getElementById('cancelLoadInclusionsModalBtn')?.addEventListener('click', () => document.getElementById('loadInclusionsModal').classList.add('hidden'));
     document.getElementById('loadMemoFromDbBtn')?.addEventListener('click', openLoadMemoModal);
     document.getElementById('closeLoadMemoModalBtn')?.addEventListener('click', () => document.getElementById('loadMemoModal').classList.add('hidden'));
     document.getElementById('cancelLoadMemoModalBtn')?.addEventListener('click', () => document.getElementById('loadMemoModal').classList.add('hidden'));
     
-    // --- 최근 파일 모달 핸들러 ---
     const recentFilesBtn = document.getElementById('recentFilesBtn');
     if (recentFilesBtn) { recentFilesBtn.addEventListener('click', openRecentFilesModal); }
-    if (cancelRecentFilesModalButton) { cancelRecentFilesModalButton.addEventListener('click', () => { if(recentFilesModal) recentFilesModal.classList.add('hidden'); }); }
-    if (closeRecentFilesModalButton) { closeRecentFilesModalButton.addEventListener('click', () => { if(recentFilesModal) recentFilesModal.classList.add('hidden'); }); }
+    if (cancelRecentFilesModalButton) { cancelRecentFilesModalButton.addEventListener('click', () => { if (recentFilesModal) recentFilesModal.classList.add('hidden'); }); }
+    if (closeRecentFilesModalButton) { closeRecentFilesModalButton.addEventListener('click', () => { if (recentFilesModal) recentFilesModal.classList.add('hidden'); }); }
     if (recentFileSearchInput) { recentFileSearchInput.addEventListener('input', renderRecentFileList); }
 
-    // --- 리사이저 핸들러 ---
     let isResizing = false;
     let pnrPaneToResize = null;
     let splitContainerToResize = null;
@@ -1045,7 +1091,6 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('mousemove', (e) => { if (!isResizing) return; const rect = splitContainerToResize.getBoundingClientRect(); let newWidth = e.clientX - rect.left; if (newWidth < 150) newWidth = 150; if (newWidth > rect.width - 350) newWidth = rect.width - 350; pnrPaneToResize.style.width = newWidth + 'px'; });
     document.addEventListener('mouseup', () => { if (isResizing) { isResizing = false; pnrPaneToResize = null; splitContainerToResize = null; document.body.style.cursor = 'default'; } });
 
-    // --- 단축키 핸들러 ---
     document.addEventListener('keydown', (event) => {
         if (event.shiftKey) {
             switch (event.code) {
