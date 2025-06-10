@@ -1060,13 +1060,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- [신규] 단축키 기능 추가 ---
     document.addEventListener('keydown', (event) => {
-        // 다른 입력창에 타이핑하는 것을 방해하지 않기 위해,
-        // 특정 요소(INPUT, TEXTAREA)에 포커스가 있을 때는 단축키가 동작하지 않도록 함
-        if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') {
-            // [추가] 엔터키 처리 로직이 이미 makeEditable 함수와 setupEnterKeyListenerForForm 함수에 의해 관리되므로
-            // 여기서 중복 처리하지 않음.
-            return; 
-        }
+        // [수정] 입력창에 포커스가 있을 때도 단축키가 동작하도록 기존의 if (document.activeElement...) return; 문을 제거합니다.
+        // 엔터키 관련 로직은 다른 곳에서 처리되므로 여기서는 단축키만 고려합니다.
 
         // Shift 키가 눌렸을 때만 동작
         if (event.shiftKey) {
@@ -1092,6 +1087,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // [추가] Shift + R: 최근 파일 불러오기
                 case 'KeyR':
                     event.preventDefault();
+                    const recentFilesBtn = document.getElementById('recentFilesBtn'); // [수정] 변수를 이 안에서 찾아 사용하도록 변경
                     if (recentFilesBtn) {
                         recentFilesBtn.click();
                     }
@@ -1099,6 +1095,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     });
-    // ▲▲▲ 여기까지 추가 ▲▲▲
+    // ▲▲▲ 여기까지 수정 ▲▲▲
 
 });
