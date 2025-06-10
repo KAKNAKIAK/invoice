@@ -17,5 +17,14 @@
       "sizes": "512x512",
       "type": "image/png"
     }
+  ],
+  "file_handlers": [
+    {
+      "action": "./index.html",
+      "accept": {
+        "text/html": [".html"]
+      },
+      "launch_type": "single-client"
+    }
   ]
 }
