@@ -295,6 +295,7 @@ async function loadFile() {
 
 async function loadFileInNewWindow(fileHandle) {
     try {
+        // 1. 권한 확인
         if ((await fileHandle.queryPermission({ mode: 'read' })) !== 'granted') {
             if ((await fileHandle.requestPermission({ mode: 'read' })) !== 'granted') {
                 showToastMessage('파일 읽기 권한이 필요합니다.', true);
@@ -302,29 +303,45 @@ async function loadFileInNewWindow(fileHandle) {
             }
         }
 
+        // 2. 파일 읽고 데이터 추출
         const file = await fileHandle.getFile();
         const contents = await file.text();
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(contents, 'text/html');
+        const restoredDataScript = doc.getElementById('restored-data');
 
-        const newWindow = window.open('', '_blank');
-        if (newWindow) {
-            newWindow.document.open();
-            newWindow.document.write(contents);
-            newWindow.document.close();
-            newWindow.focus();
+        if (restoredDataScript && restoredDataScript.textContent) {
+            const restoredDataJSON = restoredDataScript.textContent;
+            
+            // 3. sessionStorage에 데이터 저장
+            const uniqueKey = `PWA_LOAD_DATA_${Date.now()}`;
+            sessionStorage.setItem(uniqueKey, restoredDataJSON);
+            
+            // 4. URL 파라미터와 함께 새 창 열기
+            const url = new URL(window.location.href);
+            url.searchParams.set('loadDataKey', uniqueKey);
+            
+            const newWindow = window.open(url.href, '_blank');
+            if (!newWindow) {
+                showToastMessage('팝업이 차단되어 새 창을 열 수 없습니다. 팝업 차단을 해제해주세요.', true);
+                sessionStorage.removeItem(uniqueKey); // 정리
+            }
+
         } else {
-            showToastMessage('팝업이 차단되어 새 창을 열 수 없습니다. 팝업 차단을 해제해주세요.', true);
-            return;
+            showToastMessage('유효한 데이터가 포함된 견적서 파일이 아닙니다.', true);
         }
-        
+
+        // 5. 현재 창의 최근 파일 목록에 핸들 저장
         await saveFileHandle(fileHandle.name, fileHandle);
 
     } catch (err) {
-         if (err.name !== 'AbortError') {
+        if (err.name !== 'AbortError') {
             console.error('새 창에서 파일 열기 실패:', err);
             showToastMessage('새 창에서 파일을 열지 못했습니다.', true);
         }
     }
 }
+
 
 // --- 최근 파일 목록 관리 ---
 let recentFilesModal, recentFileSearchInput, recentFileListUl, loadingRecentFileListMsg, cancelRecentFilesModalButton, closeRecentFilesModalButton;
@@ -1055,15 +1072,46 @@ document.addEventListener('DOMContentLoaded', () => {
     cancelRecentFilesModalButton = document.getElementById('cancelRecentFilesModalButton');
     closeRecentFilesModalButton = document.getElementById('closeRecentFilesModalButton');
 
-    const restoredDataScript = document.getElementById('restored-data');
-    let restoredData = null;
-    if (restoredDataScript && restoredDataScript.textContent.trim()) {
-        try { restoredData = JSON.parse(restoredDataScript.textContent); }
-        catch (e) { console.error("저장된 데이터를 파싱하는 데 실패했습니다.", e); restoredData = null; }
-    }
-    if (restoredData) { restoreState(restoredData); }
-    else { initializeNewSession(); }
+    // PWA 새 창 데이터 로드 로직
+    const urlParams = new URLSearchParams(window.location.search);
+    const loadDataKey = urlParams.get('loadDataKey');
+    
+    if (loadDataKey) {
+        const restoredDataJSON = sessionStorage.getItem(loadDataKey);
+        sessionStorage.removeItem(loadDataKey); // 즉시 삭제하여 정리
 
+        // URL에서 파라미터 정리
+        const newUrl = new URL(window.location.href);
+        newUrl.searchParams.delete('loadDataKey');
+        history.replaceState({}, '', newUrl);
+
+        if (restoredDataJSON) {
+            try {
+                const restoredData = JSON.parse(restoredDataJSON);
+                restoreState(restoredData);
+            } catch(e) {
+                console.error("세션에서 불러온 데이터를 파싱하는 데 실패했습니다.", e);
+                initializeNewSession();
+            }
+        } else {
+            initializeNewSession();
+        }
+    } else {
+        // 기존의 파일 내장 데이터 로드 로직
+        const restoredDataScript = document.getElementById('restored-data');
+        let restoredData = null;
+        if (restoredDataScript && restoredDataScript.textContent.trim()) {
+            try { restoredData = JSON.parse(restoredDataScript.textContent); }
+            catch (e) { console.error("저장된 데이터를 파싱하는 데 실패했습니다.", e); restoredData = null; }
+        }
+        if (restoredData) { 
+            restoreState(restoredData); 
+        } else { 
+            initializeNewSession(); 
+        }
+    }
+
+    // 나머지 이벤트 리스너 설정
     document.getElementById('addCustomerBtn').addEventListener('click', () => createCustomerCard());
     document.getElementById('newGroupBtn').addEventListener('click', addNewGroup);
     document.getElementById('copyGroupBtn').addEventListener('click', copyActiveGroup);
