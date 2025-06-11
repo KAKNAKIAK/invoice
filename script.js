@@ -295,7 +295,6 @@ async function loadFile() {
 
 async function loadFileInNewWindow(fileHandle) {
     try {
-        // 1. 권한 확인
         if ((await fileHandle.queryPermission({ mode: 'read' })) !== 'granted') {
             if ((await fileHandle.requestPermission({ mode: 'read' })) !== 'granted') {
                 showToastMessage('파일 읽기 권한이 필요합니다.', true);
@@ -303,7 +302,6 @@ async function loadFileInNewWindow(fileHandle) {
             }
         }
 
-        // 2. 파일 읽고 데이터 추출
         const file = await fileHandle.getFile();
         const contents = await file.text();
         const parser = new DOMParser();
@@ -313,24 +311,21 @@ async function loadFileInNewWindow(fileHandle) {
         if (restoredDataScript && restoredDataScript.textContent) {
             const restoredDataJSON = restoredDataScript.textContent;
             
-            // 3. sessionStorage에 데이터 저장
             const uniqueKey = `PWA_LOAD_DATA_${Date.now()}`;
             sessionStorage.setItem(uniqueKey, restoredDataJSON);
             
-            // 4. [수정] 전체 URL 대신 상대 URL로 새 창 열기
             const relativeUrl = `?loadDataKey=${uniqueKey}`;
             const newWindow = window.open(relativeUrl, '_blank');
             
             if (!newWindow) {
                 showToastMessage('팝업이 차단되어 새 창을 열 수 없습니다. 팝업 차단을 해제해주세요.', true);
-                sessionStorage.removeItem(uniqueKey); // 정리
+                sessionStorage.removeItem(uniqueKey);
             }
 
         } else {
             showToastMessage('유효한 데이터가 포함된 견적서 파일이 아닙니다.', true);
         }
 
-        // 5. 현재 창의 최근 파일 목록에 핸들 저장
         await saveFileHandle(fileHandle.name, fileHandle);
 
     } catch (err) {
@@ -587,7 +582,10 @@ function initializeGroup(groupEl, groupId) {
     groupEl.innerHTML = `<div class="flex gap-6"> 
         <div class="w-1/2 flex flex-col"> 
             <div id="calculators-wrapper-${groupId}" class="space-y-4"></div> 
-            <div class="mt-4"><button type="button" class="btn btn-outline add-calculator-btn w-full"><i class="fas fa-plus mr-2"></i>견적 계산 추가</button></div> 
+            <div class="mt-4 flex gap-2">
+                <button type="button" class="btn btn-outline add-calculator-btn w-1/2"><i class="fas fa-plus mr-2"></i>견적 계산 추가</button>
+                <button type="button" class="btn btn-yellow-outline copy-last-calculator-btn w-1/2"><i class="fas fa-copy mr-2"></i>견적복사</button>
+            </div> 
         </div> 
         <div class="w-1/2 space-y-6 right-panel-container"> 
             <section class="p-6 border border-gray-200 rounded-lg bg-gray-50"><div class="flex justify-between items-center mb-4"><h2 class="text-xl font-semibold text-gray-800">항공 스케줄</h2><div class="flex items-center space-x-2"><button type="button" class="btn btn-sm btn-secondary copy-flight-schedule-btn" title="항공 스케줄 HTML 복사"><i class="fas fa-clipboard"></i> 복사</button><button type="button" class="btn btn-sm btn-secondary parse-gds-btn">GDS 파싱</button><button type="button" class="btn btn-sm btn-secondary add-flight-subgroup-btn"><i class="fas fa-plus mr-1"></i> 스케줄 추가</button></div></div><div class="space-y-4 flight-schedule-container"></div></section> 
@@ -617,16 +615,40 @@ function initializeGroup(groupEl, groupId) {
             <section class="p-6 border border-gray-200 rounded-lg bg-gray-50"><h2 class="text-xl font-semibold text-gray-800 mb-4">상세 일정표</h2><iframe src="./itinerary_planner/index.html" style="width: 100%; height: 800px; border: 1px solid #ccc; border-radius: 0.25rem;" allow="clipboard-write"></iframe></section> 
         </div> 
     </div>`;
+
     const groupData = quoteGroupsData[groupId];
     if (!groupData) return;
+    
     const calculatorsWrapper = groupEl.querySelector(`#calculators-wrapper-${groupId}`);
-    if (groupData.calculators && groupData.calculators.length > 0) { groupData.calculators.forEach(calcData => createCalculatorInstance(calculatorsWrapper, groupId, calcData)); }
+    if (groupData.calculators && groupData.calculators.length > 0) {
+        groupData.calculators.forEach(calcData => createCalculatorInstance(calculatorsWrapper, groupId, calcData));
+    }
+
     groupEl.querySelector('.add-calculator-btn').addEventListener('click', () => {
         saveAllCalculatorsInGroup(groupId);
         const newCalcData = { id: `calc_${Date.now()}`, pnr: '', tableHTML: null };
         groupData.calculators.push(newCalcData);
-        createCalculatorInstance(calculatorsWrapper, groupId, newCalcData);
+        const wrapper = document.querySelector(`#calculators-wrapper-${groupId}`);
+        wrapper.innerHTML = '';
+        groupData.calculators.forEach(calc => createCalculatorInstance(wrapper, groupId, calc));
     });
+
+    groupEl.querySelector('.copy-last-calculator-btn').addEventListener('click', () => {
+        const groupData = quoteGroupsData[groupId];
+        if (!groupData || groupData.calculators.length === 0) {
+            showToastMessage('복사할 견적 계산이 없습니다.', true);
+            return;
+        }
+        const lastCalculatorData = groupData.calculators[groupData.calculators.length - 1];
+        const lastCalculatorId = lastCalculatorData.id;
+        const wrapper = groupEl.querySelector(`#calculators-wrapper-${groupId}`);
+        const lastDomElement = wrapper.querySelector(`[data-calculator-id="${lastCalculatorId}"]`);
+        
+        if (lastDomElement) {
+            copyCalculatorInstance(lastCalculatorId, groupId, lastDomElement);
+        }
+    });
+
     const flightContainer = groupEl.querySelector('.flight-schedule-container');
     if (groupData.flightSchedule) { groupData.flightSchedule.forEach(subgroup => createFlightSubgroup(flightContainer, subgroup, groupId)); }
     const priceContainer = groupEl.querySelector('.price-info-container');
@@ -685,17 +707,59 @@ function createCalculatorInstance(wrapper, groupId, calcData) {
     const instanceContainer = document.createElement('div');
     instanceContainer.className = 'calculator-instance border p-4 rounded-lg relative bg-white shadow';
     instanceContainer.dataset.calculatorId = calcData.id;
+
     const deleteBtn = document.createElement('button');
     deleteBtn.type = 'button';
     deleteBtn.className = 'absolute top-2 right-2 text-gray-400 hover:text-red-600 z-10';
     deleteBtn.innerHTML = '<i class="fas fa-times-circle"></i>';
     deleteBtn.title = '이 계산기 삭제';
-    deleteBtn.addEventListener('click', (e) => { e.stopPropagation(); if (confirm('이 견적 계산기를 삭제하시겠습니까?')) { const groupData = quoteGroupsData[groupId]; if (groupData) { groupData.calculators = groupData.calculators.filter(c => c.id !== calcData.id); } instanceContainer.remove(); } });
+    deleteBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (confirm('이 견적 계산기를 삭제하시겠습니까?')) {
+            const groupData = quoteGroupsData[groupId];
+            if (groupData) {
+                groupData.calculators = groupData.calculators.filter(c => c.id !== calcData.id);
+            }
+            instanceContainer.remove();
+        }
+    });
     instanceContainer.appendChild(deleteBtn);
+
     wrapper.appendChild(instanceContainer);
     buildCalculatorDOM(instanceContainer);
-    if (calcData && calcData.tableHTML) { restoreCalculatorState(instanceContainer, calcData); }
-    else { addPersonTypeColumn(instanceContainer, '성인', 1); }
+    if (calcData && calcData.tableHTML) {
+        restoreCalculatorState(instanceContainer, calcData);
+    } else {
+        addPersonTypeColumn(instanceContainer, '성인', 1);
+    }
+}
+
+function copyCalculatorInstance(originalCalcId, groupId, originalDomElement) {
+    saveAllCalculatorsInGroup(groupId);
+
+    const groupData = quoteGroupsData[groupId];
+    if (!groupData) return;
+
+    const originalCalcIndex = groupData.calculators.findIndex(c => c.id === originalCalcId);
+    if (originalCalcIndex === -1) return;
+
+    const newCalcData = JSON.parse(JSON.stringify(groupData.calculators[originalCalcIndex]));
+    newCalcData.id = `calc_${Date.now()}`;
+
+    groupData.calculators.splice(originalCalcIndex + 1, 0, newCalcData);
+
+    const wrapper = originalDomElement.parentElement;
+    wrapper.innerHTML = '';
+    groupData.calculators.forEach(calcData => {
+        createCalculatorInstance(wrapper, groupId, calcData);
+    });
+
+    showToastMessage('견적 계산기가 복사되었습니다.');
+    
+    const newInstanceContainer = wrapper.querySelector(`[data-calculator-id="${newCalcData.id}"]`);
+    if (newInstanceContainer) {
+        newInstanceContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
 }
 
 function restoreCalculatorState(instanceContainer, calcData) {
@@ -1071,15 +1135,13 @@ document.addEventListener('DOMContentLoaded', () => {
     cancelRecentFilesModalButton = document.getElementById('cancelRecentFilesModalButton');
     closeRecentFilesModalButton = document.getElementById('closeRecentFilesModalButton');
 
-    // PWA 새 창 데이터 로드 로직
     const urlParams = new URLSearchParams(window.location.search);
     const loadDataKey = urlParams.get('loadDataKey');
     
     if (loadDataKey) {
         const restoredDataJSON = sessionStorage.getItem(loadDataKey);
-        sessionStorage.removeItem(loadDataKey); // 즉시 삭제하여 정리
+        sessionStorage.removeItem(loadDataKey);
 
-        // URL에서 파라미터 정리
         const newUrl = new URL(window.location.href);
         newUrl.searchParams.delete('loadDataKey');
         history.replaceState({}, '', newUrl);
@@ -1096,7 +1158,6 @@ document.addEventListener('DOMContentLoaded', () => {
             initializeNewSession();
         }
     } else {
-        // 기존의 파일 내장 데이터 로드 로직
         const restoredDataScript = document.getElementById('restored-data');
         let restoredData = null;
         if (restoredDataScript && restoredDataScript.textContent.trim()) {
@@ -1110,7 +1171,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // 나머지 이벤트 리스너 설정
     document.getElementById('addCustomerBtn').addEventListener('click', () => createCustomerCard());
     document.getElementById('newGroupBtn').addEventListener('click', addNewGroup);
     document.getElementById('copyGroupBtn').addEventListener('click', copyActiveGroup);
@@ -1122,7 +1182,16 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('saveAsBtn').addEventListener('click', (event) => saveFile(true, event.currentTarget));
     const loadFileLabel = document.querySelector('label[for="loadFile"]');
     if (loadFileLabel) { loadFileLabel.addEventListener('click', (event) => { event.preventDefault(); loadFile(); }); }
-    document.getElementById('quoteForm').addEventListener('reset', (e) => { e.preventDefault(); if (confirm("작성중인 모든 내용을 삭제하고 새로 시작하시겠습니까?")) { window.location.reload(); } });
+    
+    const quoteForm = document.getElementById('quoteForm');
+    if (quoteForm.querySelector('button[type="reset"]')) {
+        quoteForm.addEventListener('reset', (e) => { 
+            e.preventDefault(); 
+            if (confirm("작성중인 모든 내용을 삭제하고 새로 시작하시겠습니까?")) { 
+                window.location.reload(); 
+            } 
+        });
+    }
 
     document.getElementById('copyMemoBtn')?.addEventListener('click', () => {
         const memoTextarea = document.getElementById('memoText');
