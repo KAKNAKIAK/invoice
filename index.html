@@ -16,6 +16,7 @@
         <header class="mb-8 flex justify-between items-center">
             <h1 class="text-3xl font-bold text-indigo-700">2025 견적</h1>
             <div class="flex items-center space-x-2">
+                <button type="button" id="newWindowBtn" class="btn btn-sm btn-secondary"><i class="far fa-window-restore"></i> 새창(Shift + N)</button>
                 <button type="button" id="saveBtn" class="btn btn-sm btn-secondary"><i class="fas fa-save"></i> 저장(Shift + S)</button>
                 <button type="button" id="saveAsBtn" class="btn btn-sm btn-secondary"><i class="fas fa-file-export"></i> 다른 이름으로 저장(Shift + W)</button>
                 <label for="loadFile" class="btn btn-sm btn-secondary cursor-pointer"><i class="fas fa-folder-open"></i> 불러오기(Shift + F)</label>
@@ -79,7 +80,6 @@
             </section>
         </form>
     </div>
-    <!-- 포함/불포함 내역 불러오기 모달 -->
     <div id="loadInclusionsModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50 hidden">
         <div class="relative p-5 border w-11/12 md:w-1/2 lg:w-1/3 shadow-lg rounded-md bg-white">
             <div class="flex justify-between items-center mb-3">
@@ -100,7 +100,6 @@
         </div>
     </div>
 
-    <!-- [신규] 자주 쓰는 문자 불러오기 모달 -->
     <div id="loadMemoModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50 hidden">
         <div class="relative p-5 border w-11/12 md:w-1/2 lg:w-1/3 shadow-lg rounded-md bg-white">
             <div class="flex justify-between items-center mb-3">
