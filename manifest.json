@@ -1,5 +1,5 @@
 {
-  "name": "여행 견적 계산기",
+  "name": "한원희랩",
   "short_name": "견적계산기",
   "description": "팀 내부용 여행 견적 계산 및 관리 도구",
   "start_url": "./index.html",
