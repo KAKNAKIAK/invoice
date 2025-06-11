@@ -137,7 +137,7 @@ function createCustomerCard(initialData = { name: '', phone: '', email: '' }) {
     const card = document.createElement('div');
     card.className = 'p-4 border border-gray-200 rounded-lg relative flex-grow sm:flex-grow-0 sm:min-w-[300px]';
     card.id = cardId;
-    card.innerHTML = `<button type="button" class="absolute top-1 right-1 text-gray-400 hover:text-red-500 text-xs remove-customer-btn p-1" title="고객 삭제"><i class="fas fa-times"></i></button><div class="space-y-3 text-sm"><div class="flex items-center gap-2"><label for="customerName_${cardId}" class="font-medium text-gray-800 w-12 text-left flex-shrink-0">고객명</label><input type="text" id="customerName_${cardId}" class="w-full flex-grow px-3 py-2 border border-gray-300 rounded-md shadow-sm" data-field="name" value="<span class="math-inline">\{initialData\.name\}"\></div\><div class\="flex items\-center gap\-2"\><label for\="customerPhone\_</span>{cardId}" class="font-medium text-gray-800 w-12 text-left flex-shrink-0">연락처</label><input type="tel" id="customerPhone_${cardId}" class="w-full flex-grow px-3 py-2 border border-gray-300 rounded-md shadow-sm" data-field="phone" value="<span class="math-inline">\{initialData\.phone\}"\></div\><div class\="flex items\-center gap\-2"\><label for\="customerEmail\_</span>{cardId}" class="font-medium text-gray-800 w-12 text-left flex-shrink-0">이메일</label><input type="email" id="customerEmail_${cardId}" class="w-full flex-grow px-3 py-2 border border-gray-300 rounded-md shadow-sm" data-field="email" value="${initialData.email}"></div></div>`;
+    card.innerHTML = `<button type="button" class="absolute top-1 right-1 text-gray-400 hover:text-red-500 text-xs remove-customer-btn p-1" title="고객 삭제"><i class="fas fa-times"></i></button><div class="space-y-3 text-sm"><div class="flex items-center gap-2"><label for="customerName_${cardId}" class="font-medium text-gray-800 w-12 text-left flex-shrink-0">고객명</label><input type="text" id="customerName_${cardId}" class="w-full flex-grow px-3 py-2 border border-gray-300 rounded-md shadow-sm" data-field="name" value="${initialData.name}"></div><div class="flex items-center gap-2"><label for="customerPhone_${cardId}" class="font-medium text-gray-800 w-12 text-left flex-shrink-0">연락처</label><input type="tel" id="customerPhone_${cardId}" class="w-full flex-grow px-3 py-2 border border-gray-300 rounded-md shadow-sm" data-field="phone" value="${initialData.phone}"></div><div class="flex items-center gap-2"><label for="customerEmail_${cardId}" class="font-medium text-gray-800 w-12 text-left flex-shrink-0">이메일</label><input type="email" id="customerEmail_${cardId}" class="w-full flex-grow px-3 py-2 border border-gray-300 rounded-md shadow-sm" data-field="email" value="${initialData.email}"></div></div>`;
     container.appendChild(card);
     card.querySelectorAll('input').forEach(input => {
         input.addEventListener('dblclick', (event) => {
@@ -177,7 +177,7 @@ const copyHtmlToClipboard = (htmlString) => {
 function copyToClipboard(text, fieldName = '텍스트') {
     if (!text || text.trim() === "") { showToastMessage('복사할 내용이 없습니다.', true); return; }
     navigator.clipboard.writeText(text).then(() => {
-        showToastMessage(`'<span class="math-inline">\{text\}'\\n\(</span>{fieldName}) 클립보드에 복사되었습니다.`);
+        showToastMessage(`'${text}'\n(${fieldName}) 클립보드에 복사되었습니다.`);
     }).catch(err => { console.error('클립보드 복사 실패:', err); showToastMessage('복사에 실패했습니다.', true); });
 }
 
@@ -287,35 +287,60 @@ async function saveFile(isSaveAs = false, clickedButton = null) {
 async function loadFile() {
     try {
         const [fileHandle] = await window.showOpenFilePicker({ types: [{ description: 'HTML 파일', accept: { 'text/html': ['.html'] } }] });
-        await loadFileFromHandle(fileHandle);
-        await saveFileHandle(fileHandle.name, fileHandle);
+        await loadFileInNewWindow(fileHandle);
     } catch (err) {
         if (err.name !== 'AbortError') { console.error('파일 열기 실패:', err); showToastMessage('파일을 열지 못했습니다.', true); }
     }
 }
 
-async function loadFileFromHandle(fileHandle) {
-    if ((await fileHandle.queryPermission({ mode: 'read' })) !== 'granted') {
-        if ((await fileHandle.requestPermission({ mode: 'read' })) !== 'granted') {
-            showToastMessage('파일 읽기 권한이 필요합니다.', true);
-            return;
+async function loadFileInNewWindow(fileHandle) {
+    try {
+        // 1. 권한 확인
+        if ((await fileHandle.queryPermission({ mode: 'read' })) !== 'granted') {
+            if ((await fileHandle.requestPermission({ mode: 'read' })) !== 'granted') {
+                showToastMessage('파일 읽기 권한이 필요합니다.', true);
+                return;
+            }
+        }
+
+        // 2. 파일 읽고 데이터 추출
+        const file = await fileHandle.getFile();
+        const contents = await file.text();
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(contents, 'text/html');
+        const restoredDataScript = doc.getElementById('restored-data');
+
+        if (restoredDataScript && restoredDataScript.textContent) {
+            const restoredDataJSON = restoredDataScript.textContent;
+            
+            // 3. sessionStorage에 데이터 저장
+            const uniqueKey = `PWA_LOAD_DATA_${Date.now()}`;
+            sessionStorage.setItem(uniqueKey, restoredDataJSON);
+            
+            // 4. [수정] 전체 URL 대신 상대 URL로 새 창 열기
+            const relativeUrl = `?loadDataKey=${uniqueKey}`;
+            const newWindow = window.open(relativeUrl, '_blank');
+            
+            if (!newWindow) {
+                showToastMessage('팝업이 차단되어 새 창을 열 수 없습니다. 팝업 차단을 해제해주세요.', true);
+                sessionStorage.removeItem(uniqueKey); // 정리
+            }
+
+        } else {
+            showToastMessage('유효한 데이터가 포함된 견적서 파일이 아닙니다.', true);
+        }
+
+        // 5. 현재 창의 최근 파일 목록에 핸들 저장
+        await saveFileHandle(fileHandle.name, fileHandle);
+
+    } catch (err) {
+        if (err.name !== 'AbortError') {
+            console.error('새 창에서 파일 열기 실패:', err);
+            showToastMessage('새 창에서 파일을 열지 못했습니다.', true);
         }
     }
-    currentFileHandle = fileHandle;
-    const file = await fileHandle.getFile();
-    const contents = await file.text();
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(contents, 'text/html');
-    const restoredDataScript = doc.getElementById('restored-data');
-    if (restoredDataScript && restoredDataScript.textContent) {
-        const restoredData = JSON.parse(restoredDataScript.textContent);
-        restoreState(restoredData);
-        document.title = fileHandle.name;
-        showToastMessage(`'${fileHandle.name}' 파일이 성공적으로 불러와졌습니다.`);
-    } else {
-        showToastMessage('유효한 데이터가 포함된 견적서 파일이 아닙니다.', true);
-    }
 }
+
 
 // --- 최근 파일 목록 관리 ---
 let recentFilesModal, recentFileSearchInput, recentFileListUl, loadingRecentFileListMsg, cancelRecentFilesModalButton, closeRecentFilesModalButton;
@@ -354,7 +379,7 @@ function renderRecentFileList(fullList, searchTerm) {
                 try {
                     const handle = await getFileHandle(item.name);
                     if (handle) {
-                        await loadFileFromHandle(handle);
+                        await loadFileInNewWindow(handle);
                         recentFilesModal.classList.add('hidden');
                     } else { showToastMessage(`'${item.name}' 파일 핸들을 찾을 수 없습니다. 다시 선택해주세요.`, true); }
                 } catch (e) { showToastMessage(`파일 로드 중 오류 발생: ${e.message}`, true); }
@@ -616,7 +641,7 @@ function initializeGroup(groupEl, groupId) {
     groupEl.querySelector('.copy-inclusion-btn').addEventListener('click', () => { copyToClipboard(inclusionTextEl.value, '포함 내역'); });
     groupEl.querySelector('.copy-exclusion-btn').addEventListener('click', () => { copyToClipboard(exclusionTextEl.value, '불포함 내역'); });
     groupEl.querySelector('.load-inclusion-exclusion-db-btn').addEventListener('click', () => { openLoadInclusionsModal(); });
-    groupEl.querySelector('.parse-gds-btn').addEventListener('click', () => { window.open('./gds_parser/gds_parser.html', 'GDS_Parser', `width=800,height=500,top=<span class="math-inline">\{\(screen\.height / 2\) \- 250\},left\=</span>{(screen.width / 2) - 400}`); });
+    groupEl.querySelector('.parse-gds-btn').addEventListener('click', () => { window.open('./gds_parser/gds_parser.html', 'GDS_Parser', `width=800,height=500,top=${(screen.height / 2) - 250},left=${(screen.width / 2) - 400}`); });
     groupEl.querySelector('.add-flight-subgroup-btn').addEventListener('click', () => {
         if (!groupData.flightSchedule) groupData.flightSchedule = [];
         const sg = { id: `flight_sub_${Date.now()}`, title: "", rows: [{}] };
@@ -761,9 +786,9 @@ function makeEditable(element, inputType, onBlurCallback) {
 }
 
 function getCellContent(rowId, colIndex, type) {
-    const name = `group[<span class="math-inline">\{colIndex\}\]\[</span>{rowId}]`;
+    const name = `group[${colIndex}][${rowId}]`;
     switch (type) {
-        case 'costInput': return `<input type="text" class="input-field-sm cost-item" name="<span class="math-inline">\{name\}" value\="</span>{rowId === 'insurance' ? '5000' : ''}" placeholder="0">`;
+        case 'costInput': return `<input type="text" class="input-field-sm cost-item" name="${name}" value="${rowId === 'insurance' ? '5000' : ''}" placeholder="0">`;
         case 'salesInput': return `<input type="text" class="input-field-sm sales-price" name="${name}" value="0" placeholder="0">`;
         case 'calculated': return `<div class="calculated-field" data-row-id="${rowId}">0 원</div>`;
         case 'calculatedPercentage': return `<div class="calculated-field" data-row-id="${rowId}">0.00 %</div>`;
@@ -904,7 +929,7 @@ function createFlightSubgroup(container, subgroupData, groupId) {
 function addFlightRow(tbody, rowData, subgroupData) {
     const tr = document.createElement('tr');
     const fields = [{ key: 'flightNum', placeholder: 'ZE561' }, { key: 'depDate', placeholder: '07/09' }, { key: 'originCity', placeholder: 'ICN' }, { key: 'depTime', placeholder: '20:55' }, { key: 'arrDate', placeholder: '07/09' }, { key: 'destCity', placeholder: 'CXR' }, { key: 'arrTime', placeholder: '23:55' }];
-    tr.innerHTML = fields.map(f => `<td><input type="text" class="flight-schedule-input" data-field="<span class="math-inline">\{f\.key\}" value\="</span>{rowData[f.key] || ''}" placeholder="${f.placeholder}"></td>`).join('') + `<td class="text-center"><button type="button" class="delete-row-btn" title="이 행 삭제"><i class="fas fa-trash"></i></button></td>`;
+    tr.innerHTML = fields.map(f => `<td><input type="text" class="flight-schedule-input" data-field="${f.key}" value="${rowData[f.key] || ''}" placeholder="${f.placeholder}"></td>`).join('') + `<td class="text-center"><button type="button" class="delete-row-btn" title="이 행 삭제"><i class="fas fa-trash"></i></button></td>`;
     tbody.appendChild(tr);
     tr.querySelectorAll('input').forEach(input => input.addEventListener('input', e => { const field = e.target.dataset.field; rowData[field] = e.target.value; }));
     tr.querySelector('.delete-row-btn').addEventListener('click', () => { const rowIndex = Array.from(tbody.children).indexOf(tr); subgroupData.rows.splice(rowIndex, 1); tr.remove(); });
@@ -927,7 +952,7 @@ function createPriceSubgroup(container, subgroupData, groupId) {
 function addPriceRow(tbody, rowData, subgroupData, subGroupDiv, groupId) {
     const tr = document.createElement('tr');
     const fields = [{ key: 'item', align: 'center' }, { key: 'price', align: 'center' }, { key: 'count', align: 'center' }, { key: 'total', align: 'center', readonly: true }, { key: 'remarks', align: 'center' }];
-    tr.innerHTML = fields.map(f => `<td><input type="text" class="text-<span class="math-inline">\{f\.align\}" data\-field\="</span>{f.key}" value="${rowData[f.key] || ''}" ${f.readonly ? 'readonly' : ''}></td>`).join('') + `<td><button type="button" class="delete-row-btn"><i class="fas fa-trash"></i></button></td>`;
+    tr.innerHTML = fields.map(f => `<td><input type="text" class="text-${f.align}" data-field="${f.key}" value="${rowData[f.key] || ''}" ${f.readonly ? 'readonly' : ''}></td>`).join('') + `<td><button type="button" class="delete-row-btn"><i class="fas fa-trash"></i></button></td>`;
     tbody.appendChild(tr);
     const updateRow = () => {
         const price = parseFloat(rowData.price) || 0;
@@ -953,7 +978,7 @@ function updateGrandTotal(subGroupDiv, groupId) {
 function generateInclusionExclusionInlineHtml(inclusionText, exclusionText) { 
     const i = inclusionText ? inclusionText.replace(/\n/g, '<br>') : ''; 
     const e = exclusionText ? exclusionText.replace(/\n/g, '<br>') : ''; 
-    return `<table style="width:100%;border-collapse:collapse;font-family:sans-serif;font-size:12px"><tbody><tr><td style="vertical-align:top;width:50%;padding-right:10px"><h3 style="font-size:16px;font-weight:600;margin-bottom:8px">포함</h3><div style="padding:8px;border:1px solid #eee;min-height:100px"><span class="math-inline">\{i\}</div\></td\><td style\="vertical\-align\:top;width\:50%;padding\-left\:10px"\><h3 style\="font\-size\:16px;font\-weight\:600;margin\-bottom\:8px"\>불포함</h3\><div style\="padding\:8px;border\:1px solid \#eee;min\-height\:100px"\></span>{e}</div></td></tr></tbody></table>`; 
+    return `<table style="width:100%;border-collapse:collapse;font-family:sans-serif;font-size:12px"><tbody><tr><td style="vertical-align:top;width:50%;padding-right:10px"><h3 style="font-size:16px;font-weight:600;margin-bottom:8px">포함</h3><div style="padding:8px;border:1px solid #eee;min-height:100px">${i}</div></td><td style="vertical-align:top;width:50%;padding-left:10px"><h3 style="font-size:16px;font-weight:600;margin-bottom:8px">불포함</h3><div style="padding:8px;border:1px solid #eee;min-height:100px">${e}</div></td></tr></tbody></table>`; 
 }
 
 function generatePriceInfoInlineHtml(priceData) {
@@ -963,7 +988,7 @@ function generatePriceInfoInlineHtml(priceData) {
             if (subgroup.title) { html += `<h4 style="font-size:14px;font-weight:600;margin-bottom:8px">${subgroup.title}</h4>`; }
             html += `<table style="width:100%;border-collapse:collapse;font-family:sans-serif;font-size:12px;margin-bottom:16px"><thead><tr style="background-color:#f9fafb"><th style="border:1px solid #ddd;padding:8px;text-align:center">내역</th><th style="border:1px solid #ddd;padding:8px;text-align:center">1인당 금액</th><th style="border:1px solid #ddd;padding:8px;text-align:center">인원</th><th style="border:1px solid #ddd;padding:8px;text-align:center">총 금액</th><th style="border:1px solid #ddd;padding:8px;text-align:center">비고</th></tr></thead><tbody>`;
             let grandTotal = 0;
-            subgroup.rows.forEach(row => { const p = parseFloat(row.price) || 0; const c = parseInt(row.count) || 0; const t = p * c; grandTotal += t; html += `<tr><td style="border:1px solid #ddd;padding:8px"><span class="math-inline">\{row\.item \|\| ''\}</td\><td style\="border\:1px solid \#ddd;padding\:8px;text\-align\:right"\></span>{p.toLocaleString()}</td><td style="border:1px solid #ddd;padding:8px;text-align:center"><span class="math-inline">\{c\}</td\><td style\="border\:1px solid \#ddd;padding\:8px;text\-align\:right"\></span>{t.toLocaleString()}</td><td style="border:1px solid #ddd;padding:8px">${row.remarks || ''}</td></tr>`; });
+            subgroup.rows.forEach(row => { const p = parseFloat(row.price) || 0; const c = parseInt(row.count) || 0; const t = p * c; grandTotal += t; html += `<tr><td style="border:1px solid #ddd;padding:8px">${row.item || ''}</td><td style="border:1px solid #ddd;padding:8px;text-align:right">${p.toLocaleString()}</td><td style="border:1px solid #ddd;padding:8px;text-align:center">${c}</td><td style="border:1px solid #ddd;padding:8px;text-align:right">${t.toLocaleString()}</td><td style="border:1px solid #ddd;padding:8px">${row.remarks || ''}</td></tr>`; });
             html += `</tbody><tfoot><tr style="font-weight:bold"><td colspan="3" style="border:1px solid #ddd;padding:8px;text-align:right">총 합계</td><td style="border:1px solid #ddd;padding:8px;text-align:right">${grandTotal.toLocaleString()}</td><td style="border:1px solid #ddd;padding:8px"></td></tr></tfoot></table>`;
         });
     }
@@ -975,7 +1000,7 @@ function generateFlightScheduleInlineHtml(flightData) {
     if(flightData) {
         flightData.forEach(subgroup => { 
             html += `<h4 style="font-size:14px;font-weight:600;margin-bottom:8px">${subgroup.title || '항공 스케줄'}</h4><table style="width:100%;border-collapse:collapse;font-family:sans-serif;font-size:12px;margin-bottom:16px"><thead><tr style="background-color:#f9fafb"><th style="border:1px solid #ddd;padding:8px;text-align:left">편명</th><th style="border:1px solid #ddd;padding:8px;text-align:left">출발일</th><th style="border:1px solid #ddd;padding:8px;text-align:left">출발지</th><th style="border:1px solid #ddd;padding:8px;text-align:left">출발시간</th><th style="border:1px solid #ddd;padding:8px;text-align:left">도착일</th><th style="border:1px solid #ddd;padding:8px;text-align:left">도착지</th><th style="border:1px solid #ddd;padding:8px;text-align:left">도착시간</th></tr></thead><tbody>`; 
-            subgroup.rows.forEach(row => { html += `<tr><td style="border:1px solid #ddd;padding:8px"><span class="math-inline">\{row\.flightNum \|\| ''\}</td\><td style\="border\:1px solid \#ddd;padding\:8px"\></span>{row.depDate || ''}</td><td style="border:1px solid #ddd;padding:8px"><span class="math-inline">\{row\.originCity \|\| ''\}</td\><td style\="border\:1px solid \#ddd;padding\:8px"\></span>{row.depTime || ''}</td><td style="border:1px solid #ddd;padding:8px"><span class="math-inline">\{row\.arrDate \|\| ''\}</td\><td style\="border\:1px solid \#ddd;padding\:8px"\></span>{row.destCity || ''}</td><td style="border:1px solid #ddd;padding:8px">${row.arrTime || ''}</td></tr>`; }); 
+            subgroup.rows.forEach(row => { html += `<tr><td style="border:1px solid #ddd;padding:8px">${row.flightNum || ''}</td><td style="border:1px solid #ddd;padding:8px">${row.depDate || ''}</td><td style="border:1px solid #ddd;padding:8px">${row.originCity || ''}</td><td style="border:1px solid #ddd;padding:8px">${row.depTime || ''}</td><td style="border:1px solid #ddd;padding:8px">${row.arrDate || ''}</td><td style="border:1px solid #ddd;padding:8px">${row.destCity || ''}</td><td style="border:1px solid #ddd;padding:8px">${row.arrTime || ''}</td></tr>`; }); 
             html += `</tbody></table>`; 
         }); 
     }
@@ -1046,17 +1071,43 @@ document.addEventListener('DOMContentLoaded', () => {
     cancelRecentFilesModalButton = document.getElementById('cancelRecentFilesModalButton');
     closeRecentFilesModalButton = document.getElementById('closeRecentFilesModalButton');
 
-    // PWA 새 창 데이터 로드 로직을 제거하고 원래 로직으로 복원
-    const restoredDataScript = document.getElementById('restored-data');
-    let restoredData = null;
-    if (restoredDataScript && restoredDataScript.textContent.trim()) {
-        try { restoredData = JSON.parse(restoredDataScript.textContent); }
-        catch (e) { console.error("저장된 데이터를 파싱하는 데 실패했습니다.", e); restoredData = null; }
-    }
-    if (restoredData) { 
-        restoreState(restoredData); 
-    } else { 
-        initializeNewSession(); 
+    // PWA 새 창 데이터 로드 로직
+    const urlParams = new URLSearchParams(window.location.search);
+    const loadDataKey = urlParams.get('loadDataKey');
+    
+    if (loadDataKey) {
+        const restoredDataJSON = sessionStorage.getItem(loadDataKey);
+        sessionStorage.removeItem(loadDataKey); // 즉시 삭제하여 정리
+
+        // URL에서 파라미터 정리
+        const newUrl = new URL(window.location.href);
+        newUrl.searchParams.delete('loadDataKey');
+        history.replaceState({}, '', newUrl);
+
+        if (restoredDataJSON) {
+            try {
+                const restoredData = JSON.parse(restoredDataJSON);
+                restoreState(restoredData);
+            } catch(e) {
+                console.error("세션에서 불러온 데이터를 파싱하는 데 실패했습니다.", e);
+                initializeNewSession();
+            }
+        } else {
+            initializeNewSession();
+        }
+    } else {
+        // 기존의 파일 내장 데이터 로드 로직
+        const restoredDataScript = document.getElementById('restored-data');
+        let restoredData = null;
+        if (restoredDataScript && restoredDataScript.textContent.trim()) {
+            try { restoredData = JSON.parse(restoredDataScript.textContent); }
+            catch (e) { console.error("저장된 데이터를 파싱하는 데 실패했습니다.", e); restoredData = null; }
+        }
+        if (restoredData) { 
+            restoreState(restoredData); 
+        } else { 
+            initializeNewSession(); 
+        }
     }
 
     // 나머지 이벤트 리스너 설정
