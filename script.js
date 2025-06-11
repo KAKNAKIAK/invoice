@@ -137,62 +137,23 @@ function createCustomerCard(initialData = { name: '', phone: '', email: '' }) {
     const card = document.createElement('div');
     card.className = 'p-4 border border-gray-200 rounded-lg relative flex-grow sm:flex-grow-0 sm:min-w-[300px]';
     card.id = cardId;
-
-    // 각 입력 필드(input) 바로 뒤에 복사 버튼(<button>)을 추가
-    card.innerHTML = `
-        <button type="button" class="absolute top-1 right-1 text-gray-400 hover:text-red-500 text-xs remove-customer-btn p-1" title="고객 삭제">
-            <i class="fas fa-times"></i>
-        </button>
-        <div class="space-y-3 text-sm">
-            <div class="flex items-center gap-2">
-                <label for="customerName_${cardId}" class="font-medium text-gray-800 w-12 text-left flex-shrink-0">고객명</label>
-                <input type="text" id="customerName_${cardId}" class="w-full flex-grow px-3 py-2 border border-gray-300 rounded-md shadow-sm" data-field="name" value="${initialData.name}">
-                <button type="button" class="inline-copy-btn copy-customer-info-btn" title="고객명 복사">
-                    <i class="far fa-copy"></i>
-                </button>
-            </div>
-            <div class="flex items-center gap-2">
-                <label for="customerPhone_${cardId}" class="font-medium text-gray-800 w-12 text-left flex-shrink-0">연락처</label>
-                <input type="tel" id="customerPhone_${cardId}" class="w-full flex-grow px-3 py-2 border border-gray-300 rounded-md shadow-sm" data-field="phone" value="${initialData.phone}">
-                <button type="button" class="inline-copy-btn copy-customer-info-btn" title="연락처 복사">
-                    <i class="far fa-copy"></i>
-                </button>
-            </div>
-            <div class="flex items-center gap-2">
-                <label for="customerEmail_${cardId}" class="font-medium text-gray-800 w-12 text-left flex-shrink-0">이메일</label>
-                <input type="email" id="customerEmail_${cardId}" class="w-full flex-grow px-3 py-2 border border-gray-300 rounded-md shadow-sm" data-field="email" value="${initialData.email}">
-                <button type="button" class="inline-copy-btn copy-customer-info-btn" title="이메일 복사">
-                    <i class="far fa-copy"></i>
-                </button>
-            </div>
-        </div>
-    `;
+    card.innerHTML = `<button type="button" class="absolute top-1 right-1 text-gray-400 hover:text-red-500 text-xs remove-customer-btn p-1" title="고객 삭제"><i class="fas fa-times"></i></button><div class="space-y-3 text-sm"><div class="flex items-center gap-2"><label for="customerName_${cardId}" class="font-medium text-gray-800 w-12 text-left flex-shrink-0">고객명</label><input type="text" id="customerName_${cardId}" class="w-full flex-grow px-3 py-2 border border-gray-300 rounded-md shadow-sm" data-field="name" value="${initialData.name}"><button type="button" class="inline-copy-btn copy-customer-info-btn" title="고객명 복사"><i class="far fa-copy"></i></button></div><div class="flex items-center gap-2"><label for="customerPhone_${cardId}" class="font-medium text-gray-800 w-12 text-left flex-shrink-0">연락처</label><input type="tel" id="customerPhone_${cardId}" class="w-full flex-grow px-3 py-2 border border-gray-300 rounded-md shadow-sm" data-field="phone" value="${initialData.phone}"><button type="button" class="inline-copy-btn copy-customer-info-btn" title="연락처 복사"><i class="far fa-copy"></i></button></div><div class="flex items-center gap-2"><label for="customerEmail_${cardId}" class="font-medium text-gray-800 w-12 text-left flex-shrink-0">이메일</label><input type="email" id="customerEmail_${cardId}" class="w-full flex-grow px-3 py-2 border border-gray-300 rounded-md shadow-sm" data-field="email" value="${initialData.email}"><button type="button" class="inline-copy-btn copy-customer-info-btn" title="이메일 복사"><i class="far fa-copy"></i></button></div></div>`;
     container.appendChild(card);
-
-    // 기존 더블클릭 이벤트 리스너 (변경 없음)
     card.querySelectorAll('input').forEach(input => {
         input.addEventListener('dblclick', (event) => {
             const label = event.target.previousElementSibling ? event.target.previousElementSibling.textContent : '입력 필드';
             copyToClipboard(event.target.value, label);
         });
     });
-
-    // 새로 추가된 복사 버튼에 대한 이벤트 리스너
     card.querySelectorAll('.copy-customer-info-btn').forEach(button => {
         button.addEventListener('click', (event) => {
-            // 버튼 바로 앞의 input 요소를 찾음
             const inputElement = event.currentTarget.previousElementSibling;
-            // input 요소 앞의 label 요소를 찾아 필드명을 가져옴
             const labelElement = inputElement.previousElementSibling;
-
             const textToCopy = inputElement.value;
             const fieldName = labelElement ? labelElement.textContent : '고객 정보';
-
             copyToClipboard(textToCopy, fieldName);
         });
     });
-
-    // 기존 삭제 버튼 이벤트 리스너 (변경 없음)
     card.querySelector('.remove-customer-btn').addEventListener('click', () => { card.remove(); });
 }
 
@@ -335,13 +296,14 @@ async function saveFile(isSaveAs = false, clickedButton = null) {
 async function loadFile() {
     try {
         const [fileHandle] = await window.showOpenFilePicker({ types: [{ description: 'HTML 파일', accept: { 'text/html': ['.html'] } }] });
-        await loadFileInNewWindow(fileHandle);
+        const openInNew = confirm("파일을 새 창에서 여시겠습니까?\n'확인' = 새 창, '취소' = 현재 창");
+        await loadDataIntoWindow(fileHandle, openInNew);
     } catch (err) {
         if (err.name !== 'AbortError') { console.error('파일 열기 실패:', err); showToastMessage('파일을 열지 못했습니다.', true); }
     }
 }
 
-async function loadFileInNewWindow(fileHandle) {
+async function loadDataIntoWindow(fileHandle, openInNewWindow) {
     try {
         if ((await fileHandle.queryPermission({ mode: 'read' })) !== 'granted') {
             if ((await fileHandle.requestPermission({ mode: 'read' })) !== 'granted') {
@@ -359,27 +321,37 @@ async function loadFileInNewWindow(fileHandle) {
         if (restoredDataScript && restoredDataScript.textContent) {
             const restoredDataJSON = restoredDataScript.textContent;
             
-            const uniqueKey = `PWA_LOAD_DATA_${Date.now()}`;
-            sessionStorage.setItem(uniqueKey, restoredDataJSON);
-            
-            const relativeUrl = `?loadDataKey=${uniqueKey}`;
-            const newWindow = window.open(relativeUrl, '_blank');
-            
-            if (!newWindow) {
-                showToastMessage('팝업이 차단되어 새 창을 열 수 없습니다. 팝업 차단을 해제해주세요.', true);
-                sessionStorage.removeItem(uniqueKey);
+            if (openInNewWindow) {
+                const uniqueKey = `PWA_LOAD_DATA_${Date.now()}`;
+                sessionStorage.setItem(uniqueKey, restoredDataJSON);
+                
+                const relativeUrl = `?loadDataKey=${uniqueKey}`;
+                const newWindow = window.open(relativeUrl, '_blank');
+                
+                if (!newWindow) {
+                    showToastMessage('팝업이 차단되어 새 창을 열 수 없습니다. 팝업 차단을 해제해주세요.', true);
+                    sessionStorage.removeItem(uniqueKey);
+                }
+            } else {
+                try {
+                    const restoredData = JSON.parse(restoredDataJSON);
+                    restoreState(restoredData);
+                    currentFileHandle = fileHandle;
+                    document.title = fileHandle.name;
+                    showToastMessage(`'${fileHandle.name}' 파일을 현재 창에 로드했습니다.`);
+                } catch (e) {
+                    console.error("데이터 파싱 또는 상태 복원 실패:", e);
+                    showToastMessage("파일 데이터를 처리하는 중 오류가 발생했습니다.", true);
+                }
             }
-
         } else {
             showToastMessage('유효한 데이터가 포함된 견적서 파일이 아닙니다.', true);
         }
-
         await saveFileHandle(fileHandle.name, fileHandle);
-
     } catch (err) {
         if (err.name !== 'AbortError') {
-            console.error('새 창에서 파일 열기 실패:', err);
-            showToastMessage('새 창에서 파일을 열지 못했습니다.', true);
+            console.error('파일 로딩 실패:', err);
+            showToastMessage('파일을 열지 못했습니다.', true);
         }
     }
 }
@@ -414,6 +386,7 @@ function renderRecentFileList(fullList, searchTerm) {
         filteredList.forEach(item => {
             const listItem = document.createElement('li');
             listItem.className = 'flex justify-between items-center p-3 hover:bg-gray-50 cursor-pointer';
+            
             const titleSpan = document.createElement('span');
             titleSpan.textContent = item.name;
             titleSpan.className = 'text-sm font-medium text-gray-900 flex-grow';
@@ -422,21 +395,27 @@ function renderRecentFileList(fullList, searchTerm) {
                 try {
                     const handle = await getFileHandle(item.name);
                     if (handle) {
-                        await loadFileInNewWindow(handle);
+                        const openInNew = confirm("파일을 새 창에서 여시겠습니까?\n'확인' = 새 창, '취소' = 현재 창");
+                        await loadDataIntoWindow(handle, openInNew);
                         recentFilesModal.classList.add('hidden');
                     } else { showToastMessage(`'${item.name}' 파일 핸들을 찾을 수 없습니다. 다시 선택해주세요.`, true); }
                 } catch (e) { showToastMessage(`파일 로드 중 오류 발생: ${e.message}`, true); }
             });
+            
             const deleteButton = document.createElement('button');
             deleteButton.innerHTML = `<svg class="w-5 h-5 text-gray-400 hover:text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>`;
             deleteButton.className = 'p-1 rounded-full hover:bg-red-100 ml-2';
             deleteButton.title = `"${item.name}" 최근 파일 목록에서 삭제`;
             deleteButton.addEventListener('click', async (e) => {
                 e.stopPropagation();
-                await deleteFileHandle(item.name);
-                openRecentFilesModal();
-                showToastMessage(`'${item.name}'이(가) 최근 파일 목록에서 삭제되었습니다.`);
+                if (confirm(`'${item.name}'을(를) 최근 파일 목록에서 삭제하시겠습니까?`)) {
+                    await deleteFileHandle(item.name);
+                    const allHandles = await getAllFileHandles();
+                    renderRecentFileList(allHandles, recentFileSearchInput.value);
+                    showToastMessage(`'${item.name}'이(가) 최근 파일 목록에서 삭제되었습니다.`);
+                }
             });
+
             listItem.appendChild(titleSpan);
             listItem.appendChild(deleteButton);
             recentFileListUl.appendChild(listItem);
@@ -1098,7 +1077,7 @@ function generatePriceInfoInlineHtml(priceData) {
     if (priceData) {
         priceData.forEach(subgroup => {
             if (subgroup.title) { html += `<h4 style="font-size:14px;font-weight:600;margin-bottom:8px">${subgroup.title}</h4>`; }
-            html += `<table style="width:100%;border-collapse:collapse;font-family:sans-serif;font-size:12px;margin-bottom:16px"><thead><tr style="background-color:#f9fafb"><th style="border:1px solid #ddd;padding:8px;text-align:center">내역</th><th style="border:1px solid #ddd;padding:8px;text-align:center">1인당 금액</th><th style="border:1px solid #ddd;padding:8px;text-align:center">인원</th><th style="border:1px solid #ddd;padding:8px;text-align:center">총 금액</th><th style="border:1px solid #ddd;padding:8px;text-align:center">비고</</th></tr></thead><tbody>`;
+            html += `<table style="width:100%;border-collapse:collapse;font-family:sans-serif;font-size:12px;margin-bottom:16px"><thead><tr style="background-color:#f9fafb"><th style="border:1px solid #ddd;padding:8px;text-align:center">내역</th><th style="border:1px solid #ddd;padding:8px;text-align:center">1인당 금액</th><th style="border:1px solid #ddd;padding:8px;text-align:center">인원</th><th style="border:1px solid #ddd;padding:8px;text-align:center">총 금액</th><th style="border:1px solid #ddd;padding:8px;text-align:center">비고</th></tr></thead><tbody>`;
             let grandTotal = 0;
             subgroup.rows.forEach(row => { const p = parseFloat(row.price) || 0; const c = parseInt(row.count) || 0; const t = p * c; grandTotal += t; html += `<tr><td style="border:1px solid #ddd;padding:8px">${row.item || ''}</td><td style="border:1px solid #ddd;padding:8px;text-align:right">${p.toLocaleString()}</td><td style="border:1px solid #ddd;padding:8px;text-align:center">${c}</td><td style="border:1px solid #ddd;padding:8px;text-align:right">${t.toLocaleString()}</td><td style="border:1px solid #ddd;padding:8px">${row.remarks || ''}</td></tr>`; });
             html += `</tbody><tfoot><tr style="font-weight:bold"><td colspan="3" style="border:1px solid #ddd;padding:8px;text-align:right">총 합계</td><td style="border:1px solid #ddd;padding:8px;text-align:right">${grandTotal.toLocaleString()}</td><td style="border:1px solid #ddd;padding:8px"></td></tr></tfoot></table>`;
