@@ -287,33 +287,42 @@ async function saveFile(isSaveAs = false, clickedButton = null) {
 async function loadFile() {
     try {
         const [fileHandle] = await window.showOpenFilePicker({ types: [{ description: 'HTML 파일', accept: { 'text/html': ['.html'] } }] });
-        await loadFileFromHandle(fileHandle);
-        await saveFileHandle(fileHandle.name, fileHandle);
+        await loadFileInNewWindow(fileHandle);
     } catch (err) {
         if (err.name !== 'AbortError') { console.error('파일 열기 실패:', err); showToastMessage('파일을 열지 못했습니다.', true); }
     }
 }
 
-async function loadFileFromHandle(fileHandle) {
-    if ((await fileHandle.queryPermission({ mode: 'read' })) !== 'granted') {
-        if ((await fileHandle.requestPermission({ mode: 'read' })) !== 'granted') {
-            showToastMessage('파일 읽기 권한이 필요합니다.', true);
+async function loadFileInNewWindow(fileHandle) {
+    try {
+        if ((await fileHandle.queryPermission({ mode: 'read' })) !== 'granted') {
+            if ((await fileHandle.requestPermission({ mode: 'read' })) !== 'granted') {
+                showToastMessage('파일 읽기 권한이 필요합니다.', true);
+                return;
+            }
+        }
+
+        const file = await fileHandle.getFile();
+        const contents = await file.text();
+
+        const newWindow = window.open('', '_blank');
+        if (newWindow) {
+            newWindow.document.open();
+            newWindow.document.write(contents);
+            newWindow.document.close();
+            newWindow.focus();
+        } else {
+            showToastMessage('팝업이 차단되어 새 창을 열 수 없습니다. 팝업 차단을 해제해주세요.', true);
             return;
         }
-    }
-    currentFileHandle = fileHandle;
-    const file = await fileHandle.getFile();
-    const contents = await file.text();
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(contents, 'text/html');
-    const restoredDataScript = doc.getElementById('restored-data');
-    if (restoredDataScript && restoredDataScript.textContent) {
-        const restoredData = JSON.parse(restoredDataScript.textContent);
-        restoreState(restoredData);
-        document.title = fileHandle.name;
-        showToastMessage(`'${fileHandle.name}' 파일이 성공적으로 불러와졌습니다.`);
-    } else {
-        showToastMessage('유효한 데이터가 포함된 견적서 파일이 아닙니다.', true);
+        
+        await saveFileHandle(fileHandle.name, fileHandle);
+
+    } catch (err) {
+         if (err.name !== 'AbortError') {
+            console.error('새 창에서 파일 열기 실패:', err);
+            showToastMessage('새 창에서 파일을 열지 못했습니다.', true);
+        }
     }
 }
 
@@ -354,7 +363,7 @@ function renderRecentFileList(fullList, searchTerm) {
                 try {
                     const handle = await getFileHandle(item.name);
                     if (handle) {
-                        await loadFileFromHandle(handle);
+                        await loadFileInNewWindow(handle);
                         recentFilesModal.classList.add('hidden');
                     } else { showToastMessage(`'${item.name}' 파일 핸들을 찾을 수 없습니다. 다시 선택해주세요.`, true); }
                 } catch (e) { showToastMessage(`파일 로드 중 오류 발생: ${e.message}`, true); }
