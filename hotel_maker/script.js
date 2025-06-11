@@ -719,9 +719,60 @@ async function deleteHotelSetFromFirestore(docId, docName) {
 
     } catch (error) {
         console.error("Error deleting hotel set from Firestore: ", error);
-        showToastMessage(`"${docName}" 정보 삭제 중 오류 발생: ${error.message}`, true);
+        showToastMessage(`"${docName}" 정보 삭제 중 오류 발생: ${error.message, true}`);
     }
 }
+
+// [추가] 부모 창과 통신하기 위한 이벤트 리스너
+window.addEventListener('message', (event) => {
+    // 보안을 위해 실제 프로덕션에서는 event.origin을 확인해야 합니다.
+    // 예: if (event.origin !== 'https://expected-parent-origin.com') return;
+
+    const { action, payload, port } = event.data;
+
+    if (action === 'getHotelData') {
+        // 1. 현재 편집기의 데이터를 동기화합니다.
+        syncCurrentHotelData();
+        
+        // 2. 부모 창으로 보낼 데이터를 준비합니다.
+        const dataToSend = {
+            allHotelData,
+            currentHotelIndex,
+            currentHotelDocumentId,
+            currentHotelDocumentName
+        };
+        
+        // 3. MessagePort를 통해 응답을 보냅니다.
+        if (port) {
+            port.postMessage({ payload: dataToSend });
+            port.close();
+        }
+    } else if (action === 'loadHotelData') {
+        // 1. 부모 창으로부터 받은 데이터로 내부 상태를 복원합니다.
+        const receivedData = payload;
+        if (receivedData) {
+            allHotelData = receivedData.allHotelData || [];
+            currentHotelIndex = receivedData.currentHotelIndex !== undefined ? receivedData.currentHotelIndex : -1;
+            currentHotelDocumentId = receivedData.currentHotelDocumentId || null;
+            currentHotelDocumentName = receivedData.currentHotelDocumentName || "새 호텔 정보 모음";
+        } else {
+            // 전달된 데이터가 없으면 초기화
+            allHotelData = [];
+            currentHotelIndex = -1;
+            currentHotelDocumentId = null;
+            currentHotelDocumentName = "새 호텔 정보 모음";
+        }
+        
+        // 2. 복원된 데이터로 UI를 다시 렌더링합니다.
+        // 데이터가 없는 경우, 빈 탭을 하나 추가해줍니다.
+        if (allHotelData.length === 0) {
+            addHotel();
+        } else {
+            renderTabs();
+            renderEditorForCurrentHotel();
+        }
+    }
+});
 
 
 // --- DOMContentLoaded ---
@@ -827,23 +878,8 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
     }
-
-    // *** 요청사항 반영: 초기 addHotel() 호출 제거 ***
-    // 기존 코드:
-    // if (allHotelData.length === 0) {
-    //     addHotel();
-    // } else {
-    //     if(currentHotelIndex === -1 && allHotelData.length > 0) {
-    //         switchTab(0);
-    //     } else {
-    //         switchTab(currentHotelIndex);
-    //     }
-    // }
-    // renderTabs(); // 이 부분은 아래 renderTabs()와 renderEditorForCurrentHotel()로 대체/보강
-
-    // 수정된 초기화:
-    // currentHotelIndex는 전역 변수로 -1로 초기화되어 있고, allHotelData는 []로 초기화되어 있음.
-    // 따라서 아무 호텔도 없는 상태로 시작.
-    renderTabs(); // 탭 UI 업데이트 (문서 이름 표시 등)
-    renderEditorForCurrentHotel(); // 편집기 폼 비활성화 및 필드 초기화
+    
+    // 수정된 초기화: 처음에는 아무것도 없는 상태로 시작
+    renderTabs(); 
+    renderEditorForCurrentHotel();
 });
