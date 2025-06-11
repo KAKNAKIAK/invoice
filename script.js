@@ -317,11 +317,10 @@ async function loadFileInNewWindow(fileHandle) {
             const uniqueKey = `PWA_LOAD_DATA_${Date.now()}`;
             sessionStorage.setItem(uniqueKey, restoredDataJSON);
             
-            // 4. URL 파라미터와 함께 새 창 열기
-            const url = new URL(window.location.href);
-            url.searchParams.set('loadDataKey', uniqueKey);
+            // 4. [수정] 전체 URL 대신 상대 URL로 새 창 열기
+            const relativeUrl = `?loadDataKey=${uniqueKey}`;
+            const newWindow = window.open(relativeUrl, '_blank');
             
-            const newWindow = window.open(url.href, '_blank');
             if (!newWindow) {
                 showToastMessage('팝업이 차단되어 새 창을 열 수 없습니다. 팝업 차단을 해제해주세요.', true);
                 sessionStorage.removeItem(uniqueKey); // 정리
