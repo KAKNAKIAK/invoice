@@ -97,6 +97,46 @@ async function deleteFileHandle(name) {
     });
 }
 
+// [추가] iframe과 통신하여 데이터를 요청하는 헬퍼 함수
+function requestDataFromIframe(iframe) {
+    return new Promise((resolve, reject) => {
+        if (!iframe || !iframe.contentWindow) {
+            // iframe이 없거나 로드되지 않은 경우, 빈 데이터를 즉시 반환
+            return resolve(null);
+        }
+
+        const channel = new MessageChannel();
+        const timeout = 5000; // 5초 타임아웃
+
+        const timer = setTimeout(() => {
+            channel.port1.close();
+            console.warn('Iframe data request timed out for:', iframe.src);
+            // 타임아웃 시 빈 데이터 반환하여 저장 프로세스 중단 방지
+            resolve(null); 
+        }, timeout);
+
+        channel.port1.onmessage = ({ data }) => {
+            clearTimeout(timer);
+            channel.port1.close();
+            resolve(data.payload);
+        };
+
+        // 메시지 유형(action)에 따라 요청을 구분
+        let action = '';
+        if (iframe.src.includes('hotel_maker')) {
+            action = 'getHotelData';
+        } else if (iframe.src.includes('itinerary_planner')) {
+            // 상세 일정표는 이번 수정 범위에 포함되지 않으므로, 요청을 보내지 않음
+             return resolve(null);
+        } else {
+             return resolve(null);
+        }
+        
+        iframe.contentWindow.postMessage({ action }, '*', [channel.port2]);
+    });
+}
+
+
 // =======================================================================
 // 3. GDS 파서 연동 함수
 // =======================================================================
@@ -229,10 +269,31 @@ function saveAllCalculatorsInGroup(groupId) {
     });
 }
 
+// [수정] iframe에서 데이터를 비동기적으로 가져오기 위해 async로 변경
 async function getSaveDataBlob() {
     if (activeGroupId) saveAllCalculatorsInGroup(activeGroupId);
     Object.keys(quoteGroupsData).forEach(id => { if (id !== activeGroupId) saveAllCalculatorsInGroup(id); });
-    const allData = { quoteGroupsData, groupCounter, activeGroupId, memoText: document.getElementById('memoText').value, customerInfo: getCustomerData() };
+
+    // [추가] 활성 그룹의 iframe에서 데이터 요청
+    let hotelMakerData = null;
+    if (activeGroupId) {
+        const activeGroupEl = document.getElementById(`group-content-${activeGroupId}`);
+        if (activeGroupEl) {
+            const hotelMakerIframe = activeGroupEl.querySelector('iframe[src*="hotel_maker"]');
+            hotelMakerData = await requestDataFromIframe(hotelMakerIframe);
+        }
+    }
+
+    const allData = { 
+        quoteGroupsData, 
+        groupCounter, 
+        activeGroupId, 
+        memoText: document.getElementById('memoText').value, 
+        customerInfo: getCustomerData(),
+        // [추가] 저장 데이터 객체에 호텔 메이커 데이터 포함
+        hotelMakerData: hotelMakerData 
+    };
+
     const doc = document.cloneNode(true);
     try {
         const styleResponse = await fetch('./style.css');
@@ -255,6 +316,7 @@ async function getSaveDataBlob() {
     }
 }
 
+// [수정] getSaveDataBlob이 비동기가 되었으므로 async로 변경
 async function saveFile(isSaveAs = false, clickedButton = null) {
     const saveBtn = document.getElementById('saveBtn');
     const saveAsBtn = document.getElementById('saveAsBtn');
@@ -263,7 +325,7 @@ async function saveFile(isSaveAs = false, clickedButton = null) {
     saveAsBtn.disabled = true;
     if (clickedButton) { clickedButton.innerHTML = `<i class="fas fa-spinner fa-spin mr-2"></i>저장 중...`; }
     try {
-        const blob = await getSaveDataBlob();
+        const blob = await getSaveDataBlob(); // await 추가
         if (!blob) throw new Error("Blob 생성 실패");
         if (isSaveAs || !currentFileHandle) {
             const newHandle = await window.showSaveFilePicker({
@@ -1140,9 +1202,38 @@ function restoreState(data) {
     document.getElementById('memoText').value = data.memoText || '';
     if (data.customerInfo && data.customerInfo.length > 0) { data.customerInfo.forEach(customer => createCustomerCard(customer)); }
     else { createCustomerCard(); }
-    if (Object.keys(quoteGroupsData).length > 0) { Object.keys(quoteGroupsData).forEach(id => createGroupUI(id)); }
-    else { addNewGroup(); }
-    switchTab(data.activeGroupId || (Object.keys(quoteGroupsData).length > 0 ? Object.keys(quoteGroupsData)[0] : null));
+    if (Object.keys(quoteGroupsData).length > 0) { 
+        Object.keys(quoteGroupsData).forEach(id => createGroupUI(id)); 
+    } else { 
+        addNewGroup(); 
+    }
+    
+    // [수정] activeGroupId를 설정하고, 해당 그룹의 iframe에 데이터 전달
+    const targetGroupId = data.activeGroupId || (Object.keys(quoteGroupsData).length > 0 ? Object.keys(quoteGroupsData)[0] : null);
+    if (targetGroupId) {
+        switchTab(targetGroupId);
+        const activeGroupEl = document.getElementById(`group-content-${targetGroupId}`);
+        if (activeGroupEl) {
+            const hotelMakerIframe = activeGroupEl.querySelector('iframe[src*="hotel_maker"]');
+            if (hotelMakerIframe && data.hotelMakerData) {
+                // iframe이 로드된 후에 메시지를 보내야 함
+                hotelMakerIframe.onload = () => {
+                    hotelMakerIframe.contentWindow.postMessage({
+                        action: 'loadHotelData',
+                        payload: data.hotelMakerData
+                    }, '*');
+                };
+                // 만약 iframe이 이미 로드되었다면, 즉시 메시지 전송
+                if (hotelMakerIframe.contentWindow.document.readyState === 'complete') {
+                     hotelMakerIframe.contentWindow.postMessage({
+                        action: 'loadHotelData',
+                        payload: data.hotelMakerData
+                    }, '*');
+                }
+            }
+        }
+    }
+    
     setupEnterKeyListenerForForm();
 }
 
