@@ -137,14 +137,62 @@ function createCustomerCard(initialData = { name: '', phone: '', email: '' }) {
     const card = document.createElement('div');
     card.className = 'p-4 border border-gray-200 rounded-lg relative flex-grow sm:flex-grow-0 sm:min-w-[300px]';
     card.id = cardId;
-    card.innerHTML = `<button type="button" class="absolute top-1 right-1 text-gray-400 hover:text-red-500 text-xs remove-customer-btn p-1" title="고객 삭제"><i class="fas fa-times"></i></button><div class="space-y-3 text-sm"><div class="flex items-center gap-2"><label for="customerName_${cardId}" class="font-medium text-gray-800 w-12 text-left flex-shrink-0">고객명</label><input type="text" id="customerName_${cardId}" class="w-full flex-grow px-3 py-2 border border-gray-300 rounded-md shadow-sm" data-field="name" value="${initialData.name}"></div><div class="flex items-center gap-2"><label for="customerPhone_${cardId}" class="font-medium text-gray-800 w-12 text-left flex-shrink-0">연락처</label><input type="tel" id="customerPhone_${cardId}" class="w-full flex-grow px-3 py-2 border border-gray-300 rounded-md shadow-sm" data-field="phone" value="${initialData.phone}"></div><div class="flex items-center gap-2"><label for="customerEmail_${cardId}" class="font-medium text-gray-800 w-12 text-left flex-shrink-0">이메일</label><input type="email" id="customerEmail_${cardId}" class="w-full flex-grow px-3 py-2 border border-gray-300 rounded-md shadow-sm" data-field="email" value="${initialData.email}"></div></div>`;
+
+    // 각 입력 필드(input) 바로 뒤에 복사 버튼(<button>)을 추가
+    card.innerHTML = `
+        <button type="button" class="absolute top-1 right-1 text-gray-400 hover:text-red-500 text-xs remove-customer-btn p-1" title="고객 삭제">
+            <i class="fas fa-times"></i>
+        </button>
+        <div class="space-y-3 text-sm">
+            <div class="flex items-center gap-2">
+                <label for="customerName_${cardId}" class="font-medium text-gray-800 w-12 text-left flex-shrink-0">고객명</label>
+                <input type="text" id="customerName_${cardId}" class="w-full flex-grow px-3 py-2 border border-gray-300 rounded-md shadow-sm" data-field="name" value="${initialData.name}">
+                <button type="button" class="inline-copy-btn copy-customer-info-btn" title="고객명 복사">
+                    <i class="far fa-copy"></i>
+                </button>
+            </div>
+            <div class="flex items-center gap-2">
+                <label for="customerPhone_${cardId}" class="font-medium text-gray-800 w-12 text-left flex-shrink-0">연락처</label>
+                <input type="tel" id="customerPhone_${cardId}" class="w-full flex-grow px-3 py-2 border border-gray-300 rounded-md shadow-sm" data-field="phone" value="${initialData.phone}">
+                <button type="button" class="inline-copy-btn copy-customer-info-btn" title="연락처 복사">
+                    <i class="far fa-copy"></i>
+                </button>
+            </div>
+            <div class="flex items-center gap-2">
+                <label for="customerEmail_${cardId}" class="font-medium text-gray-800 w-12 text-left flex-shrink-0">이메일</label>
+                <input type="email" id="customerEmail_${cardId}" class="w-full flex-grow px-3 py-2 border border-gray-300 rounded-md shadow-sm" data-field="email" value="${initialData.email}">
+                <button type="button" class="inline-copy-btn copy-customer-info-btn" title="이메일 복사">
+                    <i class="far fa-copy"></i>
+                </button>
+            </div>
+        </div>
+    `;
     container.appendChild(card);
+
+    // 기존 더블클릭 이벤트 리스너 (변경 없음)
     card.querySelectorAll('input').forEach(input => {
         input.addEventListener('dblclick', (event) => {
             const label = event.target.previousElementSibling ? event.target.previousElementSibling.textContent : '입력 필드';
             copyToClipboard(event.target.value, label);
         });
     });
+
+    // 새로 추가된 복사 버튼에 대한 이벤트 리스너
+    card.querySelectorAll('.copy-customer-info-btn').forEach(button => {
+        button.addEventListener('click', (event) => {
+            // 버튼 바로 앞의 input 요소를 찾음
+            const inputElement = event.currentTarget.previousElementSibling;
+            // input 요소 앞의 label 요소를 찾아 필드명을 가져옴
+            const labelElement = inputElement.previousElementSibling;
+
+            const textToCopy = inputElement.value;
+            const fieldName = labelElement ? labelElement.textContent : '고객 정보';
+
+            copyToClipboard(textToCopy, fieldName);
+        });
+    });
+
+    // 기존 삭제 버튼 이벤트 리스너 (변경 없음)
     card.querySelector('.remove-customer-btn').addEventListener('click', () => { card.remove(); });
 }
 
@@ -1050,7 +1098,7 @@ function generatePriceInfoInlineHtml(priceData) {
     if (priceData) {
         priceData.forEach(subgroup => {
             if (subgroup.title) { html += `<h4 style="font-size:14px;font-weight:600;margin-bottom:8px">${subgroup.title}</h4>`; }
-            html += `<table style="width:100%;border-collapse:collapse;font-family:sans-serif;font-size:12px;margin-bottom:16px"><thead><tr style="background-color:#f9fafb"><th style="border:1px solid #ddd;padding:8px;text-align:center">내역</th><th style="border:1px solid #ddd;padding:8px;text-align:center">1인당 금액</th><th style="border:1px solid #ddd;padding:8px;text-align:center">인원</th><th style="border:1px solid #ddd;padding:8px;text-align:center">총 금액</th><th style="border:1px solid #ddd;padding:8px;text-align:center">비고</th></tr></thead><tbody>`;
+            html += `<table style="width:100%;border-collapse:collapse;font-family:sans-serif;font-size:12px;margin-bottom:16px"><thead><tr style="background-color:#f9fafb"><th style="border:1px solid #ddd;padding:8px;text-align:center">내역</th><th style="border:1px solid #ddd;padding:8px;text-align:center">1인당 금액</th><th style="border:1px solid #ddd;padding:8px;text-align:center">인원</th><th style="border:1px solid #ddd;padding:8px;text-align:center">총 금액</th><th style="border:1px solid #ddd;padding:8px;text-align:center">비고</</th></tr></thead><tbody>`;
             let grandTotal = 0;
             subgroup.rows.forEach(row => { const p = parseFloat(row.price) || 0; const c = parseInt(row.count) || 0; const t = p * c; grandTotal += t; html += `<tr><td style="border:1px solid #ddd;padding:8px">${row.item || ''}</td><td style="border:1px solid #ddd;padding:8px;text-align:right">${p.toLocaleString()}</td><td style="border:1px solid #ddd;padding:8px;text-align:center">${c}</td><td style="border:1px solid #ddd;padding:8px;text-align:right">${t.toLocaleString()}</td><td style="border:1px solid #ddd;padding:8px">${row.remarks || ''}</td></tr>`; });
             html += `</tbody><tfoot><tr style="font-weight:bold"><td colspan="3" style="border:1px solid #ddd;padding:8px;text-align:right">총 합계</td><td style="border:1px solid #ddd;padding:8px;text-align:right">${grandTotal.toLocaleString()}</td><td style="border:1px solid #ddd;padding:8px"></td></tr></tfoot></table>`;
