@@ -1059,6 +1059,9 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('newGroupBtn').addEventListener('click', addNewGroup);
     document.getElementById('copyGroupBtn').addEventListener('click', copyActiveGroup);
     document.getElementById('deleteGroupBtn').addEventListener('click', deleteActiveGroup);
+    document.getElementById('newWindowBtn').addEventListener('click', () => {
+        window.open(window.location.href, '_blank');
+    });
     document.getElementById('saveBtn').addEventListener('click', (event) => saveFile(false, event.currentTarget));
     document.getElementById('saveAsBtn').addEventListener('click', (event) => saveFile(true, event.currentTarget));
     const loadFileLabel = document.querySelector('label[for="loadFile"]');
@@ -1094,6 +1097,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('keydown', (event) => {
         if (event.shiftKey) {
             switch (event.code) {
+                case 'KeyN': event.preventDefault(); document.getElementById('newWindowBtn').click(); break;
                 case 'KeyS': event.preventDefault(); document.getElementById('saveBtn').click(); break;
                 case 'KeyW': event.preventDefault(); document.getElementById('saveAsBtn').click(); break;
                 case 'KeyF': event.preventDefault(); document.querySelector('label[for="loadFile"]').click(); break;
