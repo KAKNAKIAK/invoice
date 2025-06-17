@@ -1282,4 +1282,4 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     });
-});ㄴ
+});
