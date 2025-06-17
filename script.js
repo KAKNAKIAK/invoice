@@ -1247,14 +1247,39 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('mouseup', () => { if (isResizing) { isResizing = false; pnrPaneToResize = null; splitContainerToResize = null; document.body.style.cursor = 'default'; } });
 
     document.addEventListener('keydown', (event) => {
+        // Shift 키가 눌리지 않은 단축키 처리
+        if (!event.shiftKey && !event.ctrlKey && !event.altKey) {
+            switch (event.code) {
+                case 'F2':
+                    event.preventDefault();
+                    document.getElementById('saveBtn').click();
+                    break;
+                case 'F3':
+                    event.preventDefault();
+                    document.getElementById('saveAsBtn').click();
+                    break;
+                case 'F4':
+                    event.preventDefault();
+                    document.querySelector('label[for="loadFile"]').click();
+                    break;
+            }
+        }
+    
+        // Shift 키와 함께 사용되는 단축키 처리
         if (event.shiftKey) {
             switch (event.code) {
-                case 'KeyN': event.preventDefault(); document.getElementById('newWindowBtn').click(); break;
-                case 'KeyS': event.preventDefault(); document.getElementById('saveBtn').click(); break;
-                case 'KeyW': event.preventDefault(); document.getElementById('saveAsBtn').click(); break;
-                case 'KeyF': event.preventDefault(); document.querySelector('label[for="loadFile"]').click(); break;
-                case 'KeyR': event.preventDefault(); if (recentFilesBtn) { recentFilesBtn.click(); } break;
+                case 'KeyY':
+                    event.preventDefault();
+                    const recentFilesBtn = document.getElementById('recentFilesBtn');
+                    if (recentFilesBtn) {
+                        recentFilesBtn.click();
+                    }
+                    break;
+                case 'KeyN': 
+                    event.preventDefault(); 
+                    document.getElementById('newWindowBtn').click(); 
+                    break;
             }
         }
     });
-});
+});ㄴ
