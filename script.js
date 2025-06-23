@@ -14,7 +14,7 @@ const ROW_DEFINITIONS = [
     { id: 'profitPerPerson', label: '1인수익', type: 'calculated' }, { id: 'profitMargin', label: '1인수익률', type: 'calculatedPercentage' }
 ];
 
-// Firebase 연동 관련 변수 및 초기화
+// Firebase 연동 관련 변수 및 초기화 (메인 앱)
 const firebaseConfig = {
     apiKey: "AIzaSyC7eXBtNczq0ylN5UZNyZaMUH3M-6Gicvc",
     authDomain: "memo-1-e9ee8.firebaseapp.com",
@@ -126,7 +126,423 @@ function addFlightsFromParser(parsedFlights) {
 }
 
 // =======================================================================
-// 4. 핵심 기능 함수
+// ▼▼▼ 4. 호텔카드 메이커 (Hotel Maker) 통합 코드 ▼▼▼
+// =======================================================================
+
+// --- 호텔카드 메이커 전용 Firebase 설정 ---
+const hmFirebaseConfig = {
+    apiKey: "AIzaSyDsV5PGKMFdCDKgFfl077-DuaYv6N5kVNs",
+    authDomain: "hotelinformation-app.firebaseapp.com",
+    projectId: "hotelinformation-app",
+    storageBucket: "hotelinformation-app.firebasestorage.app",
+    messagingSenderId: "1027315001739",
+    appId: "1:1027315001739:web:d7995a67062441fa93a78e",
+    measurementId: "G-X889T0FZCY"
+};
+const hmFbApp = firebase.initializeApp(hmFirebaseConfig, 'hotelMakerApp');
+const hmDb = firebase.firestore(hmFbApp);
+
+/**
+ * 호텔카드 메이커의 전체 UI를 생성하고 이벤트 리스너를 바인딩합니다.
+ * 이 함수는 탭이 전환되거나 그룹이 생성될 때 호출되어 해당 그룹에 맞는 호텔카드 메이커를 그립니다.
+ * @param {HTMLElement} container - 호텔카드 메이커 UI가 들어갈 부모 요소
+ * @param {string} groupId - 현재 활성화된 견적 그룹의 ID
+ */
+function initializeHotelMakerForGroup(container, groupId) {
+    // 1. UI HTML 구조 생성
+    container.innerHTML = `
+        <div class="hm-controls flex flex-wrap gap-2 justify-end mb-4">
+            <button id="hm-copyHtmlBtn-${groupId}" class="btn btn-sm btn-outline"><i class="fas fa-copy"></i> 코드 복사</button>
+            <button id="hm-previewHotelBtn-${groupId}" class="btn btn-sm btn-outline"><i class="fas fa-eye"></i> 미리보기</button>
+            <button id="hm-loadHotelHtmlBtn-${groupId}" class="btn btn-sm btn-outline"><i class="fas fa-database"></i> DB 불러오기</button>
+        </div>
+        <div id="hm-hotelTabsContainer-${groupId}" class="hm-tabs-container flex flex-wrap items-center border-b-2 border-gray-200 mb-4">
+            <button id="hm-addHotelTabBtn-${groupId}" class="hotel-tab-button"><i class="fas fa-plus mr-2"></i>새 호텔 추가</button>
+        </div>
+        <div id="hm-hotelEditorForm-${groupId}" class="hm-editor-form">
+            <div class="input-card-group bg-white p-4 rounded-lg border border-gray-200">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="form-field"><input type="text" id="hm-hotelNameKo-${groupId}" class="input-field" placeholder="호텔명 (한글)"><label for="hm-hotelNameKo-${groupId}">호텔명 (한글)</label></div>
+                    <div class="form-field"><input type="text" id="hm-hotelNameEn-${groupId}" class="input-field" placeholder="호텔명 (영문)"><label for="hm-hotelNameEn-${groupId}">호텔명 (영문)</label></div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                    <div class="form-field"><input type="url" id="hm-hotelWebsite-${groupId}" class="input-field" placeholder="호텔 웹사이트"><label for="hm-hotelWebsite-${groupId}">호텔 웹사이트</label></div>
+                    <div class="form-field"><input type="url" id="hm-hotelImage-${groupId}" class="input-field" placeholder="대표 이미지 URL"><label for="hm-hotelImage-${groupId}">대표 이미지 URL</label></div>
+                </div>
+                <div class="form-field mt-4"><textarea id="hm-hotelDescription-${groupId}" class="input-field" rows="4" placeholder="간단 설명 (줄바꿈으로 항목 구분)"></textarea><label for="hm-hotelDescription-${groupId}">간단 설명</label></div>
+            </div>
+        </div>
+    `;
+
+    // 2. 이벤트 리스너 바인딩
+    document.getElementById(`hm-copyHtmlBtn-${groupId}`).addEventListener('click', () => hm_copyOptimizedHtml(groupId));
+    document.getElementById(`hm-previewHotelBtn-${groupId}`).addEventListener('click', () => hm_previewHotelInfo(groupId));
+    document.getElementById(`hm-loadHotelHtmlBtn-${groupId}`).addEventListener('click', () => hm_openLoadHotelSetModal(groupId));
+    document.getElementById(`hm-addHotelTabBtn-${groupId}`).addEventListener('click', () => hm_addHotel(groupId));
+
+    const editorForm = document.getElementById(`hm-hotelEditorForm-${groupId}`);
+    editorForm.querySelectorAll('input, textarea').forEach(input => {
+        input.addEventListener('input', () => {
+            hm_syncCurrentHotelData(groupId);
+            // 이름이 변경되면 탭 제목도 실시간으로 업데이트
+            if (input.id.includes('hotelNameKo')) {
+                hm_renderTabs(groupId);
+            }
+        });
+    });
+
+    // 3. 초기 렌더링 호출
+    hm_render(groupId);
+}
+
+/**
+ * 호텔카드 메이커의 전체 UI를 다시 그립니다. (탭, 에디터)
+ * @param {string} groupId - 현재 그룹 ID
+ */
+function hm_render(groupId) {
+    hm_renderTabs(groupId);
+    hm_renderEditorForCurrentHotel(groupId);
+}
+
+/**
+ * 현재 활성화된 호텔의 데이터를 UI의 입력 필드 값과 동기화하여 데이터 객체에 저장합니다.
+ * @param {string} groupId - 현재 그룹 ID
+ */
+function hm_syncCurrentHotelData(groupId) {
+    const hotelData = quoteGroupsData[groupId]?.hotelMakerData;
+    if (!hotelData || hotelData.currentHotelIndex === -1 || hotelData.currentHotelIndex >= hotelData.allHotelData.length) return;
+
+    const groupEl = document.getElementById(`group-content-${groupId}`);
+    if (!groupEl) return;
+
+    const currentHotel = hotelData.allHotelData[hotelData.currentHotelIndex];
+    if (!currentHotel) return;
+
+    currentHotel.nameKo = groupEl.querySelector(`#hm-hotelNameKo-${groupId}`).value.trim();
+    currentHotel.nameEn = groupEl.querySelector(`#hm-hotelNameEn-${groupId}`).value.trim();
+    currentHotel.website = groupEl.querySelector(`#hm-hotelWebsite-${groupId}`).value.trim();
+    currentHotel.image = groupEl.querySelector(`#hm-hotelImage-${groupId}`).value.trim();
+    currentHotel.description = groupEl.querySelector(`#hm-hotelDescription-${groupId}`).value.trim();
+}
+
+/**
+ * 특정 그룹의 호텔 탭 목록을 렌더링합니다.
+ * @param {string} groupId - 현재 그룹 ID
+ */
+function hm_renderTabs(groupId) {
+    const groupEl = document.getElementById(`group-content-${groupId}`);
+    if (!groupEl) return;
+    const hotelData = quoteGroupsData[groupId]?.hotelMakerData;
+    if (!hotelData) return;
+    
+    const tabsContainer = groupEl.querySelector(`#hm-hotelTabsContainer-${groupId}`);
+    const addBtn = groupEl.querySelector(`#hm-addHotelTabBtn-${groupId}`);
+
+    // 기존 탭 삭제 (추가 버튼 제외)
+    tabsContainer.querySelectorAll('.hotel-tab-button:not([id^="hm-addHotelTabBtn-"])').forEach(tab => tab.remove());
+
+    hotelData.allHotelData.forEach((hotel, index) => {
+        const tabButton = document.createElement('button');
+        tabButton.className = 'hotel-tab-button';
+        if (index === hotelData.currentHotelIndex) {
+            tabButton.classList.add('active');
+        }
+        tabButton.innerHTML = `<span class="tab-title">${hotel.nameKo || `새 호텔 ${index + 1}`}</span><i class="fas fa-times tab-delete-icon" title="이 호텔 정보 삭제"></i>`;
+        
+        tabButton.addEventListener('click', () => hm_switchTab(groupId, index));
+        tabButton.querySelector('.tab-delete-icon').addEventListener('click', (e) => {
+            e.stopPropagation();
+            hm_deleteHotel(groupId, index);
+        });
+
+        tabsContainer.insertBefore(tabButton, addBtn);
+    });
+}
+
+/**
+ * 현재 선택된 호텔에 대한 정보를 편집기에 표시합니다.
+ * @param {string} groupId - 현재 그룹 ID
+ */
+function hm_renderEditorForCurrentHotel(groupId) {
+    const groupEl = document.getElementById(`group-content-${groupId}`);
+    if (!groupEl) return;
+    const hotelData = quoteGroupsData[groupId]?.hotelMakerData;
+    if (!hotelData) return;
+    const editorForm = groupEl.querySelector(`#hm-hotelEditorForm-${groupId}`);
+
+    if (hotelData.currentHotelIndex === -1 || !hotelData.allHotelData[hotelData.currentHotelIndex]) {
+        editorForm.classList.add('disabled');
+        editorForm.querySelectorAll('input, textarea').forEach(el => { el.value = ''; });
+        return;
+    }
+
+    editorForm.classList.remove('disabled');
+    const hotel = hotelData.allHotelData[hotelData.currentHotelIndex];
+    groupEl.querySelector(`#hm-hotelNameKo-${groupId}`).value = hotel.nameKo || '';
+    groupEl.querySelector(`#hm-hotelNameEn-${groupId}`).value = hotel.nameEn || '';
+    groupEl.querySelector(`#hm-hotelWebsite-${groupId}`).value = hotel.website || '';
+    groupEl.querySelector(`#hm-hotelImage-${groupId}`).value = hotel.image || '';
+    groupEl.querySelector(`#hm-hotelDescription-${groupId}`).value = hotel.description || '';
+}
+
+/**
+ * 호텔 탭을 전환합니다.
+ * @param {string} groupId - 현재 그룹 ID
+ * @param {number} index - 전환할 탭의 인덱스
+ */
+function hm_switchTab(groupId, index) {
+    hm_syncCurrentHotelData(groupId);
+    const hotelData = quoteGroupsData[groupId].hotelMakerData;
+    hotelData.currentHotelIndex = index;
+    hm_render(groupId);
+}
+
+/**
+ * 새로운 호텔을 추가합니다.
+ * @param {string} groupId - 현재 그룹 ID
+ */
+function hm_addHotel(groupId) {
+    hm_syncCurrentHotelData(groupId);
+    const hotelData = quoteGroupsData[groupId].hotelMakerData;
+    const newHotel = { nameKo: `새 호텔 ${hotelData.allHotelData.length + 1}`, nameEn: "", website: "", image: "", description: "" };
+    hotelData.allHotelData.push(newHotel);
+    hm_switchTab(groupId, hotelData.allHotelData.length - 1);
+}
+
+/**
+ * 특정 호텔을 삭제합니다.
+ * @param {string} groupId - 현재 그룹 ID
+ * @param {number} indexToDelete - 삭제할 호텔의 인덱스
+ */
+function hm_deleteHotel(groupId, indexToDelete) {
+    const hotelData = quoteGroupsData[groupId].hotelMakerData;
+    const hotelName = hotelData.allHotelData[indexToDelete].nameKo || `새 호텔 ${indexToDelete + 1}`;
+    if (!confirm(`'${hotelName}' 호텔을 삭제하시겠습니까?`)) return;
+
+    hotelData.allHotelData.splice(indexToDelete, 1);
+
+    if (hotelData.currentHotelIndex >= indexToDelete) {
+        hotelData.currentHotelIndex = Math.max(0, hotelData.currentHotelIndex - 1);
+    }
+    
+    if (hotelData.allHotelData.length === 0) {
+        hotelData.currentHotelIndex = -1;
+    }
+
+    hm_render(groupId);
+}
+
+/**
+ * 선택된 호텔 카드의 HTML 코드를 클립보드에 복사합니다.
+ * @param {string} groupId - 현재 그룹 ID
+ */
+function hm_copyOptimizedHtml(groupId) {
+    hm_syncCurrentHotelData(groupId);
+    const hotelData = quoteGroupsData[groupId].hotelMakerData;
+    if (hotelData.currentHotelIndex === -1) {
+        showToastMessage('복사할 호텔을 선택해주세요.', true);
+        return;
+    }
+    const hotel = hotelData.allHotelData[hotelData.currentHotelIndex];
+    const htmlToCopy = hm_generateHotelCardHtml(hotel);
+    navigator.clipboard.writeText(htmlToCopy)
+        .then(() => showToastMessage('호텔 카드 HTML 코드가 클립보드에 복사되었습니다.'))
+        .catch(err => showToastMessage('복사에 실패했습니다.', true));
+}
+
+/**
+ * 호텔 정보 미리보기 창을 엽니다.
+ * @param {string} groupId - 현재 그룹 ID
+ */
+function hm_previewHotelInfo(groupId) {
+    hm_syncCurrentHotelData(groupId);
+    const hotelData = quoteGroupsData[groupId].hotelMakerData;
+    if (hotelData.allHotelData.length === 0) {
+        showToastMessage('미리보기할 호텔 정보가 없습니다.', true);
+        return;
+    }
+    const previewHtml = hm_generateFullPreviewHtml(hotelData.allHotelData);
+    const previewWindow = window.open('', '_blank', 'width=900,height=600,scrollbars=yes,resizable=yes');
+    if (previewWindow) {
+        previewWindow.document.open();
+        previewWindow.document.write(previewHtml);
+        previewWindow.document.close();
+    } else {
+        showToastMessage('팝업이 차단되어 미리보기를 열 수 없습니다.', true);
+    }
+}
+
+/**
+ * DB에서 호텔 정보 세트를 불러오는 모달을 엽니다.
+ * @param {string} groupId - 현재 그룹 ID
+ */
+async function hm_openLoadHotelSetModal(groupId) {
+    // 모달 UI가 이미 있으면 제거하고 새로 생성
+    let modal = document.getElementById('hm_loadHotelSetModal');
+    if (modal) modal.remove();
+
+    modal = document.createElement('div');
+    modal.id = 'hm_loadHotelSetModal';
+    modal.className = "fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50";
+    modal.innerHTML = `
+        <div class="relative p-5 border w-11/12 md:w-1/2 lg:w-1/3 shadow-lg rounded-md bg-white">
+            <div class="flex justify-between items-center mb-3">
+                <h3 class="text-lg font-medium leading-6 text-gray-900">저장된 호텔 정보 불러오기</h3>
+                <button id="hm_closeLoadHotelSetModalButton" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+            </div>
+            <input type="text" id="hm_hotelSetSearchInput" placeholder="저장된 이름으로 검색..." class="w-full p-2 mb-3 border rounded-md">
+            <ul id="hm_hotelSetListForLoad" class="mt-2 h-60 overflow-y-auto border rounded-md divide-y divide-gray-200"></ul>
+            <div id="hm_loadingHotelSetListMsg" class="mt-2 text-sm text-gray-500" style="display:none;">목록을 불러오는 중...</div>
+            <div class="mt-4">
+                <button id="hm_cancelLoadHotelSetModalButton" class="btn btn-outline w-full">닫기</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    const closeModal = () => modal.remove();
+    modal.querySelector('#hm_closeLoadHotelSetModalButton').addEventListener('click', closeModal);
+    modal.querySelector('#hm_cancelLoadHotelSetModalButton').addEventListener('click', closeModal);
+
+    // 데이터 로드 및 렌더링
+    const listEl = modal.querySelector('#hm_hotelSetListForLoad');
+    const loadingMsg = modal.querySelector('#hm_loadingHotelSetListMsg');
+    const searchInput = modal.querySelector('#hm_hotelSetSearchInput');
+    
+    loadingMsg.style.display = 'block';
+    listEl.innerHTML = '';
+
+    try {
+        const querySnapshot = await hmDb.collection("hotels").orderBy("timestamp", "desc").get();
+        const allSets = [];
+        querySnapshot.forEach(doc => allSets.push({ id: doc.id, ...doc.data() }));
+        loadingMsg.style.display = 'none';
+
+        const renderList = (sets) => {
+            listEl.innerHTML = '';
+            if (sets.length === 0) {
+                listEl.innerHTML = `<li class="p-3 text-center text-gray-500">결과가 없습니다.</li>`;
+                return;
+            }
+            sets.forEach(set => {
+                const li = document.createElement('li');
+                li.className = 'p-3 hover:bg-gray-100 cursor-pointer';
+                li.textContent = set.name;
+                li.addEventListener('click', () => {
+                    hm_addHotelsFromDbToGroup(groupId, set.hotels);
+                    showToastMessage(`'${set.name}'의 호텔 정보가 현재 목록에 추가되었습니다.`);
+                    closeModal();
+                });
+                listEl.appendChild(li);
+            });
+        };
+        
+        searchInput.addEventListener('input', () => {
+            const term = searchInput.value.toLowerCase();
+            const filtered = allSets.filter(s => s.name.toLowerCase().includes(term));
+            renderList(filtered);
+        });
+
+        renderList(allSets);
+
+    } catch (error) {
+        loadingMsg.textContent = '목록 로딩 실패';
+        showToastMessage('호텔 목록을 불러오는 중 오류가 발생했습니다.', true);
+    }
+}
+
+/**
+ * DB에서 불러온 호텔 목록을 현재 그룹에 추가합니다.
+ * @param {string} groupId - 현재 그룹 ID
+ * @param {Array} hotelsToAdd - 추가할 호텔 데이터 배열
+ */
+function hm_addHotelsFromDbToGroup(groupId, hotelsToAdd) {
+    if (!hotelsToAdd || hotelsToAdd.length === 0) return;
+
+    hm_syncCurrentHotelData(groupId);
+    const hotelData = quoteGroupsData[groupId].hotelMakerData;
+    
+    // 현재 목록이 비어있고 첫 호텔이 기본값("새 호텔 1")이면, 불러온 데이터로 대체
+    if (hotelData.allHotelData.length === 1 && hotelData.allHotelData[0].nameKo.startsWith('새 호텔')) {
+        hotelData.allHotelData = JSON.parse(JSON.stringify(hotelsToAdd));
+        hotelData.currentHotelIndex = 0;
+    } else {
+        // 아니면 기존 목록 뒤에 추가
+        hotelData.allHotelData.push(...JSON.parse(JSON.stringify(hotelsToAdd)));
+        hotelData.currentHotelIndex = hotelData.allHotelData.length - hotelsToAdd.length;
+    }
+
+    hm_render(groupId);
+}
+
+/**
+ * 호텔 카드의 HTML을 생성하는 헬퍼 함수입니다.
+ * @param {object} hotel - 호텔 정보 객체
+ * @returns {string} 생성된 HTML 문자열
+ */
+function hm_generateHotelCardHtml(hotel) {
+    const placeholderImage = 'https://placehold.co/400x300/e2e8f0/cbd5e0?text=No+Image';
+    const currentHotelImage = (typeof hotel.image === 'string' && hotel.image.startsWith('http')) ? hotel.image : placeholderImage;
+
+    const descriptionItems = hotel.description ? hotel.description.split('\n').filter(line => line.trim() !== '') : [];
+    const descriptionHtml = descriptionItems.map(item => `
+        <div style="margin-bottom: 6px; line-height: 1.6;">
+            <span style="font-size: 12px; color: #34495e;">${item.replace(/● /g, '')}</span>
+        </div>`).join('');
+
+    const websiteButtonHtml = hotel.website ? `
+        <div style="margin-top: 20px;">
+            <a href="${hotel.website}" target="_blank" style="background-color: #3498db; color: #ffffff; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 500; font-size: 12px;">웹사이트 바로가기</a>
+        </div>` : '';
+
+    return `
+      <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 750px; font-family: 'Malgun Gothic', '맑은 고딕', sans-serif; border-collapse: separate; border-spacing: 24px;">
+        <tbody>
+          <tr>
+            <td width="320" style="width: 320px; vertical-align: top;">
+              <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); overflow: hidden;">
+                <tbody>
+                  <tr><td><img src="${currentHotelImage}" alt="${hotel.nameKo || '호텔 이미지'}" width="320" style="width: 100%; height: auto; display: block;" onerror="this.onerror=null; this.src='${placeholderImage}';"></td></tr>
+                  <tr><td style="padding: 16px 20px;"><div style="font-size: 14px; font-weight: bold; color: #2c3e50;">${hotel.nameKo || '호텔명 없음'}</div>${hotel.nameEn ? `<div style="font-size: 12px; color: #7f8c8d; margin-top: 4px;">${hotel.nameEn}</div>` : ''}</td></tr>
+                </tbody>
+              </table>
+            </td>
+            <td style="vertical-align: middle;"><div>${descriptionHtml}${websiteButtonHtml}</div></td>
+          </tr>
+        </tbody>
+      </table>`;
+}
+
+/**
+ * 미리보기용 전체 HTML 페이지를 생성합니다.
+ * @param {Array} data - 모든 호텔 데이터 배열
+ * @returns {string} 생성된 HTML 페이지 문자열
+ */
+function hm_generateFullPreviewHtml(data) {
+    const hotelName = data.length > 0 ? data[0].nameKo : '호텔';
+    // Swiper 라이브러리 추가 (여러 호텔일 경우 슬라이더 기능)
+    const sliderHead = data.length > 1 ? `<link rel="stylesheet" href="https://unpkg.com/swiper/swiper-bundle.min.css" /><script src="https://unpkg.com/swiper/swiper-bundle.min.js"></script>` : '';
+    const sliderBodyScript = data.length > 1 ? `<script>new Swiper('.swiper', {loop: true, pagination: {el: '.swiper-pagination', clickable: true}, navigation: {nextEl: '.swiper-button-next', prevEl: '.swiper-button-prev'}});</script>` : '';
+    
+    let bodyContent;
+    if (data.length > 1) {
+        const slides = data.map(hotel => `<div class="swiper-slide">${hm_generateHotelCardHtml(hotel)}</div>`).join('');
+        bodyContent = `<div class="swiper" style="max-width: 800px; margin: auto;"><div class="swiper-wrapper">${slides}</div><div class="swiper-pagination"></div><div class="swiper-button-prev"></div><div class="swiper-button-next"></div></div>`;
+    } else if (data.length === 1) {
+        bodyContent = hm_generateHotelCardHtml(data[0]);
+    } else {
+        bodyContent = '<h1 style="text-align: center;">표시할 호텔 정보가 없습니다.</h1>';
+    }
+
+    return `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>호텔 안내: ${hotelName}</title>${sliderHead}<style>body{font-family:'Malgun Gothic',sans-serif;background-color:#f0f2f5;display:flex;justify-content:center;align-items:center;min-height:100vh;padding:2rem;box-sizing:border-box;margin:0;}.swiper-slide{display:flex;justify-content:center;align-items:center;}</style></head><body>${bodyContent}${sliderBodyScript}</body></html>`;
+}
+
+// ▲▲▲ 4. 호텔카드 메이커 (Hotel Maker) 통합 코드 끝 ▲▲▲
+// =======================================================================
+
+
+// =======================================================================
+// 5. 핵심 기능 함수 (기존 메인 앱 함수들)
 // =======================================================================
 
 // --- 고객 정보 ---
@@ -211,42 +627,69 @@ function showToastMessage(message, isError = false) {
 
 
 // --- 저장 및 불러오기 ---
-function saveAllCalculatorsInGroup(groupId) {
+/**
+ * [수정] 현재 활성화된 그룹의 모든 UI 상태를 데이터 객체(`quoteGroupsData`)로 동기화합니다.
+ * @param {string} groupId - 동기화할 그룹의 ID
+ */
+function syncGroupUIToData(groupId) {
     if (!groupId || !quoteGroupsData[groupId]) return;
     const groupEl = document.getElementById(`group-content-${groupId}`);
     if (!groupEl) return;
+
+    // 계산기 데이터 동기화
     groupEl.querySelectorAll('.calculator-instance').forEach(instance => {
         const calcId = instance.dataset.calculatorId;
         const calculatorData = quoteGroupsData[groupId].calculators.find(c => c.id === calcId);
         if (!calculatorData) return;
-        const pnr = instance.querySelector('.pnr-pane textarea').value;
+        calculatorData.pnr = instance.querySelector('.pnr-pane textarea').value;
         const table = instance.querySelector('.quote-table');
         if (table) {
             table.querySelectorAll('input[type="text"]').forEach(input => input.setAttribute('value', input.value));
             calculatorData.tableHTML = table.innerHTML;
         }
-        calculatorData.pnr = pnr;
     });
+
+    // 오른쪽 패널 데이터 동기화
+    // (이 부분은 각 패널의 이벤트 리스너에서 실시간으로 처리하는 방식으로 변경하여, 저장 시점에 별도 호출 필요 없음)
+    
+    // [추가] 호텔 카드 메이커 데이터 동기화
+    hm_syncCurrentHotelData(groupId);
 }
 
 async function getSaveDataBlob() {
-    if (activeGroupId) saveAllCalculatorsInGroup(activeGroupId);
-    Object.keys(quoteGroupsData).forEach(id => { if (id !== activeGroupId) saveAllCalculatorsInGroup(id); });
-    const allData = { quoteGroupsData, groupCounter, activeGroupId, memoText: document.getElementById('memoText').value, customerInfo: getCustomerData() };
+    // 저장 전, 현재 활성화된 그룹의 UI 상태를 데이터에 최종 반영
+    if (activeGroupId) {
+        syncGroupUIToData(activeGroupId);
+    }
+    
+    const allData = { 
+        quoteGroupsData, 
+        groupCounter, 
+        activeGroupId, 
+        memoText: document.getElementById('memoText').value, 
+        customerInfo: getCustomerData() 
+    };
+    
     const doc = document.cloneNode(true);
     try {
+        // 외부 CSS와 JS를 인라인으로 삽입하여 단일 파일로 저장
         const styleResponse = await fetch('./style.css');
         const styleText = await styleResponse.text();
         const scriptResponse = await fetch('./script.js');
         const scriptText = await scriptResponse.text();
+        
         const styleTag = document.createElement('style');
         styleTag.textContent = styleText;
         doc.head.querySelector('link[href="style.css"]')?.replaceWith(styleTag);
+        
         const scriptTag = document.createElement('script');
         scriptTag.textContent = scriptText;
         doc.body.querySelector('script[src="script.js"]')?.replaceWith(scriptTag);
+        
+        // 데이터 저장
         const dataScriptTag = doc.getElementById('restored-data');
         if (dataScriptTag) { dataScriptTag.textContent = JSON.stringify(allData); }
+
         return new Blob([doc.documentElement.outerHTML], { type: 'text/html' });
     } catch (error) {
         console.error("CSS 또는 JS 파일을 포함하는 중 오류 발생:", error);
@@ -305,6 +748,7 @@ async function loadFile() {
 
 async function loadDataIntoWindow(fileHandle, openInNewWindow) {
     try {
+        // 파일 읽기 권한 요청
         if ((await fileHandle.queryPermission({ mode: 'read' })) !== 'granted') {
             if ((await fileHandle.requestPermission({ mode: 'read' })) !== 'granted') {
                 showToastMessage('파일 읽기 권한이 필요합니다.', true);
@@ -322,6 +766,7 @@ async function loadDataIntoWindow(fileHandle, openInNewWindow) {
             const restoredDataJSON = restoredDataScript.textContent;
             
             if (openInNewWindow) {
+                // 새 창에서 열기: 세션 스토리지를 통해 데이터 전달
                 const uniqueKey = `PWA_LOAD_DATA_${Date.now()}`;
                 sessionStorage.setItem(uniqueKey, restoredDataJSON);
                 
@@ -333,6 +778,7 @@ async function loadDataIntoWindow(fileHandle, openInNewWindow) {
                     sessionStorage.removeItem(uniqueKey);
                 }
             } else {
+                // 현재 창에서 열기: 상태 복원 함수 직접 호출
                 try {
                     const restoredData = JSON.parse(restoredDataJSON);
                     restoreState(restoredData);
@@ -410,6 +856,7 @@ function renderRecentFileList(fullList, searchTerm) {
                 e.stopPropagation();
                 if (confirm(`'${item.name}'을(를) 최근 파일 목록에서 삭제하시겠습니까?`)) {
                     await deleteFileHandle(item.name);
+                    // 목록 다시 그리기
                     const allHandles = await getAllFileHandles();
                     renderRecentFileList(allHandles, recentFileSearchInput.value);
                     showToastMessage(`'${item.name}'이(가) 최근 파일 목록에서 삭제되었습니다.`);
@@ -533,17 +980,28 @@ async function openLoadMemoModal() {
 }
 
 // --- 견적 그룹 관리 ---
+/**
+ * [수정] 새 견적 그룹을 추가합니다. 호텔 카드 메이커 데이터도 함께 초기화됩니다.
+ */
 function addNewGroup() {
     groupCounter++;
     const groupId = groupCounter;
     quoteGroupsData[groupId] = {
         id: groupId,
         calculators: [{ id: `calc_${Date.now()}`, pnr: '', tableHTML: null }],
-        flightSchedule: [], priceInfo: [],
+        flightSchedule: [], 
+        priceInfo: [],
         inclusionText: '● 왕복 항공권\n● 호텔\n└ 조식포함\n└ 스탠다드 더블\n└ 2025-10-01(수) ~ 2025-10-05(일) (4박)\n* 1억원 여행자보험',
         exclusionText: '● 개인경비\n● 식사 시 음료 및 주류\n● 매너팁',
         inclusionExclusionDocId: null,
-        inclusionExclusionDocName: '새로운 포함/불포함 내역'
+        inclusionExclusionDocName: '새로운 포함/불포함 내역',
+        // [추가] 호텔카드 메이커 데이터 초기화
+        hotelMakerData: {
+            allHotelData: [{ nameKo: `새 호텔 1`, nameEn: "", website: "", image: "", description: "" }],
+            currentHotelIndex: 0,
+            currentHotelDocumentId: null,
+            currentHotelDocumentName: "새 호텔 정보 모음"
+        }
     };
     createGroupUI(groupId);
     switchTab(groupId);
@@ -566,26 +1024,60 @@ function deleteGroup(groupId) {
 
 function deleteActiveGroup() { if (activeGroupId) { deleteGroup(activeGroupId); } }
 
+/**
+ * [수정] 활성 그룹 복사 시, 호텔 카드 데이터도 함께 복사됩니다.
+ */
 function copyActiveGroup() {
     if (!activeGroupId) return;
-    showToastMessage("현재 탭의 모든 정보가 복사됩니다. (단, 호텔카드와 일정표 내용은 기술적 제약으로 인해 복사되지 않습니다.)");
-    saveAllCalculatorsInGroup(activeGroupId);
+    
+    // 복사 전 현재 UI 상태를 데이터에 저장
+    syncGroupUIToData(activeGroupId);
+
+    // JSON 직렬화/역직렬화를 통해 깊은 복사 수행
     const newGroupData = JSON.parse(JSON.stringify(quoteGroupsData[activeGroupId]));
+    
     groupCounter++;
     newGroupData.id = groupCounter;
+    // 계산기 ID는 고유해야 하므로 재생성
+    newGroupData.calculators.forEach(calc => { calc.id = `calc_${Date.now()}_${Math.random()}`; });
+    
     quoteGroupsData[groupCounter] = newGroupData;
+
     createGroupUI(groupCounter);
     switchTab(groupCounter);
     showToastMessage(`견적 그룹 ${activeGroupId}이(가) 복사되어 새 그룹 ${groupCounter}이(가) 생성되었습니다.`);
 }
 
+/**
+ * [수정] 탭 전환 시, 이전 그룹의 데이터를 동기화하고 새 그룹의 전체 UI를 다시 그립니다.
+ */
 function switchTab(newGroupId) {
-    if (activeGroupId && activeGroupId !== newGroupId) { saveAllCalculatorsInGroup(activeGroupId); }
+    // 이전 탭의 데이터 동기화
+    if (activeGroupId && activeGroupId !== newGroupId) {
+        syncGroupUIToData(activeGroupId);
+    }
+    
     activeGroupId = String(newGroupId);
-    document.querySelectorAll('.quote-tab').forEach(tab => { tab.classList.toggle('active', tab.dataset.groupId == newGroupId); });
-    document.querySelectorAll('.calculation-group-content').forEach(content => { content.classList.toggle('active', content.id == `group-content-${newGroupId}`); });
+    
+    // 모든 탭의 활성 상태 업데이트
+    document.querySelectorAll('.quote-tab').forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.groupId == newGroupId);
+    });
+
+    // 컨텐츠 영역을 비우고 새 그룹의 UI를 그림
+    const contentsContainer = document.getElementById('quoteGroupContentsContainer');
+    contentsContainer.innerHTML = ''; // 이전 그룹 UI 제거
+    const groupEl = document.createElement('div');
+    groupEl.className = 'calculation-group-content active';
+    groupEl.id = `group-content-${newGroupId}`;
+    contentsContainer.appendChild(groupEl);
+    
+    // 새 그룹 UI 초기화
+    initializeGroup(groupEl, newGroupId);
+
     setupEnterKeyListenerForForm();
 }
+
 
 // --- UI 생성 및 초기화 ---
 function createGroupUI(groupId) {
@@ -597,14 +1089,11 @@ function createGroupUI(groupId) {
     tabsContainer.appendChild(tabEl);
     tabEl.addEventListener('click', e => { if (e.target.tagName !== 'BUTTON') switchTab(groupId); });
     tabEl.querySelector('.close-tab-btn').addEventListener('click', () => deleteGroup(groupId));
-    const contentsContainer = document.getElementById('quoteGroupContentsContainer');
-    const groupEl = document.createElement('div');
-    groupEl.className = 'calculation-group-content';
-    groupEl.id = `group-content-${groupId}`;
-    contentsContainer.appendChild(groupEl);
-    initializeGroup(groupEl, groupId);
 }
 
+/**
+ * [수정] 그룹 UI 초기화 시, iframe 대신 호텔 카드 메이커 컨테이너를 생성하고 초기화 함수를 호출합니다.
+ */
 function initializeGroup(groupEl, groupId) {
     groupEl.innerHTML = `<div class="flex gap-6"> 
         <div class="w-1/2 flex flex-col"> 
@@ -638,7 +1127,12 @@ function initializeGroup(groupEl, groupId) {
                     </div>
                 </div>
             </section> 
-            <section class="p-6 border border-gray-200 rounded-lg bg-gray-50"><h2 class="text-xl font-semibold text-gray-800 mb-4">호텔카드 메이커</h2><iframe src="./hotel_maker/index.html" style="width: 100%; height: 480px; border: 1px solid #ccc; border-radius: 0.25rem;" allow="clipboard-write"></iframe></section> 
+            
+            <section class="p-6 border border-gray-200 rounded-lg bg-gray-50">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4">호텔카드 메이커</h2>
+                <div id="hotel-maker-container-${groupId}"></div>
+            </section> 
+            
             <section class="p-6 border border-gray-200 rounded-lg bg-gray-50"><h2 class="text-xl font-semibold text-gray-800 mb-4">상세 일정표</h2><iframe src="./itinerary_planner/index.html" style="width: 100%; height: 800px; border: 1px solid #ccc; border-radius: 0.25rem;" allow="clipboard-write"></iframe></section> 
         </div> 
     </div>`;
@@ -646,36 +1140,13 @@ function initializeGroup(groupEl, groupId) {
     const groupData = quoteGroupsData[groupId];
     if (!groupData) return;
     
+    // 계산기 UI 초기화
     const calculatorsWrapper = groupEl.querySelector(`#calculators-wrapper-${groupId}`);
     if (groupData.calculators && groupData.calculators.length > 0) {
         groupData.calculators.forEach(calcData => createCalculatorInstance(calculatorsWrapper, groupId, calcData));
     }
 
-    groupEl.querySelector('.add-calculator-btn').addEventListener('click', () => {
-        saveAllCalculatorsInGroup(groupId);
-        const newCalcData = { id: `calc_${Date.now()}`, pnr: '', tableHTML: null };
-        groupData.calculators.push(newCalcData);
-        const wrapper = document.querySelector(`#calculators-wrapper-${groupId}`);
-        wrapper.innerHTML = '';
-        groupData.calculators.forEach(calc => createCalculatorInstance(wrapper, groupId, calc));
-    });
-
-    groupEl.querySelector('.copy-last-calculator-btn').addEventListener('click', () => {
-        const groupData = quoteGroupsData[groupId];
-        if (!groupData || groupData.calculators.length === 0) {
-            showToastMessage('복사할 견적 계산이 없습니다.', true);
-            return;
-        }
-        const lastCalculatorData = groupData.calculators[groupData.calculators.length - 1];
-        const lastCalculatorId = lastCalculatorData.id;
-        const wrapper = groupEl.querySelector(`#calculators-wrapper-${groupId}`);
-        const lastDomElement = wrapper.querySelector(`[data-calculator-id="${lastCalculatorId}"]`);
-        
-        if (lastDomElement) {
-            copyCalculatorInstance(lastCalculatorId, groupId, lastDomElement);
-        }
-    });
-
+    // 오른쪽 패널 UI 초기화
     const flightContainer = groupEl.querySelector('.flight-schedule-container');
     if (groupData.flightSchedule) { groupData.flightSchedule.forEach(subgroup => createFlightSubgroup(flightContainer, subgroup, groupId)); }
     const priceContainer = groupEl.querySelector('.price-info-container');
@@ -685,6 +1156,24 @@ function initializeGroup(groupEl, groupId) {
     if (inclusionTextEl) inclusionTextEl.value = groupData.inclusionText || '';
     if (exclusionTextEl) exclusionTextEl.value = groupData.exclusionText || '';
     groupEl.querySelector('.inclusion-exclusion-doc-name-display').textContent = `(${groupData.inclusionExclusionDocName || '새 내역'})`;
+    
+    // 이벤트 리스너 바인딩
+    groupEl.querySelector('.add-calculator-btn').addEventListener('click', () => {
+        syncGroupUIToData(groupId); // 추가 전 상태 저장
+        const newCalcData = { id: `calc_${Date.now()}`, pnr: '', tableHTML: null };
+        groupData.calculators.push(newCalcData);
+        createCalculatorInstance(calculatorsWrapper, groupId, newCalcData); // 새 인스턴스만 추가
+    });
+    groupEl.querySelector('.copy-last-calculator-btn').addEventListener('click', () => {
+        if (!groupData || groupData.calculators.length === 0) { showToastMessage('복사할 견적 계산이 없습니다.', true); return; }
+        syncGroupUIToData(groupId); // 복사 전 상태 저장
+        const lastCalculatorData = groupData.calculators[groupData.calculators.length - 1];
+        const newCalcData = JSON.parse(JSON.stringify(lastCalculatorData));
+        newCalcData.id = `calc_${Date.now()}_${Math.random()}`; // 새 ID 부여
+        groupData.calculators.push(newCalcData);
+        createCalculatorInstance(calculatorsWrapper, groupId, newCalcData); // 복사된 인스턴스 추가
+    });
+    // ... 기타 이벤트 리스너 바인딩 ...
     inclusionTextEl.addEventListener('input', e => { groupData.inclusionText = e.target.value; });
     exclusionTextEl.addEventListener('input', e => { groupData.exclusionText = e.target.value; });
     groupEl.querySelector('.copy-inclusion-btn').addEventListener('click', () => { copyToClipboard(inclusionTextEl.value, '포함 내역'); });
@@ -709,9 +1198,15 @@ function initializeGroup(groupEl, groupId) {
     });
     groupEl.querySelector('.copy-flight-schedule-btn').addEventListener('click', () => copyHtmlToClipboard(generateFlightScheduleInlineHtml(groupData.flightSchedule)));
     groupEl.querySelector('.copy-price-info-btn').addEventListener('click', () => copyHtmlToClipboard(generatePriceInfoInlineHtml(groupData.priceInfo)));
+
+    // [추가] 호텔카드 메이커 UI 초기화 호출
+    const hotelMakerContainer = groupEl.querySelector(`#hotel-maker-container-${groupId}`);
+    if (hotelMakerContainer) {
+        initializeHotelMakerForGroup(hotelMakerContainer, groupId);
+    }
 }
 
-// --- 계산기 관련 함수들 ---
+// --- 계산기 관련 함수들 (기존 코드와 동일) ---
 function buildCalculatorDOM(calcContainer) {
     const content = document.createElement('div');
     content.innerHTML = `<div class="split-container"><div class="pnr-pane"><label class="label-text font-semibold mb-2">PNR 정보</label><textarea class="w-full flex-grow px-3 py-2 border border-gray-300 rounded-md shadow-sm" placeholder="PNR 정보를 여기에 붙여넣으세요."></textarea></div><div class="resizer-handle"></div><div class="quote-pane"><div class="table-container"><table class="quote-table"><thead><tr class="header-row"><th><button type="button" class="btn btn-sm btn-primary add-person-type-btn"><i class="fas fa-plus"></i> 항목 추가</button></th></tr><tr class="count-row"><th></th></tr></thead><tbody></tbody><tfoot></tfoot></table></div></div></div>`;
@@ -758,34 +1253,6 @@ function createCalculatorInstance(wrapper, groupId, calcData) {
         restoreCalculatorState(instanceContainer, calcData);
     } else {
         addPersonTypeColumn(instanceContainer, '성인', 1);
-    }
-}
-
-function copyCalculatorInstance(originalCalcId, groupId, originalDomElement) {
-    saveAllCalculatorsInGroup(groupId);
-
-    const groupData = quoteGroupsData[groupId];
-    if (!groupData) return;
-
-    const originalCalcIndex = groupData.calculators.findIndex(c => c.id === originalCalcId);
-    if (originalCalcIndex === -1) return;
-
-    const newCalcData = JSON.parse(JSON.stringify(groupData.calculators[originalCalcIndex]));
-    newCalcData.id = `calc_${Date.now()}`;
-
-    groupData.calculators.splice(originalCalcIndex + 1, 0, newCalcData);
-
-    const wrapper = originalDomElement.parentElement;
-    wrapper.innerHTML = '';
-    groupData.calculators.forEach(calcData => {
-        createCalculatorInstance(wrapper, groupId, calcData);
-    });
-
-    showToastMessage('견적 계산기가 복사되었습니다.');
-    
-    const newInstanceContainer = wrapper.querySelector(`[data-calculator-id="${newCalcData.id}"]`);
-    if (newInstanceContainer) {
-        newInstanceContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
 }
 
@@ -1003,7 +1470,7 @@ function updateCalculatedCell(table, colIndex, rowId, value) {
     }
 }
 
-// --- 오른쪽 패널 관련 함수들 ---
+// --- 오른쪽 패널 관련 함수들 (기존 코드와 동일) ---
 function createFlightSubgroup(container, subgroupData, groupId) {
     const subGroupDiv = document.createElement('div');
     subGroupDiv.className = 'dynamic-section flight-schedule-subgroup';
@@ -1129,20 +1596,44 @@ function handleEnterKey(e) {
 
 
 // =======================================================================
-// 5. 시스템 시작 (DOM 로드 후 실행)
+// 6. 시스템 시작 (DOM 로드 후 실행)
 // =======================================================================
+/**
+ * [수정] 저장된 상태 복원 시, 호텔 카드 메이커 데이터가 없는 구버전 파일을 위해 기본값을 설정합니다.
+ */
 function restoreState(data) {
     document.getElementById('customerInfoContainer').innerHTML = '';
     document.getElementById('quoteGroupTabs').innerHTML = '';
     document.getElementById('quoteGroupContentsContainer').innerHTML = '';
+    
     quoteGroupsData = data.quoteGroupsData || {};
+
+    // [추가] 구버전 파일 호환성을 위해 hotelMakerData가 없으면 추가
+    Object.values(quoteGroupsData).forEach(group => {
+        if (!group.hotelMakerData) {
+            group.hotelMakerData = {
+                allHotelData: [{ nameKo: `새 호텔 1`, nameEn: "", website: "", image: "", description: "" }],
+                currentHotelIndex: 0,
+                currentHotelDocumentId: null,
+                currentHotelDocumentName: "새 호텔 정보 모음"
+            };
+        }
+    });
+
     groupCounter = data.groupCounter || 0;
     document.getElementById('memoText').value = data.memoText || '';
+    
     if (data.customerInfo && data.customerInfo.length > 0) { data.customerInfo.forEach(customer => createCustomerCard(customer)); }
     else { createCustomerCard(); }
-    if (Object.keys(quoteGroupsData).length > 0) { Object.keys(quoteGroupsData).forEach(id => createGroupUI(id)); }
-    else { addNewGroup(); }
-    switchTab(data.activeGroupId || (Object.keys(quoteGroupsData).length > 0 ? Object.keys(quoteGroupsData)[0] : null));
+    
+    if (Object.keys(quoteGroupsData).length > 0) { 
+        Object.keys(quoteGroupsData).forEach(id => createGroupUI(id)); 
+        const groupIdToSelect = (data.activeGroupId && quoteGroupsData[data.activeGroupId]) ? data.activeGroupId : Object.keys(quoteGroupsData)[0];
+        switchTab(groupIdToSelect);
+    }
+    else { 
+        addNewGroup(); 
+    }
     setupEnterKeyListenerForForm();
 }
 
@@ -1198,6 +1689,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // 전역 이벤트 리스너 설정
     document.getElementById('addCustomerBtn').addEventListener('click', () => createCustomerCard());
     document.getElementById('newGroupBtn').addEventListener('click', addNewGroup);
     document.getElementById('copyGroupBtn').addEventListener('click', copyActiveGroup);
@@ -1237,8 +1729,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (recentFilesBtn) { recentFilesBtn.addEventListener('click', openRecentFilesModal); }
     if (cancelRecentFilesModalButton) { cancelRecentFilesModalButton.addEventListener('click', () => { if (recentFilesModal) recentFilesModal.classList.add('hidden'); }); }
     if (closeRecentFilesModalButton) { closeRecentFilesModalButton.addEventListener('click', () => { if (recentFilesModal) recentFilesModal.classList.add('hidden'); }); }
-    if (recentFileSearchInput) { recentFileSearchInput.addEventListener('input', renderRecentFileList); }
+    if (recentFileSearchInput) { recentFileSearchInput.addEventListener('input', () => { /* openRecentFilesModal에서 oninput을 설정하므로 여기서는 생략 */ }); }
 
+    // 리사이저 핸들 이벤트
     let isResizing = false;
     let pnrPaneToResize = null;
     let splitContainerToResize = null;
@@ -1246,39 +1739,19 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('mousemove', (e) => { if (!isResizing) return; const rect = splitContainerToResize.getBoundingClientRect(); let newWidth = e.clientX - rect.left; if (newWidth < 150) newWidth = 150; if (newWidth > rect.width - 350) newWidth = rect.width - 350; pnrPaneToResize.style.width = newWidth + 'px'; });
     document.addEventListener('mouseup', () => { if (isResizing) { isResizing = false; pnrPaneToResize = null; splitContainerToResize = null; document.body.style.cursor = 'default'; } });
 
+    // 단축키 이벤트
     document.addEventListener('keydown', (event) => {
-        // Shift 키가 눌리지 않은 단축키 처리
         if (!event.shiftKey && !event.ctrlKey && !event.altKey) {
             switch (event.code) {
-                case 'F2':
-                    event.preventDefault();
-                    document.getElementById('saveBtn').click();
-                    break;
-                case 'F3':
-                    event.preventDefault();
-                    document.getElementById('saveAsBtn').click();
-                    break;
-                case 'F4':
-                    event.preventDefault();
-                    document.querySelector('label[for="loadFile"]').click();
-                    break;
+                case 'F2': event.preventDefault(); document.getElementById('saveBtn').click(); break;
+                case 'F3': event.preventDefault(); document.getElementById('saveAsBtn').click(); break;
+                case 'F4': event.preventDefault(); document.querySelector('label[for="loadFile"]').click(); break;
             }
         }
-    
-        // Shift 키와 함께 사용되는 단축키 처리
         if (event.shiftKey) {
             switch (event.code) {
-                case 'KeyY':
-                    event.preventDefault();
-                    const recentFilesBtn = document.getElementById('recentFilesBtn');
-                    if (recentFilesBtn) {
-                        recentFilesBtn.click();
-                    }
-                    break;
-                case 'KeyN': 
-                    event.preventDefault(); 
-                    document.getElementById('newWindowBtn').click(); 
-                    break;
+                case 'KeyY': event.preventDefault(); document.getElementById('recentFilesBtn')?.click(); break;
+                case 'KeyN': event.preventDefault(); document.getElementById('newWindowBtn').click(); break;
             }
         }
     });
