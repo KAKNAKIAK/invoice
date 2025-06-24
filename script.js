@@ -1254,7 +1254,7 @@ function initializeGroup(groupEl, groupId) {
                     <h2 class="text-xl font-semibold">항공 스케줄</h2>
                     <div class="flex items-center space-x-2">
                         <button type="button" class="btn btn-sm btn-outline copy-flight-schedule-btn" title="HTML 복사"><i class="fas fa-clipboard"></i> 코드 복사</button>
-                        <button type="button" class="btn btn-sm btn-primary parse-gds-btn">GDS</button>
+                        <button type="button" class="btn btn-sm btn-primary parse-gds-btn">GDS 파싱</button>
                         <button type="button" class="btn btn-sm btn-primary add-flight-subgroup-btn"><i class="fas fa-plus"></i> 추가</button>
                     </div>
                 </div>
