@@ -3,30 +3,31 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>견적 인보이스_0611ver.</title>
+    <title>견적 인보이스_최종 통합본</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
     <script id="restored-data" type="application/json"></script>
     <meta name="theme-color" content="#4f46e5"/>
     <link rel="manifest" href="manifest.json">
 </head>
-<body class="bg-gray-50 p-4 sm:p-6 md:p-8">
+<body class="bg-gray-100 p-4 sm:p-6 md:p-8">
     <div class="max-w-full mx-auto bg-white p-6 sm:p-8 rounded-lg shadow-xl">
         <header class="mb-8 flex justify-between items-center">
             <h1 class="text-3xl font-bold text-indigo-700">2025 견적</h1>
-            <div class="flex items-center space-x-2">
-                <button type="button" id="newWindowBtn" class="btn btn-sm btn-secondary"><i class="far fa-window-restore"></i> 새창(Shift + N)</button>
+            <div class="flex items-center space-x-2 flex-wrap">
+                <button type="button" id="newWindowBtn" class="btn btn-sm btn-secondary"><i class="far fa-window-restore"></i> 새창(Shift+N)</button>
                 <button type="button" id="saveBtn" class="btn btn-sm btn-secondary"><i class="fas fa-save"></i> 저장(F2)</button>
                 <button type="button" id="saveAsBtn" class="btn btn-sm btn-secondary"><i class="fas fa-file-export"></i> 다른 이름으로 저장(F3)</button>
                 <label for="loadFile" class="btn btn-sm btn-secondary cursor-pointer"><i class="fas fa-folder-open"></i> 불러오기(F4)</label>
-                <button type="button" id="recentFilesBtn" class="btn btn-sm btn-secondary"><i class="fas fa-history"></i> 최근 파일(Shift + Y)</button>
+                <button type="button" id="recentFilesBtn" class="btn btn-sm btn-secondary"><i class="fas fa-history"></i> 최근 파일(Shift+Y)</button>
             </div>
         </header>
 
         <form id="quoteForm" onsubmit="return false;">
-            <div class="flex gap-6 mb-8">
-                <section class="w-1/2 p-6 border border-gray-200 rounded-lg">
+            <div class="flex flex-col lg:flex-row gap-6 mb-8">
+                <section class="lg:w-1/2 p-4 sm:p-6 border border-gray-200 rounded-lg">
                     <div class="flex justify-between items-center mb-4">
                         <h2 class="text-xl font-semibold text-gray-800">고객 정보</h2>
                         <button type="button" id="addCustomerBtn" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium">
@@ -37,26 +38,24 @@
                     </div>
                 </section>
 
-                <div class="w-1/2 flex gap-6">
-                    <section class="w-1/2 p-6 border border-gray-200 rounded-lg flex flex-col">
+                <div class="lg:w-1/2 flex flex-col sm:flex-row gap-6">
+                    <section class="w-full sm:w-1/2 p-4 sm:p-6 border border-gray-200 rounded-lg flex flex-col">
                         <div class="flex justify-between items-center mb-4">
-                            <div class="flex items-center">
-                                <h2 class="text-xl font-semibold text-gray-800">메모</h2>
-                                <button type="button" id="copyMemoBtn" class="ml-2 inline-copy-btn" title="메모 내용 복사"><i class="far fa-copy"></i></button>
-                            </div>
-                            <button type="button" id="loadMemoFromDbBtn" class="btn btn-sm btn-outline"><i class="fas fa-database mr-1"></i> DB 불러오기</button>
+                            <h2 class="text-xl font-semibold text-gray-800">메모</h2>
+                            <button type="button" id="loadMemoFromDbBtn" class="btn btn-sm btn-outline"><i class="fas fa-database mr-1"></i> DB</button>
                         </div>
-                        <textarea id="memoText" class="w-full flex-grow px-3 py-2 border border-gray-300 rounded-md shadow-sm" placeholder="여기에 메모를 입력하세요..."></textarea>
+                        <textarea id="memoText" class="w-full flex-grow px-3 py-2 border rounded-md shadow-sm" placeholder="메모 입력..."></textarea>
+                         <button type="button" id="copyMemoBtn" class="mt-2 btn btn-sm btn-outline"><i class="far fa-copy"></i> 메모 복사</button>
                     </section>
-                    <section class="w-1/2 p-6 border border-gray-200 rounded-lg">
+                    <section class="w-full sm:w-1/2 p-4 sm:p-6 border border-gray-200 rounded-lg">
                         <h2 class="text-xl font-semibold text-gray-800 mb-4">업무 보조 툴</h2>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-4">
-                            <a href="https://kaknakiak.github.io/ERPTOGDS/" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline text-base text-center">GDS 엔트리 생성기</a>
-                            <a href="https://kaknakiak.github.io/PNRTOERP/" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline text-base text-center">PNR 네임필드추출</a>
-                            <a href="https://incomparable-meringue-d33b6b.netlify.app/" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline text-base text-center">간편 URL 단축기</a>
-                            <a href="https://kaknakiak.github.io/hotelbooking/" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline text-base text-center">호텔 수배서 작성기</a>
-                            <a href="https://kaknakiak.github.io/hotelinformation/" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline text-base text-center">호텔카드 메이커</a>
-                            <a href="https://kaknakiak.github.io/tripplantest2/" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline text-base text-center">상세일정표</a>
+                        <div class="grid grid-cols-1 gap-2 mt-4">
+                            <a href="https://kaknakiak.github.io/ERPTOGDS/" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline text-center">GDS 엔트리 생성기</a>
+                            <a href="https://kaknakiak.github.io/PNRTOERP/" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline text-center">PNR 네임필드추출</a>
+                            <a href="https://incomparable-meringue-d33b6b.netlify.app/" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline text-center">간편 URL 단축기</a>
+                            <a href="https://kaknakiak.github.io/hotelbooking/" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline text-center">호텔 수배서 작성기</a>
+                            <a href="https://kaknakiak.github.io/hotelinformation/" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline text-center">호텔카드 메이커</a>
+                            <a href="https://kaknakiak.github.io/tripplantest2/" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline text-center">상세일정표</a>
                         </div>
                     </section>
                 </div>
@@ -72,71 +71,91 @@
                 </div>
             </div>
 
-            <div id="quoteGroupContentsContainer" class="border border-gray-300 rounded-lg rounded-tl-none p-4"></div>
+            <div id="quoteGroupContentsContainer" class="border border-t-0 border-gray-300 rounded-lg rounded-tl-none p-4"></div>
         </form>
     </div>
-    <div id="loadInclusionsModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50 hidden">
+
+    <div id="loadInclusionsModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
         <div class="relative p-5 border w-11/12 md:w-1/2 lg:w-1/3 shadow-lg rounded-md bg-white">
-            <div class="flex justify-between items-center mb-3">
-                <h3 class="text-lg font-medium leading-6 text-gray-900">포함/불포함 내역 불러오기</h3>
-                <button id="closeLoadInclusionsModalBtn" class="text-gray-400 hover:text-gray-600">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                    </svg>
-                </button>
-            </div>
-            <input type="text" id="inclusionsSearchInput" placeholder="이름으로 검색..." class="w-full p-2 mb-3 border rounded-md focus:ring-blue-500 focus:border-blue-500">
-            <ul id="inclusionsList" class="mt-2 h-60 overflow-y-auto border rounded-md divide-y divide-gray-200">
-            </ul>
+            <div class="flex justify-between items-center mb-3"><h3 class="text-lg font-medium">포함/불포함 내역 불러오기</h3><button id="closeLoadInclusionsModalBtn" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button></div>
+            <input type="text" id="inclusionsSearchInput" placeholder="이름으로 검색..." class="w-full p-2 mb-3 border rounded-md">
+            <ul id="inclusionsList" class="mt-2 h-60 overflow-y-auto border rounded-md divide-y"></ul>
             <div id="loadingInclusionsMsg" class="mt-2 text-sm text-gray-500" style="display:none;">목록을 불러오는 중...</div>
-            <div class="mt-4">
-                <button id="cancelLoadInclusionsModalBtn" class="px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md w-full shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400">닫기</button>
-            </div>
+            <div class="mt-4"><button id="cancelLoadInclusionsModalBtn" class="btn btn-outline w-full">닫기</button></div>
         </div>
     </div>
-
-    <div id="loadMemoModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50 hidden">
-        <div class="relative p-5 border w-11/12 md:w-1/2 lg:w-1/3 shadow-lg rounded-md bg-white">
-            <div class="flex justify-between items-center mb-3">
-                <h3 class="text-lg font-medium leading-6 text-gray-900">자주 쓰는 문자 불러오기</h3>
-                <button id="closeLoadMemoModalBtn" class="text-gray-400 hover:text-gray-600">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                    </svg>
-                </button>
-            </div>
-            <input type="text" id="memoSearchInput" placeholder="제목으로 검색..." class="w-full p-2 mb-3 border rounded-md focus:ring-blue-500 focus:border-blue-500">
-            <ul id="memoList" class="mt-2 h-60 overflow-y-auto border rounded-md divide-y divide-gray-200"></ul>
+    <div id="loadMemoModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
+         <div class="relative p-5 border w-11/12 md:w-1/2 lg:w-1/3 shadow-lg rounded-md bg-white">
+            <div class="flex justify-between items-center mb-3"><h3 class="text-lg font-medium">자주 쓰는 문자 불러오기</h3><button id="closeLoadMemoModalBtn" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button></div>
+            <input type="text" id="memoSearchInput" placeholder="제목으로 검색..." class="w-full p-2 mb-3 border rounded-md">
+            <ul id="memoList" class="mt-2 h-60 overflow-y-auto border rounded-md divide-y"></ul>
             <div id="loadingMemoMsg" class="mt-2 text-sm text-gray-500" style="display:none;">목록을 불러오는 중...</div>
-            <div class="mt-4">
-                <button id="cancelLoadMemoModalBtn" class="px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md w-full shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400">닫기</button>
+            <div class="mt-4"><button id="cancelLoadMemoModalBtn" class="btn btn-outline w-full">닫기</button></div>
+        </div>
+    </div>
+    <div id="recentFilesModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50">
+        <div class="relative p-5 border w-11/12 md:w-1/2 lg:w-1/3 shadow-lg rounded-md bg-white">
+            <div class="flex justify-between items-center mb-3"><h3 class="text-lg font-medium">최근 로드 파일</h3><button id="closeRecentFilesModalButton" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button></div>
+            <input type="text" id="recentFileSearchInput" placeholder="파일 이름으로 검색..." class="w-full p-2 mb-3 border rounded-md">
+            <ul id="recentFileList" class="mt-2 h-60 overflow-y-auto border rounded-md divide-y"></ul>
+            <div id="loadingRecentFileListMsg" class="mt-2 text-sm text-gray-500" style="display:none;">목록을 불러오는 중...</div>
+            <div class="mt-4"><button id="cancelRecentFilesModalButton" class="btn btn-outline w-full">닫기</button></div>
+        </div>
+    </div>
+    
+    <div id="ipActivityModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-[51]">
+        <div class="modal-content bg-white p-6 rounded-lg shadow-xl w-11/12 max-w-lg">
+            <h2 id="ipModalTitle" class="text-xl font-bold mb-4">일정 관리</h2>
+            <form id="ipActivityForm" onsubmit="return false;">
+                <input type="hidden" id="ipActivityIndex">
+                <input type="hidden" id="ipActivityDayIndex">
+                <input type="hidden" id="ipGroupId">
+                <div class="space-y-4">
+                    <div class="form-field"><input type="text" id="ipActivityTimeInput" class="input-field" placeholder="예: 1130 또는 0900" maxlength="4"><label>시간 (HHMM)</label></div>
+                    <div class="form-field"><select id="ipActivityIconSelect" class="input-field"></select><label>아이콘</label></div>
+                    <div class="form-field"><input type="text" id="ipActivityTitle" class="input-field" required placeholder="예: 루브르 박물관 방문"><label>활동/장소명</label></div>
+                    <div class="form-field"><textarea id="ipActivityDescription" class="input-field" rows="3" placeholder="예: 모나리자 및 주요 작품 관람"></textarea><label>간단 설명/메모</label></div>
+                    <div class="form-field"><input type="url" id="ipActivityLocation" class="input-field" placeholder="구글맵 링크 등"><label>주소/위치 링크</label></div>
+                    <div class="form-field"><input type="url" id="ipActivityImageUrl" class="input-field" placeholder="이미지 주소"><label>이미지 URL</label></div>
+                    <div class="form-field"><input type="text" id="ipActivityCost" class="input-field" placeholder="예: €20 또는 ₩25,000"><label>비용</label></div>
+                    <div class="form-field"><input type="text" id="ipActivityNotes" class="input-field" placeholder="예: 예약번호: 12345"><label>기타 노트 (예약번호 등)</label></div>
+                </div>
+                <div class="mt-6 flex justify-end gap-2">
+                    <button type="button" id="ipCancelActivityButton" class="btn btn-outline">취소</button>
+                    <button type="submit" class="btn btn-primary">저장</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <div id="ipConfirmDeleteDayModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-[51]">
+        <div class="modal-content bg-white p-6 rounded-lg shadow-xl w-11/12 max-w-sm">
+            <h3 class="text-lg font-semibold mb-4">일정 삭제 확인</h3>
+            <p id="ipConfirmDeleteDayMessage" class="mb-6"></p>
+            <div class="flex justify-end gap-2">
+                <button id="ipCancelDeleteDayButton" class="btn btn-outline">아니오</button>
+                <button id="ipConfirmDeleteDayActionButton" class="btn btn-red">예, 삭제합니다</button>
             </div>
+        </div>
+    </div>
+     <div id="ipLoadTemplateModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-[51]">
+        <div class="relative p-5 border w-11/12 md:w-1/2 lg:w-1/3 shadow-lg rounded-md bg-white">
+            <div class="flex justify-between items-center mb-3"><h3 class="text-lg font-medium">일정 템플릿 불러오기</h3><button id="ipCloseLoadTemplateModal" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button></div>
+            <input type="text" id="ipTemplateSearchInput" placeholder="템플릿 이름으로 검색..." class="w-full p-2 mb-3 border rounded-md">
+            <ul id="ipTemplateList" class="mt-2 h-60 overflow-y-auto border rounded-md divide-y"></ul>
+            <div id="ipLoadingTemplateMsg" class="mt-2 text-sm" style="display:none;">템플릿 목록 로딩 중...</div>
+            <div class="mt-4"><button id="ipCancelLoadTemplateModal" class="btn btn-outline w-full">닫기</button></div>
         </div>
     </div>
 
-    <div id="recentFilesModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50 hidden">
-        <div class="relative p-5 border w-11/12 md:w-1/2 lg:w-1/3 shadow-lg rounded-md bg-white">
-            <div class="flex justify-between items-center mb-3">
-                <h3 class="text-lg font-medium leading-6 text-gray-900">최근 로드 파일</h3>
-                <button id="closeRecentFilesModalButton" class="text-gray-400 hover:text-gray-600"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
-            </div>
-            <input type="text" id="recentFileSearchInput" placeholder="파일 이름으로 검색..." class="w-full p-2 mb-3 border rounded-md focus:ring-blue-500 focus:border-blue-500">
-            <ul id="recentFileList" class="mt-2 h-60 overflow-y-auto border rounded-md divide-y divide-gray-200"></ul>
-            <div id="loadingRecentFileListMsg" class="mt-2 text-sm text-gray-500" style="display:none;">목록을 불러오는 중...</div>
-            <div class="mt-4">
-                <button id="cancelRecentFilesModalButton" class="px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md w-full shadow-sm hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400">닫기</button>
-            </div>
-        </div>
-    </div>
     <div id="toast-container" class="fixed bottom-4 right-4 z-[1000]"></div>
 
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
-
+    <script src="script.js"></script>
     <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/service-worker.js').then((reg) => {
+                navigator.serviceWorker.register('./service-worker.js').then((reg) => {
                     console.log('서비스 워커가 등록되었습니다.', reg);
                 }).catch((err) => {
                     console.error('서비스 워커 등록 실패:', err);
@@ -144,6 +163,5 @@
             });
         }
     </script>
-    <script src="script.js"></script>
 </body>
 </html>
