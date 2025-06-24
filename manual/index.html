@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>견적 인보이스 앱 사용자 매뉴얼</title>
+    <style>
+        body {
+            font-family: 'Malgun Gothic', '맑은 고딕', sans-serif;
+            line-height: 1.7;
+            color: #333;
+            background-color: #f8f9fa;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 900px;
+            margin: 2rem auto;
+            background-color: #fff;
+            padding: 2rem 3rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+        h1, h2, h3 {
+            color: #2c3e50;
+            border-bottom: 2px solid #e0e7ff;
+            padding-bottom: 0.5rem;
+            margin-top: 2.5rem;
+        }
+        h1 {
+            text-align: center;
+            font-size: 2.5rem;
+            border-bottom: 3px solid #4f46e5;
+            margin-bottom: 2rem;
+        }
+        h2 {
+            font-size: 1.8rem;
+        }
+        h3 {
+            font-size: 1.4rem;
+            border-bottom-style: dashed;
+        }
+        p {
+            margin-bottom: 1rem;
+        }
+        ul {
+            padding-left: 20px;
+        }
+        li {
+            margin-bottom: 0.5rem;
+        }
+        .toc {
+            background-color: #f9fafb;
+            border: 1px solid #e5e7eb;
+            padding: 1.5rem;
+            border-radius: 8px;
+            margin-bottom: 3rem;
+        }
+        .toc h2 {
+            margin-top: 0;
+            border-bottom: none;
+        }
+        .toc ul {
+            list-style-type: none;
+            padding-left: 0;
+        }
+        .toc a {
+            text-decoration: none;
+            color: #3730a3;
+        }
+        .toc a:hover {
+            text-decoration: underline;
+        }
+        kbd {
+            background-color: #e5e7eb;
+            border-radius: 4px;
+            padding: 0.2em 0.4em;
+            font-family: 'Consolas', monospace;
+            font-size: 0.9em;
+            border: 1px solid #d1d5db;
+        }
+        .code-block {
+            background-color: #f1f3f5;
+            padding: 1rem;
+            border-radius: 6px;
+            font-family: 'Consolas', monospace;
+            white-space: pre-wrap;
+            word-break: break-all;
+            font-size: 0.85rem;
+            border: 1px solid #dee2e6;
+        }
+        .highlight {
+            color: #c92a2a;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>견적 인보이스 앱 사용자 매뉴얼</h1>
+
+        <nav class="toc">
+            <h2>목차</h2>
+            <ul>
+                <li><a href="#section-1">1. 시작하기</a></li>
+                <li><a href="#section-2">2. 화면 구성</a></li>
+                <li><a href="#section-3">3. 기본 기능</a>
+                    <ul>
+                        <li><a href="#section-3-1">3.1. 파일 관리</a></li>
+                        <li><a href="#section-3-2">3.2. 고객 정보</a></li>
+                        <li><a href="#section-3-3">3.3. 메모 및 보조 툴</a></li>
+                    </ul>
+                </li>
+                <li><a href="#section-4">4. 핵심 기능: 견적 그룹</a>
+                    <ul>
+                        <li><a href="#section-4-1">4.1. 그룹 관리 (추가, 복사, 삭제)</a></li>
+                        <li><a href="#section-4-2">4.2. 견적 계산기</a></li>
+                        <li><a href="#section-4-3">4.3. 항공 스케줄</a></li>
+                        <li><a href="#section-4-4">4.4. 요금 안내</a></li>
+                        <li><a href="#section-4-5">4.5. 포함/불포함 내역</a></li>
+                    </ul>
+                </li>
+                <li><a href="#section-5">5. 통합 도구 활용</a>
+                    <ul>
+                        <li><a href="#section-5-1">5.1. 호텔카드 메이커</a></li>
+                        <li><a href="#section-5-2">5.2. 상세 일정표</a></li>
+                        <li><a href="#section-5-3">5.3. GDS 파서 연동</a></li>
+                    </ul>
+                </li>
+                <li><a href="#section-6">6. 단축키 모음</a></li>
+            </ul>
+        </nav>
+
+        <section id="section-1">
+            <h2>1. 시작하기</h2>
+            <p>본 애플리케이션은 여행 견적서 작성을 위한 통합 업무 도구입니다. 복잡한 요금 계산부터 고객용 안내 자료(항공, 호텔, 일정) 생성까지 하나의 화면에서 처리할 수 있도록 설계되었습니다.</p>
+            <p>주요 작업 흐름은 다음과 같습니다:</p>
+            <ol>
+                <li><strong>견적 그룹 생성:</strong> 작업의 기본 단위인 '견적 그룹'을 만듭니다.</li>
+                <li><strong>견적 계산:</strong> 견적 계산기를 이용해 원가와 판매가를 계산합니다.</li>
+                <li><strong>안내 자료 작성:</strong> 항공, 요금, 포함/불포함, 호텔, 상세 일정 등 고객에게 제공할 정보를 작성합니다.</li>
+                <li><strong>데이터 저장 및 활용:</strong> 작업 내용을 파일로 저장하거나, 필요한 부분의 HTML 코드를 복사하여 메일 등에 활용합니다.</li>
+            </ol>
+             <p>이 앱은 PWA(Progressive Web App)로 제작되어, 브라우저의 '앱 설치' 기능을 통해 데스크톱에 설치하여 일반 프로그램처럼 사용할 수 있습니다.</p>
+        </section>
+
+        <section id="section-2">
+            <h2>2. 화면 구성</h2>
+            <p>화면은 크게 상단 메뉴, 고객 정보, 메인 작업 영역으로 나뉩니다.</p>
+            <ul>
+                <li><strong>상단 메뉴:</strong> 파일 저장, 불러오기, 새 창 열기 등 앱의 전반적인 기능을 제어합니다.</li>
+                <li><strong>고객 정보 영역:</strong> 견적 대상 고객의 이름, 연락처, 이메일을 관리합니다.</li>
+                <li><strong>메모 및 보조 툴:</strong> 빠른 메모 작성과 외부 업무 보조 툴로의 바로가기를 제공합니다.</li>
+                <li><strong>메인 작업 영역:</strong> '견적 그룹' 탭을 중심으로 모든 실제 작업이 이루어지는 핵심 공간입니다.</li>
+            </ul>
+        </section>
+
+        <section id="section-3">
+            <h2>3. 기본 기능</h2>
+            <h3 id="section-3-1">3.1. 파일 관리</h3>
+            <p>작성한 모든 내용은 하나의 HTML 파일로 저장되어 관리됩니다.</p>
+            <ul>
+                <li><kbd>저장</kbd> (<kbd>F2</kbd>): 현재 작업 중인 파일을 덮어씁니다. 처음 저장 시 파일 이름을 지정합니다.</li>
+                <li><kbd>다른 이름으로 저장</kbd> (<kbd>F3</kbd>): 현재 내용을 새로운 파일로 저장합니다.</li>
+                <li><kbd>불러오기</kbd> (<kbd>F4</kbd>): 기존에 저장했던 HTML 파일을 불러옵니다. 현재 창 또는 새 창에서 열지 선택할 수 있습니다.</li>
+                <li><kbd>최근 파일</kbd> (<kbd>Shift</kbd>+<kbd>Y</kbd>): 최근에 열었던 파일 목록을 보여주고 빠르게 불러올 수 있습니다. 이 목록은 브라우저(IndexedDB)에 저장됩니다.</li>
+                 <li><kbd>새창</kbd> (<kbd>Shift</kbd>+<kbd>N</kbd>): 현재 앱을 새 브라우저 창에서 엽니다.</li>
+            </ul>
+
+            <h3 id="section-3-2">3.2. 고객 정보</h3>
+            <p>견적을 받을 고객의 정보를 입력하고 관리합니다.</p>
+            <ul>
+                <li><strong>고객 추가/삭제:</strong> 우측의 <kbd>연락처 추가</kbd> 버튼으로 카드를 추가하고, 카드 우측 상단의 <kbd>X</kbd> 버튼으로 삭제할 수 있습니다.</li>
+                <li><strong>정보 복사:</strong> 각 입력 필드(고객명, 연락처, 이메일) 우측의 복사 아이콘(<i class="far fa-copy"></i>)을 클릭하거나, 입력 필드를 <span class="highlight">더블클릭</span>하면 해당 내용이 클립보드에 복사됩니다.</li>
+            </ul>
+
+            <h3 id="section-3-3">3.3. 메모 및 보조 툴</h3>
+            <ul>
+                <li><strong>메모:</strong> 간단한 메모를 작성하고 <kbd>메모 복사</kbd> 버튼으로 내용을 복사할 수 있습니다. <kbd>DB</kbd> 버튼을 누르면 Firestore 데이터베이스에 저장된 자주 쓰는 문구를 불러와 적용할 수 있습니다.</li>
+                <li><strong>업무 보조 툴:</strong> GDS 엔트리 생성기, PNR 네임필드 추출 등 자주 사용하는 외부 웹사이트로 바로 이동할 수 있는 링크를 제공합니다.</li>
+            </ul>
+        </section>
+
+        <section id="section-4">
+            <h2>4. 핵심 기능: 견적 그룹</h2>
+            <p>하나의 파일 안에서 여러 개의 독립된 견적 작업을 관리할 수 있습니다. 각 탭이 하나의 '견적 그룹'이 됩니다.</p>
+            
+            <h3 id="section-4-1">4.1. 그룹 관리 (추가, 복사, 삭제)</h3>
+            <p>탭 영역 우측의 버튼들을 이용해 그룹을 관리합니다.</p>
+            <ul>
+                <li><kbd>새 그룹</kbd>: 비어있는 새로운 견적 그룹 탭을 추가합니다.</li>
+                <li><kbd>그룹 복사</kbd>: 현재 활성화된 그룹의 모든 내용을 그대로 복사하여 새 그룹을 만듭니다.</li>
+                <li><kbd>그룹 삭제</kbd>: 현재 활성화된 그룹을 삭제합니다. 탭 이름 옆의 <kbd>X</kbd> 버튼으로도 삭제할 수 있습니다.</li>
+            </ul>
+
+            <h3 id="section-4-2">4.2. 견적 계산기</h3>
+            <p>견적 그룹의 핵심 기능으로, 원가 기반의 수익 및 판매가를 계산합니다. 하나의 그룹 안에 여러 개의 계산기 인스턴스를 추가할 수 있습니다.</p>
+            <ul>
+                <li><strong>PNR 정보:</strong> 좌측의 텍스트 영역에 관련 PNR 정보를 자유롭게 기입할 수 있습니다.</li>
+                <li><strong>계산기 추가/복사:</strong> <kbd>견적 계산 추가</kbd> 버튼으로 새 계산기를, <kbd>견적 복사</kbd> 버튼으로 마지막 계산기를 복사하여 추가할 수 있습니다.</li>
+                <li><strong>인원(항목) 추가/삭제:</strong>
+                    <ul>
+                        <li>테이블 최상단 좌측의 <kbd>+</kbd> 버튼으로 '성인', '아동' 등 새로운 인원 유형(컬럼)을 추가할 수 있습니다.</li>
+                        <li>추가된 인원 유형의 이름(<span class="highlight">성인</span>)이나 인원수(<span class="highlight">1</span>) 부분을 클릭하면 직접 수정할 수 있습니다.</li>
+                        <li>각 컬럼 헤더의 <kbd>X</kbd> 버튼으로 해당 컬럼을 삭제합니다.</li>
+                    </ul>
+                </li>
+                <li><strong>비용 항목 추가/삭제:</strong>
+                    <ul>
+                        <li><kbd>+ 항목 추가</kbd> 버튼을 눌러 새로운 비용 항목(로우)을 동적으로 추가할 수 있습니다.</li>
+                        <li>추가된 항목의 이름(<span class="highlight">신규 항목</span>)을 클릭하여 수정하고, 좌측 휴지통 아이콘으로 삭제합니다.</li>
+                    </ul>
+                </li>
+                <li><strong>비용 입력 및 계산:</strong>
+                    <ul>
+                        <li>비용 입력칸에는 숫자뿐만 아니라 간단한 사칙연산 (예: <span class="highlight">305000+122000</span>) 입력이 가능합니다. 입력칸에 마우스를 올리면 계산된 결과값이 툴팁으로 표시됩니다.</li>
+                        <li>'넷가', '1인수익', '1인수익률'은 입력된 비용과 상품가를 바탕으로 자동 계산됩니다.</li>
+                        <li>테이블 하단에는 모든 인원을 합산한 '전체 합계'가 표시됩니다.</li>
+                    </ul>
+                </li>
+            </ul>
+
+            <h3 id="section-4-3">4.3. 항공 스케줄</h3>
+            <p>고객에게 안내할 항공 스케줄을 작성하고 HTML 코드로 복사할 수 있습니다.</p>
+            <ul>
+                <li><kbd>추가</kbd> 버튼으로 새로운 항공사 그룹을 추가하고, 그룹 내 <kbd>+</kbd> 버튼으로 항공편을 추가할 수 있습니다.</li>
+                <li><kbd>GDS</kbd> 버튼을 눌러 GDS 파서와 연동할 수 있습니다. (자세한 내용은 '5.3. GDS 파서 연동' 참조)</li>
+                <li><kbd>코드 복사</kbd> 버튼을 누르면 작성된 스케줄 전체가 이메일 등에 바로 붙여넣을 수 있는 테이블(HTML) 형식으로 클립보드에 복사됩니다.</li>
+            </ul>
+            
+            <h3 id="section-4-4">4.4. 요금 안내</h3>
+            <p>고객에게 안내할 최종 요금 내역을 작성합니다. 항공 스케줄과 동일하게 그룹 및 항목을 추가하고, <kbd>코드 복사</kbd> 버튼으로 HTML 테이블을 복사할 수 있습니다.</p>
+
+            <h3 id="section-4-5">4.5. 포함/불포함 내역</h3>
+            <p>상품의 포함 및 불포함 내역을 텍스트로 작성합니다. <kbd>DB 불러오기</kbd> 버튼을 통해 이전에 저장해둔 템플릿을 Firestore에서 불러와 간편하게 적용할 수 있습니다.</p>
+
+        </section>
+
+        <section id="section-5">
+            <h2>5. 통합 도구 활용</h2>
+            <p>견적 그룹 내에는 보다 전문적인 자료 생성을 위한 도구들이 통합되어 있습니다.</p>
+            
+            <h3 id="section-5-1">5.1. 호텔카드 메이커</h3>
+            <p>이미지와 상세 설명이 포함된 전문적인 호텔 안내 카드를 제작하는 도구입니다.</p>
+            <ul>
+                <li><kbd>새 호텔 추가</kbd> 버튼으로 여러 호텔 정보를 탭으로 관리할 수 있습니다.</li>
+                <li>호텔명, 이미지 URL, 설명 등을 입력하면 자동으로 카드 디자인이 구성됩니다.</li>
+                <li><kbd>DB 불러오기</kbd>를 통해 Firestore에 저장된 호텔 정보 세트를 불러와 현재 목록에 추가할 수 있습니다.</li>
+                <li><kbd>코드 복사</kbd>를 누르면 현재 선택된 호텔 카드가 이메일용 HTML로 복사되며, <kbd>미리보기</kbd>로 전체 호텔 카드를 슬라이드 형태로 확인할 수 있습니다.</li>
+            </ul>
+
+            <h3 id="section-5-2">5.2. 상세 일정표</h3>
+            <p>일자별 상세 여행 일정을 시간, 장소, 활동 아이콘과 함께 체계적으로 작성하는 도구입니다.</p>
+            <ul>
+                <li><kbd>새 날짜 추가</kbd>로 일정을 늘려갈 수 있습니다. 각 날짜 블록과 그 안의 활동 카드는 드래그 앤 드롭으로 순서를 쉽게 변경할 수 있습니다.</li>
+                <li>활동 카드를 더블클릭하거나 수정 버튼을 눌러 시간, 아이콘, 설명, 이미지, 위치 링크 등 상세 정보를 입력하는 모달 창을 열 수 있습니다.</li>
+                <li><kbd>DB에서 불러오기</kbd> 버튼으로 Firestore에 저장된 일정 템플릿을 불러와 현재 그룹에 덮어쓸 수 있습니다.</li>
+                <li><kbd>코드 복사</kbd> 및 <kbd>미리보기</kbd> 기능으로 완성된 일정표를 외부에 활용할 수 있습니다.</li>
+            </ul>
+
+            <h3 id="section-5-3">5.3. GDS 파서 연동</h3>
+            <p>GDS(Global Distribution System)에서 복사한 항공 스케줄 텍스트를 자동으로 분석하여 표로 만들어주는 기능입니다.</p>
+            <ol>
+                <li>'항공 스케줄' 섹션의 <kbd>GDS</kbd> 버튼을 클릭하여 파서 팝업창을 엽니다.</li>
+                <li>팝업창의 텍스트 영역에 GDS 스케줄을 붙여넣습니다. (아래 예시 참조)</li>
+                <div class="code-block">6  KE 467 U 13JUN 5 ICNCXR HK5 2000 2305 13JUN E KE/5IKQC5
+7  KE 468 Q 17JUN 2 CXRICN HK5 0020 0725 17JUN E KE/5IKQC5</div>
+                <li><kbd>파싱하여 적용</kbd> 버튼을 클릭하면, 분석된 정보가 메인 앱의 '항공 스케줄' 표에 자동으로 추가됩니다.</li>
+            </ol>
+        </section>
+
+        <section id="section-6">
+            <h2>6. 단축키 모음</h2>
+            <p>자주 사용하는 기능은 아래 단축키로 빠르게 실행할 수 있습니다.</p>
+            <ul>
+                <li><kbd>F2</kbd> : 파일 저장</li>
+                <li><kbd>F3</kbd> : 다른 이름으로 파일 저장</li>
+                <li><kbd>F4</kbd> : 파일 불러오기</li>
+                <li><kbd>Shift</kbd> + <kbd>Y</kbd> : 최근 파일 목록 열기</li>
+                <li><kbd>Shift</kbd> + <kbd>N</kbd> : 새 창으로 열기</li>
+            </ul>
+        </section>
+
+    </div>
+</body>
+</html>
