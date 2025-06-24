@@ -1267,7 +1267,7 @@ function addNewGroup() {
         flightSchedule: [], 
         priceInfo: [],
         inclusionExclusionDocId: null,
-        inclusionExclusionDocName: '새로운 포함/불포함 내역',
+        inclusionExclusionDocName: '',
         hotelMakerData: {
             allHotelData: [{ nameKo: `새 호텔 1`, nameEn: "", website: "", image: "", description: "" }],
             currentHotelIndex: 0,
