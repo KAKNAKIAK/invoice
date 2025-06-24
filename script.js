@@ -126,10 +126,8 @@ function addFlightsFromParser(parsedFlights) {
 }
 
 // =======================================================================
-// ▼▼▼ 4. 호텔카드 메이커 (Hotel Maker) 통합 코드 ▼▼▼
+// 4. 호텔카드 메이커 (Hotel Maker) 통합 코드
 // =======================================================================
-
-// --- 호텔카드 메이커 전용 Firebase 설정 ---
 const hmFirebaseConfig = {
     apiKey: "AIzaSyDsV5PGKMFdCDKgFfl077-DuaYv6N5kVNs",
     authDomain: "hotelinformation-app.firebaseapp.com",
@@ -142,140 +140,101 @@ const hmFirebaseConfig = {
 const hmFbApp = firebase.initializeApp(hmFirebaseConfig, 'hotelMakerApp');
 const hmDb = firebase.firestore(hmFbApp);
 
-/**
- * 호텔카드 메이커의 전체 UI를 생성하고 이벤트 리스너를 바인딩합니다.
- * 이 함수는 탭이 전환되거나 그룹이 생성될 때 호출되어 해당 그룹에 맞는 호텔카드 메이커를 그립니다.
- * @param {HTMLElement} container - 호텔카드 메이커 UI가 들어갈 부모 요소
- * @param {string} groupId - 현재 활성화된 견적 그룹의 ID
- */
 function initializeHotelMakerForGroup(container, groupId) {
-    // 1. UI HTML 구조 생성
     container.innerHTML = `
         <div class="hm-controls flex flex-wrap gap-2 justify-end mb-4">
             <button id="hm-copyHtmlBtn-${groupId}" class="btn btn-sm btn-outline"><i class="fas fa-copy"></i> 코드 복사</button>
-            <button id="hm-previewHotelBtn-${groupId}" class="btn btn-sm btn-outline"><i class="fas fa-eye"></i> 미리보기</button>
-            <button id="hm-loadHotelHtmlBtn-${groupId}" class="btn btn-sm btn-outline"><i class="fas fa-database"></i> DB 불러오기</button>
+            <button id="hm-previewHotelBtn-${groupId}" class="btn btn-sm btn-primary"><i class="fas fa-eye"></i> 미리보기</button>
+            <button id="hm-loadHotelHtmlBtn-${groupId}" class="btn btn-sm btn-primary"><i class="fas fa-database"></i> DB 불러오기</button>
         </div>
-        <div id="hm-hotelTabsContainer-${groupId}" class="hm-tabs-container flex flex-wrap items-center border-b-2 border-gray-200 mb-4">
+        <div id="hm-hotelTabsContainer-${groupId}" class="hotel-tabs-container flex flex-wrap items-center border-b-2 border-gray-200 mb-4">
             <button id="hm-addHotelTabBtn-${groupId}" class="hotel-tab-button"><i class="fas fa-plus mr-2"></i>새 호텔 추가</button>
         </div>
-        <div id="hm-hotelEditorForm-${groupId}" class="hm-editor-form">
+        <form id="hm-hotelEditorForm-${groupId}" class="hm-editor-form" onsubmit="return false;">
             <div class="input-card-group bg-white p-4 rounded-lg border border-gray-200">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div class="form-field"><input type="text" id="hm-hotelNameKo-${groupId}" class="input-field" placeholder="호텔명 (한글)"><label for="hm-hotelNameKo-${groupId}">호텔명 (한글)</label></div>
-                    <div class="form-field"><input type="text" id="hm-hotelNameEn-${groupId}" class="input-field" placeholder="호텔명 (영문)"><label for="hm-hotelNameEn-${groupId}">호텔명 (영문)</label></div>
+                    <div class="form-field"><input type="text" id="hm-hotelNameKo-${groupId}" class="input-field" placeholder=" "><label for="hm-hotelNameKo-${groupId}">호텔명 (한글)</label></div>
+                    <div class="form-field"><input type="text" id="hm-hotelNameEn-${groupId}" class="input-field" placeholder=" "><label for="hm-hotelNameEn-${groupId}">호텔명 (영문)</label></div>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                    <div class="form-field"><input type="url" id="hm-hotelWebsite-${groupId}" class="input-field" placeholder="호텔 웹사이트"><label for="hm-hotelWebsite-${groupId}">호텔 웹사이트</label></div>
-                    <div class="form-field"><input type="url" id="hm-hotelImage-${groupId}" class="input-field" placeholder="대표 이미지 URL"><label for="hm-hotelImage-${groupId}">대표 이미지 URL</label></div>
+                    <div class="form-field"><input type="url" id="hm-hotelWebsite-${groupId}" class="input-field" placeholder=" "><label for="hm-hotelWebsite-${groupId}">호텔 웹사이트</label></div>
+                    <div class="form-field"><input type="url" id="hm-hotelImage-${groupId}" class="input-field" placeholder=" "><label for="hm-hotelImage-${groupId}">대표 이미지 URL</label></div>
                 </div>
-                <div class="form-field mt-4"><textarea id="hm-hotelDescription-${groupId}" class="input-field" rows="4" placeholder="간단 설명 (줄바꿈으로 항목 구분)"></textarea><label for="hm-hotelDescription-${groupId}">간단 설명</label></div>
+                <div class="form-field mt-4"><textarea id="hm-hotelDescription-${groupId}" class="input-field" rows="4" placeholder=" "></textarea><label for="hm-hotelDescription-${groupId}">간단 설명</label></div>
             </div>
-        </div>
+        </form>
     `;
-
-    // 2. 이벤트 리스너 바인딩
-    document.getElementById(`hm-copyHtmlBtn-${groupId}`).addEventListener('click', () => hm_copyOptimizedHtml(groupId));
-    document.getElementById(`hm-previewHotelBtn-${groupId}`).addEventListener('click', () => hm_previewHotelInfo(groupId));
-    document.getElementById(`hm-loadHotelHtmlBtn-${groupId}`).addEventListener('click', () => hm_openLoadHotelSetModal(groupId));
-    document.getElementById(`hm-addHotelTabBtn-${groupId}`).addEventListener('click', () => hm_addHotel(groupId));
-
-    const editorForm = document.getElementById(`hm-hotelEditorForm-${groupId}`);
-    editorForm.querySelectorAll('input, textarea').forEach(input => {
-        input.addEventListener('input', () => {
-            hm_syncCurrentHotelData(groupId);
-            // 이름이 변경되면 탭 제목도 실시간으로 업데이트
-            if (input.id.includes('hotelNameKo')) {
-                hm_renderTabs(groupId);
-            }
+    
+    // [수정] document.getElementById 대신 container.querySelector를 사용하여 요소를 찾습니다.
+    container.querySelector(`#hm-copyHtmlBtn-${groupId}`).addEventListener('click', () => hm_copyOptimizedHtml(groupId));
+    container.querySelector(`#hm-previewHotelBtn-${groupId}`).addEventListener('click', () => hm_previewHotelInfo(groupId));
+    container.querySelector(`#hm-loadHotelHtmlBtn-${groupId}`).addEventListener('click', () => hm_openLoadHotelSetModal(groupId));
+    container.querySelector(`#hm-addHotelTabBtn-${groupId}`).addEventListener('click', () => hm_addHotel(groupId));
+    
+    const editorForm = container.querySelector(`#hm-hotelEditorForm-${groupId}`);
+    if (editorForm) {
+        editorForm.querySelectorAll('input, textarea').forEach(input => {
+            input.addEventListener('input', () => {
+                hm_syncCurrentHotelData(groupId);
+                if (input.id.includes('hotelNameKo')) {
+                    hm_renderTabs(groupId);
+                }
+            });
         });
-    });
-
-    // 3. 초기 렌더링 호출
+    }
     hm_render(groupId);
 }
-
-/**
- * 호텔카드 메이커의 전체 UI를 다시 그립니다. (탭, 에디터)
- * @param {string} groupId - 현재 그룹 ID
- */
+// ... (나머지 hm_* 함수들은 이전과 동일) ...
 function hm_render(groupId) {
     hm_renderTabs(groupId);
     hm_renderEditorForCurrentHotel(groupId);
 }
-
-/**
- * 현재 활성화된 호텔의 데이터를 UI의 입력 필드 값과 동기화하여 데이터 객체에 저장합니다.
- * @param {string} groupId - 현재 그룹 ID
- */
 function hm_syncCurrentHotelData(groupId) {
-    const hotelData = quoteGroupsData[groupId]?.hotelMakerData;
-    if (!hotelData || hotelData.currentHotelIndex === -1 || hotelData.currentHotelIndex >= hotelData.allHotelData.length) return;
-
+    const groupData = quoteGroupsData[groupId];
+    if (!groupData || !groupData.hotelMakerData) return;
+    const hotelData = groupData.hotelMakerData;
+    if (hotelData.currentHotelIndex === -1 || hotelData.currentHotelIndex >= hotelData.allHotelData.length) return;
     const groupEl = document.getElementById(`group-content-${groupId}`);
     if (!groupEl) return;
-
     const currentHotel = hotelData.allHotelData[hotelData.currentHotelIndex];
     if (!currentHotel) return;
-
-    currentHotel.nameKo = groupEl.querySelector(`#hm-hotelNameKo-${groupId}`).value.trim();
-    currentHotel.nameEn = groupEl.querySelector(`#hm-hotelNameEn-${groupId}`).value.trim();
-    currentHotel.website = groupEl.querySelector(`#hm-hotelWebsite-${groupId}`).value.trim();
-    currentHotel.image = groupEl.querySelector(`#hm-hotelImage-${groupId}`).value.trim();
-    currentHotel.description = groupEl.querySelector(`#hm-hotelDescription-${groupId}`).value.trim();
+    currentHotel.nameKo = groupEl.querySelector(`#hm-hotelNameKo-${groupId}`)?.value.trim() || '';
+    currentHotel.nameEn = groupEl.querySelector(`#hm-hotelNameEn-${groupId}`)?.value.trim() || '';
+    currentHotel.website = groupEl.querySelector(`#hm-hotelWebsite-${groupId}`)?.value.trim() || '';
+    currentHotel.image = groupEl.querySelector(`#hm-hotelImage-${groupId}`)?.value.trim() || '';
+    currentHotel.description = groupEl.querySelector(`#hm-hotelDescription-${groupId}`)?.value.trim() || '';
 }
-
-/**
- * 특정 그룹의 호텔 탭 목록을 렌더링합니다.
- * @param {string} groupId - 현재 그룹 ID
- */
 function hm_renderTabs(groupId) {
     const groupEl = document.getElementById(`group-content-${groupId}`);
     if (!groupEl) return;
     const hotelData = quoteGroupsData[groupId]?.hotelMakerData;
     if (!hotelData) return;
-    
     const tabsContainer = groupEl.querySelector(`#hm-hotelTabsContainer-${groupId}`);
     const addBtn = groupEl.querySelector(`#hm-addHotelTabBtn-${groupId}`);
-
-    // 기존 탭 삭제 (추가 버튼 제외)
+    if (!tabsContainer || !addBtn) return;
     tabsContainer.querySelectorAll('.hotel-tab-button:not([id^="hm-addHotelTabBtn-"])').forEach(tab => tab.remove());
-
     hotelData.allHotelData.forEach((hotel, index) => {
         const tabButton = document.createElement('button');
         tabButton.className = 'hotel-tab-button';
-        if (index === hotelData.currentHotelIndex) {
-            tabButton.classList.add('active');
-        }
-        tabButton.innerHTML = `<span class="tab-title">${hotel.nameKo || `새 호텔 ${index + 1}`}</span><i class="fas fa-times tab-delete-icon" title="이 호텔 정보 삭제"></i>`;
-        
+        if (index === hotelData.currentHotelIndex) tabButton.classList.add('active');
+        tabButton.innerHTML = `<span class="tab-title">${hotel.nameKo || `새 호텔 ${index + 1}`}</span><i class="fas fa-times tab-delete-icon" title="삭제"></i>`;
         tabButton.addEventListener('click', () => hm_switchTab(groupId, index));
-        tabButton.querySelector('.tab-delete-icon').addEventListener('click', (e) => {
-            e.stopPropagation();
-            hm_deleteHotel(groupId, index);
-        });
-
+        tabButton.querySelector('.tab-delete-icon').addEventListener('click', (e) => { e.stopPropagation(); hm_deleteHotel(groupId, index); });
         tabsContainer.insertBefore(tabButton, addBtn);
     });
 }
-
-/**
- * 현재 선택된 호텔에 대한 정보를 편집기에 표시합니다.
- * @param {string} groupId - 현재 그룹 ID
- */
 function hm_renderEditorForCurrentHotel(groupId) {
     const groupEl = document.getElementById(`group-content-${groupId}`);
     if (!groupEl) return;
     const hotelData = quoteGroupsData[groupId]?.hotelMakerData;
     if (!hotelData) return;
     const editorForm = groupEl.querySelector(`#hm-hotelEditorForm-${groupId}`);
-
+    if (!editorForm) return;
     if (hotelData.currentHotelIndex === -1 || !hotelData.allHotelData[hotelData.currentHotelIndex]) {
         editorForm.classList.add('disabled');
-        editorForm.querySelectorAll('input, textarea').forEach(el => { el.value = ''; });
+        editorForm.querySelectorAll('input, textarea').forEach(el => { el.value = ''; el.placeholder = ' '; });
         return;
     }
-
     editorForm.classList.remove('disabled');
     const hotel = hotelData.allHotelData[hotelData.currentHotelIndex];
     groupEl.querySelector(`#hm-hotelNameKo-${groupId}`).value = hotel.nameKo || '';
@@ -283,24 +242,14 @@ function hm_renderEditorForCurrentHotel(groupId) {
     groupEl.querySelector(`#hm-hotelWebsite-${groupId}`).value = hotel.website || '';
     groupEl.querySelector(`#hm-hotelImage-${groupId}`).value = hotel.image || '';
     groupEl.querySelector(`#hm-hotelDescription-${groupId}`).value = hotel.description || '';
+    editorForm.querySelectorAll('input, textarea').forEach(el => { if(el.value) el.placeholder = ' '; });
 }
-
-/**
- * 호텔 탭을 전환합니다.
- * @param {string} groupId - 현재 그룹 ID
- * @param {number} index - 전환할 탭의 인덱스
- */
 function hm_switchTab(groupId, index) {
     hm_syncCurrentHotelData(groupId);
     const hotelData = quoteGroupsData[groupId].hotelMakerData;
     hotelData.currentHotelIndex = index;
     hm_render(groupId);
 }
-
-/**
- * 새로운 호텔을 추가합니다.
- * @param {string} groupId - 현재 그룹 ID
- */
 function hm_addHotel(groupId) {
     hm_syncCurrentHotelData(groupId);
     const hotelData = quoteGroupsData[groupId].hotelMakerData;
@@ -308,222 +257,97 @@ function hm_addHotel(groupId) {
     hotelData.allHotelData.push(newHotel);
     hm_switchTab(groupId, hotelData.allHotelData.length - 1);
 }
-
-/**
- * 특정 호텔을 삭제합니다.
- * @param {string} groupId - 현재 그룹 ID
- * @param {number} indexToDelete - 삭제할 호텔의 인덱스
- */
 function hm_deleteHotel(groupId, indexToDelete) {
     const hotelData = quoteGroupsData[groupId].hotelMakerData;
     const hotelName = hotelData.allHotelData[indexToDelete].nameKo || `새 호텔 ${indexToDelete + 1}`;
     if (!confirm(`'${hotelName}' 호텔을 삭제하시겠습니까?`)) return;
-
     hotelData.allHotelData.splice(indexToDelete, 1);
-
     if (hotelData.currentHotelIndex >= indexToDelete) {
         hotelData.currentHotelIndex = Math.max(0, hotelData.currentHotelIndex - 1);
     }
-    
-    if (hotelData.allHotelData.length === 0) {
-        hotelData.currentHotelIndex = -1;
-    }
-
+    if (hotelData.allHotelData.length === 0) hotelData.currentHotelIndex = -1;
     hm_render(groupId);
 }
-
-/**
- * 선택된 호텔 카드의 HTML 코드를 클립보드에 복사합니다.
- * @param {string} groupId - 현재 그룹 ID
- */
 function hm_copyOptimizedHtml(groupId) {
     hm_syncCurrentHotelData(groupId);
     const hotelData = quoteGroupsData[groupId].hotelMakerData;
-    if (hotelData.currentHotelIndex === -1) {
-        showToastMessage('복사할 호텔을 선택해주세요.', true);
-        return;
-    }
+    if (hotelData.currentHotelIndex === -1) { showToastMessage('복사할 호텔을 선택해주세요.', true); return; }
     const hotel = hotelData.allHotelData[hotelData.currentHotelIndex];
     const htmlToCopy = hm_generateHotelCardHtml(hotel);
-    navigator.clipboard.writeText(htmlToCopy)
-        .then(() => showToastMessage('호텔 카드 HTML 코드가 클립보드에 복사되었습니다.'))
-        .catch(err => showToastMessage('복사에 실패했습니다.', true));
+    navigator.clipboard.writeText(htmlToCopy).then(() => showToastMessage('호텔 카드 HTML 코드가 복사되었습니다.')).catch(err => showToastMessage('복사에 실패했습니다.', true));
 }
-
-/**
- * 호텔 정보 미리보기 창을 엽니다.
- * @param {string} groupId - 현재 그룹 ID
- */
 function hm_previewHotelInfo(groupId) {
     hm_syncCurrentHotelData(groupId);
     const hotelData = quoteGroupsData[groupId].hotelMakerData;
-    if (hotelData.allHotelData.length === 0) {
-        showToastMessage('미리보기할 호텔 정보가 없습니다.', true);
-        return;
-    }
+    if (hotelData.allHotelData.length === 0) { showToastMessage('미리보기할 호텔 정보가 없습니다.', true); return; }
     const previewHtml = hm_generateFullPreviewHtml(hotelData.allHotelData);
     const previewWindow = window.open('', '_blank', 'width=900,height=600,scrollbars=yes,resizable=yes');
     if (previewWindow) {
         previewWindow.document.open();
         previewWindow.document.write(previewHtml);
         previewWindow.document.close();
-    } else {
-        showToastMessage('팝업이 차단되어 미리보기를 열 수 없습니다.', true);
-    }
+    } else { showToastMessage('팝업이 차단되었습니다.', true); }
 }
-
-/**
- * DB에서 호텔 정보 세트를 불러오는 모달을 엽니다.
- * @param {string} groupId - 현재 그룹 ID
- */
 async function hm_openLoadHotelSetModal(groupId) {
-    // 모달 UI가 이미 있으면 제거하고 새로 생성
     let modal = document.getElementById('hm_loadHotelSetModal');
     if (modal) modal.remove();
-
     modal = document.createElement('div');
     modal.id = 'hm_loadHotelSetModal';
     modal.className = "fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50";
-    modal.innerHTML = `
-        <div class="relative p-5 border w-11/12 md:w-1/2 lg:w-1/3 shadow-lg rounded-md bg-white">
-            <div class="flex justify-between items-center mb-3">
-                <h3 class="text-lg font-medium leading-6 text-gray-900">저장된 호텔 정보 불러오기</h3>
-                <button id="hm_closeLoadHotelSetModalButton" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
-            </div>
-            <input type="text" id="hm_hotelSetSearchInput" placeholder="저장된 이름으로 검색..." class="w-full p-2 mb-3 border rounded-md">
-            <ul id="hm_hotelSetListForLoad" class="mt-2 h-60 overflow-y-auto border rounded-md divide-y divide-gray-200"></ul>
-            <div id="hm_loadingHotelSetListMsg" class="mt-2 text-sm text-gray-500" style="display:none;">목록을 불러오는 중...</div>
-            <div class="mt-4">
-                <button id="hm_cancelLoadHotelSetModalButton" class="btn btn-outline w-full">닫기</button>
-            </div>
-        </div>
-    `;
+    modal.innerHTML = `<div class="relative p-5 border w-11/12 md:w-1/2 lg:w-1/3 shadow-lg rounded-md bg-white"><div class="flex justify-between items-center mb-3"><h3 class="text-lg font-medium">호텔 정보 불러오기</h3><button id="hm_closeLoadHotelSetModalButton" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button></div><input type="text" id="hm_hotelSetSearchInput" placeholder="이름으로 검색..." class="w-full p-2 mb-3 border rounded-md"><ul id="hm_hotelSetListForLoad" class="mt-2 h-60 overflow-y-auto border rounded-md divide-y"></ul><div id="hm_loadingHotelSetListMsg" class="mt-2 text-sm" style="display:none;">로딩 중...</div><div class="mt-4"><button id="hm_cancelLoadHotelSetModalButton" class="btn btn-outline w-full">닫기</button></div></div>`;
     document.body.appendChild(modal);
-
     const closeModal = () => modal.remove();
     modal.querySelector('#hm_closeLoadHotelSetModalButton').addEventListener('click', closeModal);
     modal.querySelector('#hm_cancelLoadHotelSetModalButton').addEventListener('click', closeModal);
-
-    // 데이터 로드 및 렌더링
     const listEl = modal.querySelector('#hm_hotelSetListForLoad');
     const loadingMsg = modal.querySelector('#hm_loadingHotelSetListMsg');
     const searchInput = modal.querySelector('#hm_hotelSetSearchInput');
-    
     loadingMsg.style.display = 'block';
     listEl.innerHTML = '';
-
     try {
         const querySnapshot = await hmDb.collection("hotels").orderBy("timestamp", "desc").get();
         const allSets = [];
         querySnapshot.forEach(doc => allSets.push({ id: doc.id, ...doc.data() }));
         loadingMsg.style.display = 'none';
-
         const renderList = (sets) => {
-            listEl.innerHTML = '';
-            if (sets.length === 0) {
-                listEl.innerHTML = `<li class="p-3 text-center text-gray-500">결과가 없습니다.</li>`;
-                return;
-            }
+            listEl.innerHTML = sets.length ? '' : `<li class="p-3 text-center text-gray-500">결과가 없습니다.</li>`;
             sets.forEach(set => {
                 const li = document.createElement('li');
                 li.className = 'p-3 hover:bg-gray-100 cursor-pointer';
                 li.textContent = set.name;
-                li.addEventListener('click', () => {
-                    hm_addHotelsFromDbToGroup(groupId, set.hotels);
-                    showToastMessage(`'${set.name}'의 호텔 정보가 현재 목록에 추가되었습니다.`);
-                    closeModal();
-                });
+                li.addEventListener('click', () => { hm_addHotelsFromDbToGroup(groupId, set.hotels); showToastMessage(`'${set.name}' 정보가 추가되었습니다.`); closeModal(); });
                 listEl.appendChild(li);
             });
         };
-        
-        searchInput.addEventListener('input', () => {
-            const term = searchInput.value.toLowerCase();
-            const filtered = allSets.filter(s => s.name.toLowerCase().includes(term));
-            renderList(filtered);
-        });
-
+        searchInput.addEventListener('input', () => { const term = searchInput.value.toLowerCase(); const filtered = allSets.filter(s => s.name.toLowerCase().includes(term)); renderList(filtered); });
         renderList(allSets);
-
-    } catch (error) {
-        loadingMsg.textContent = '목록 로딩 실패';
-        showToastMessage('호텔 목록을 불러오는 중 오류가 발생했습니다.', true);
-    }
+    } catch (error) { loadingMsg.textContent = '로딩 실패'; showToastMessage('호텔 목록 로딩 중 오류 발생.', true); }
 }
-
-/**
- * DB에서 불러온 호텔 목록을 현재 그룹에 추가합니다.
- * @param {string} groupId - 현재 그룹 ID
- * @param {Array} hotelsToAdd - 추가할 호텔 데이터 배열
- */
 function hm_addHotelsFromDbToGroup(groupId, hotelsToAdd) {
     if (!hotelsToAdd || hotelsToAdd.length === 0) return;
-
     hm_syncCurrentHotelData(groupId);
     const hotelData = quoteGroupsData[groupId].hotelMakerData;
-    
-    // 현재 목록이 비어있고 첫 호텔이 기본값("새 호텔 1")이면, 불러온 데이터로 대체
     if (hotelData.allHotelData.length === 1 && hotelData.allHotelData[0].nameKo.startsWith('새 호텔')) {
         hotelData.allHotelData = JSON.parse(JSON.stringify(hotelsToAdd));
         hotelData.currentHotelIndex = 0;
     } else {
-        // 아니면 기존 목록 뒤에 추가
         hotelData.allHotelData.push(...JSON.parse(JSON.stringify(hotelsToAdd)));
         hotelData.currentHotelIndex = hotelData.allHotelData.length - hotelsToAdd.length;
     }
-
     hm_render(groupId);
 }
-
-/**
- * 호텔 카드의 HTML을 생성하는 헬퍼 함수입니다.
- * @param {object} hotel - 호텔 정보 객체
- * @returns {string} 생성된 HTML 문자열
- */
 function hm_generateHotelCardHtml(hotel) {
     const placeholderImage = 'https://placehold.co/400x300/e2e8f0/cbd5e0?text=No+Image';
     const currentHotelImage = (typeof hotel.image === 'string' && hotel.image.startsWith('http')) ? hotel.image : placeholderImage;
-
     const descriptionItems = hotel.description ? hotel.description.split('\n').filter(line => line.trim() !== '') : [];
-    const descriptionHtml = descriptionItems.map(item => `
-        <div style="margin-bottom: 6px; line-height: 1.6;">
-            <span style="font-size: 12px; color: #34495e;">${item.replace(/● /g, '')}</span>
-        </div>`).join('');
-
-    const websiteButtonHtml = hotel.website ? `
-        <div style="margin-top: 20px;">
-            <a href="${hotel.website}" target="_blank" style="background-color: #3498db; color: #ffffff; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 500; font-size: 12px;">웹사이트 바로가기</a>
-        </div>` : '';
-
-    return `
-      <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 750px; font-family: 'Malgun Gothic', '맑은 고딕', sans-serif; border-collapse: separate; border-spacing: 24px;">
-        <tbody>
-          <tr>
-            <td width="320" style="width: 320px; vertical-align: top;">
-              <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); overflow: hidden;">
-                <tbody>
-                  <tr><td><img src="${currentHotelImage}" alt="${hotel.nameKo || '호텔 이미지'}" width="320" style="width: 100%; height: auto; display: block;" onerror="this.onerror=null; this.src='${placeholderImage}';"></td></tr>
-                  <tr><td style="padding: 16px 20px;"><div style="font-size: 14px; font-weight: bold; color: #2c3e50;">${hotel.nameKo || '호텔명 없음'}</div>${hotel.nameEn ? `<div style="font-size: 12px; color: #7f8c8d; margin-top: 4px;">${hotel.nameEn}</div>` : ''}</td></tr>
-                </tbody>
-              </table>
-            </td>
-            <td style="vertical-align: middle;"><div>${descriptionHtml}${websiteButtonHtml}</div></td>
-          </tr>
-        </tbody>
-      </table>`;
+    const descriptionHtml = descriptionItems.map(item => `<div style="margin-bottom: 6px; line-height: 1.6;"><span style="font-size: 12px; color: #34495e;">${item.replace(/● /g, '')}</span></div>`).join('');
+    const websiteButtonHtml = hotel.website ? `<div style="margin-top: 20px;"><a href="${hotel.website}" target="_blank" style="background-color: #3498db; color: #ffffff; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 500; font-size: 12px;">웹사이트</a></div>` : '';
+    return `<table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 750px; font-family: 'Malgun Gothic', sans-serif; border-collapse: separate; border-spacing: 24px;"><tbody><tr><td width="320" style="width: 320px; vertical-align: top;"><table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); overflow: hidden;"><tbody><tr><td><img src="${currentHotelImage}" alt="${hotel.nameKo || '호텔 이미지'}" width="320" style="width: 100%; height: auto; display: block;" onerror="this.onerror=null; this.src='${placeholderImage}';"></td></tr><tr><td style="padding: 16px 20px;"><div style="font-size: 14px; font-weight: bold; color: #2c3e50;">${hotel.nameKo || '호텔명 없음'}</div>${hotel.nameEn ? `<div style="font-size: 12px; color: #7f8c8d; margin-top: 4px;">${hotel.nameEn}</div>` : ''}</td></tr></tbody></table></td><td style="vertical-align: middle;"><div>${descriptionHtml}${websiteButtonHtml}</div></td></tr></tbody></table>`;
 }
-
-/**
- * 미리보기용 전체 HTML 페이지를 생성합니다.
- * @param {Array} data - 모든 호텔 데이터 배열
- * @returns {string} 생성된 HTML 페이지 문자열
- */
 function hm_generateFullPreviewHtml(data) {
     const hotelName = data.length > 0 ? data[0].nameKo : '호텔';
-    // Swiper 라이브러리 추가 (여러 호텔일 경우 슬라이더 기능)
     const sliderHead = data.length > 1 ? `<link rel="stylesheet" href="https://unpkg.com/swiper/swiper-bundle.min.css" /><script src="https://unpkg.com/swiper/swiper-bundle.min.js"></script>` : '';
     const sliderBodyScript = data.length > 1 ? `<script>new Swiper('.swiper', {loop: true, pagination: {el: '.swiper-pagination', clickable: true}, navigation: {nextEl: '.swiper-button-next', prevEl: '.swiper-button-prev'}});</script>` : '';
-    
     let bodyContent;
     if (data.length > 1) {
         const slides = data.map(hotel => `<div class="swiper-slide">${hm_generateHotelCardHtml(hotel)}</div>`).join('');
@@ -533,16 +357,353 @@ function hm_generateFullPreviewHtml(data) {
     } else {
         bodyContent = '<h1 style="text-align: center;">표시할 호텔 정보가 없습니다.</h1>';
     }
-
     return `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>호텔 안내: ${hotelName}</title>${sliderHead}<style>body{font-family:'Malgun Gothic',sans-serif;background-color:#f0f2f5;display:flex;justify-content:center;align-items:center;min-height:100vh;padding:2rem;box-sizing:border-box;margin:0;}.swiper-slide{display:flex;justify-content:center;align-items:center;}</style></head><body>${bodyContent}${sliderBodyScript}</body></html>`;
 }
 
-// ▲▲▲ 4. 호텔카드 메이커 (Hotel Maker) 통합 코드 끝 ▲▲▲
-// =======================================================================
-
 
 // =======================================================================
-// 5. 핵심 기능 함수 (기존 메인 앱 함수들)
+// 5. 상세 일정표 (Itinerary Planner) 통합 코드
+// =======================================================================
+
+// --- 상세 일정표 전용 Firebase 초기화 ---
+const ipFirebaseConfig = {
+  apiKey: "AIzaSyAGULxdnWWnSc5eMCsqHeKGK9tmyHsxlv0",
+  authDomain: "trip-planner-app-cc72c.firebaseapp.com",
+  projectId: "trip-planner-app-cc72c",
+  storageBucket: "trip-planner-app-cc72c.appspot.com",
+  messagingSenderId: "1063594141232",
+  appId: "1:1063594141232:web:1dbba9b9722b20ff602ff5",
+  measurementId: "G-2G3Z6WMLF6"
+};
+const ipFbApp = firebase.initializeApp(ipFirebaseConfig, 'itineraryPlannerApp');
+const ipDb = firebase.firestore(ipFbApp);
+
+
+// --- 상세 일정표 관련 상수 및 헬퍼 함수 ---
+const ip_travelEmojis = [
+    { value: "", display: "아이콘 없음" }, { value: "💆🏻", display: "💆🏻 마사지" }, { value: "✈️", display: "✈️ 항공" }, { value: "🏨", display: "🏨 숙소" }, { value: "🍽️", display: "🍽️ 식사" }, { value: "🏛️", display: "🏛️ 관광(실내)" }, { value: "🏞️", display: "🏞️ 관광(야외)" }, { value: "🚶", display: "🚶 이동(도보)" }, { value: "🚌", display: "🚌 이동(버스)" }, { value: "🚆", display: "🚆 이동(기차)" }, { value: "🚢", display: "🚢 이동(배)" }, { value: "🚕", display: "🚕 이동(택시)" }, { value: "🛍️", display: "🛍️ 쇼핑" }, { value: "📷", display: "📷 사진촬영" }, { value: "🗺️", display: "🗺️ 계획/지도" }, { value: "📌", display: "📌 중요장소" }, { value: "☕", display: "☕ 카페/휴식" }, { value: "🎭", display: "🎭 공연/문화" }, { value: "💼", display: "💼 업무" }, { value: "ℹ️", display: "ℹ️ 정보" }
+];
+const ip_editIconSVG = `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>`;
+const ip_saveIconSVG = `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>`;
+const ip_cancelIconSVG = `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>`;
+const ip_deleteIconSVG = `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>`;
+const ip_duplicateIconSVG = `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>`;
+
+function ip_generateId() { return 'id_' + Math.random().toString(36).substr(2, 9); }
+function dateToYyyyMmDd(date) {
+    const d = new Date(date);
+    let month = '' + (d.getMonth() + 1); let dayVal = '' + d.getDate(); const year = d.getFullYear();
+    if (month.length < 2) month = '0' + month; if (dayVal.length < 2) dayVal = '0' + dayVal;
+    return [year, month, dayVal].join('-');
+}
+function ip_formatDate(dateString, dayNumber) { return `DAY ${dayNumber}`; }
+function ip_formatTimeToHHMM(timeStr) {
+    if (timeStr && timeStr.length === 4 && /^\d{4}$/.test(timeStr)) {
+        const hours = timeStr.substring(0, 2); const minutes = timeStr.substring(2, 4);
+        if (parseInt(hours, 10) >= 0 && parseInt(hours, 10) <= 23 && parseInt(minutes, 10) >= 0 && parseInt(minutes, 10) <= 59) return `${hours}:${minutes}`;
+    }
+    return "";
+}
+function ip_isValidDateString(dateString) { if (!/^\d{4}-\d{2}-\d{2}$/.test(dateString)) return false; const parts = dateString.split("-"); const year = parseInt(parts[0], 10); const month = parseInt(parts[1], 10); const day = parseInt(parts[2], 10); if (year < 1000 || year > 3000 || month === 0 || month > 12) return false; const monthLength = [31, (year % 400 === 0 || (year % 100 !== 0 && year % 4 === 0)) ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]; return !(day === 0 || day > monthLength[month - 1]); }
+function ip_parseAndValidateDateInput(inputValue) { let dateStr = inputValue.trim(); if (/^\d{8}$/.test(dateStr)) { dateStr = `${dateStr.substring(0, 4)}-${dateStr.substring(4, 6)}-${dateStr.substring(6, 8)}`; } else if (/^\d{6}$/.test(dateStr)) { const currentYearPrefix = new Date().getFullYear().toString().substring(0, 2); dateStr = `${currentYearPrefix}${dateStr.substring(0, 2)}-${dateStr.substring(2, 4)}-${dateStr.substring(4, 6)}`; } else if (/^\d{4}[./]\d{2}[./]\d{2}$/.test(dateStr)) { dateStr = dateStr.replace(/[./]/g, '-'); } return ip_isValidDateString(dateStr) ? dateStr : null; }
+
+// --- 상세 일정표 UI 초기화 ---
+function initializeItineraryPlannerForGroup(container, groupId) {
+    container.innerHTML = `
+        <header class="ip-header sticky top-0 z-10 py-3 px-4 -mx-4 mb-4 bg-white/80 backdrop-blur-sm">
+            <div class="flex justify-between items-center h-[50px]">
+                <div id="ip-headerTitleSection-${groupId}" class="ip-header-title-container"></div>
+                <div class="flex items-center space-x-2">
+                    <button id="ip-loadFromDBBtn-${groupId}" class="btn btn-sm btn-primary" title="DB에서 일정 불러오기"><i class="fas fa-database"></i><span class="inline ml-2">DB 불러오기</span></button>
+                    <button id="ip-copyInlineHtmlButton-${groupId}" class="btn btn-sm btn-outline" title="일정표 코드 복사"><i class="fas fa-copy"></i> 코드 복사</button>
+                    <button id="ip-inlinePreviewButton-${groupId}" class="btn btn-sm btn-primary" title="인라인 형식 미리보기"><i class="fas fa-eye"></i> 미리보기</button>
+                </div>
+            </div>
+        </header>
+        <main class="ip-main-content">
+            <div id="ip-daysContainer-${groupId}" class="space-y-4"></div>
+            <div class="add-day-button-container mt-6 text-center">
+                <button id="ip-addDayButton-${groupId}" class="btn btn-indigo"><i class="fas fa-plus mr-2"></i>새 날짜 추가</button>
+            </div>
+        </main>
+    `;
+    container.querySelector(`#ip-addDayButton-${groupId}`).addEventListener('click', () => ip_addDay(groupId));
+    container.querySelector(`#ip-copyInlineHtmlButton-${groupId}`).addEventListener('click', () => ip_handleCopyInlineHtml(groupId));
+    container.querySelector(`#ip-inlinePreviewButton-${groupId}`).addEventListener('click', () => ip_handleInlinePreview(groupId));
+    container.querySelector(`#ip-loadFromDBBtn-${groupId}`).addEventListener('click', () => ip_openLoadTripModal(groupId));
+    container.querySelector(`#ip-daysContainer-${groupId}`).addEventListener('dblclick', (event) => ip_handleActivityDoubleClick(event, groupId));
+    ip_render(groupId);
+}
+
+// --- 상세 일정표 렌더링 함수들 ---
+function ip_render(groupId) {
+    const container = document.getElementById(`itinerary-planner-container-${groupId}`);
+    if (!container) return;
+    ip_renderHeaderTitle(groupId, container);
+    ip_renderDays(groupId, container);
+}
+function ip_renderHeaderTitle(groupId, container) {
+    const itineraryData = quoteGroupsData[groupId].itineraryData;
+    const headerTitleSection = container.querySelector(`#ip-headerTitleSection-${groupId}`);
+    if (!headerTitleSection) return;
+    headerTitleSection.innerHTML = '';
+    if (itineraryData.editingTitle) {
+        const input = document.createElement('input'); input.type = 'text'; input.className = 'ip-header-title-input'; input.value = itineraryData.title;
+        const saveButton = document.createElement('button'); saveButton.className = 'icon-button'; saveButton.title = '제목 저장'; saveButton.innerHTML = ip_saveIconSVG; saveButton.addEventListener('click', () => ip_handleSaveTripTitle(groupId));
+        const cancelButton = document.createElement('button'); cancelButton.className = 'icon-button'; cancelButton.title = '취소'; cancelButton.innerHTML = ip_cancelIconSVG; cancelButton.addEventListener('click', () => ip_handleCancelTripTitleEdit(groupId));
+        headerTitleSection.append(input, saveButton, cancelButton); input.focus();
+    } else {
+        const titleH1 = document.createElement('h1'); titleH1.className = 'text-2xl font-bold'; titleH1.textContent = itineraryData.title;
+        const editButton = document.createElement('button'); editButton.className = 'icon-button ml-2'; editButton.title = '여행 제목 수정'; editButton.innerHTML = ip_editIconSVG; editButton.addEventListener('click', () => ip_handleEditTripTitle(groupId));
+        headerTitleSection.append(titleH1, editButton);
+    }
+}
+function ip_renderDays(groupId, container) {
+    const itineraryData = quoteGroupsData[groupId].itineraryData;
+    const daysContainer = container.querySelector(`#ip-daysContainer-${groupId}`);
+    daysContainer.innerHTML = '';
+    (itineraryData.days || []).forEach((day, dayIndex) => {
+        const daySection = document.createElement('div');
+        daySection.className = 'ip-day-section day-section'; daySection.dataset.dayId = `day-${dayIndex}`;
+        const expandedIcon = `<svg class="toggle-icon w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>`;
+        const collapsedIcon = `<svg class="toggle-icon w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>`;
+        let dateDisplayHTML = day.editingDate
+            ? `<input type="text" class="date-edit-input-text" value="${day.date}" placeholder="YYYY-MM-DD"><button class="save-date-button icon-button" title="날짜 저장">${ip_saveIconSVG}</button><button class="cancel-date-edit-button icon-button" title="취소">${ip_cancelIconSVG}</button>`
+            : `<h2 class="day-header-title">${ip_formatDate(day.date, dayIndex + 1)}</h2><button class="edit-date-button icon-button ml-2" title="날짜 수정">${ip_editIconSVG}</button>`;
+        daySection.innerHTML = `<div class="ip-day-header-container day-header-container"><div class="ip-day-header-main">${dateDisplayHTML}</div><div class="ip-day-header-controls"><button class="delete-day-button icon-button" title="이 날짜 삭제">${ip_deleteIconSVG}</button><button class="day-toggle-button icon-button">${day.isCollapsed ? collapsedIcon : expandedIcon}</button></div></div><div class="day-content-wrapper ${day.isCollapsed ? 'hidden' : ''}"><div class="activities-list ip-activities-list pt-4" data-day-index="${dayIndex}"></div><button class="add-activity-button mt-4 ml-2 btn btn-sm btn-outline"><i class="fas fa-plus mr-1"></i>일정 추가</button></div>`;
+        daysContainer.appendChild(daySection);
+        const activitiesList = daySection.querySelector('.activities-list');
+        ip_renderActivities(activitiesList, day.activities, dayIndex, groupId);
+        if (day.editingDate) {
+            daySection.querySelector('.save-date-button').addEventListener('click', (e) => ip_handleSaveDate(dayIndex, groupId, e.currentTarget.previousElementSibling.value));
+            daySection.querySelector('.cancel-date-edit-button').addEventListener('click', () => ip_handleCancelDateEdit(dayIndex, groupId));
+        } else {
+            daySection.querySelector('.edit-date-button').addEventListener('click', () => ip_handleEditDate(dayIndex, groupId));
+        }
+        daySection.querySelector('.delete-day-button').addEventListener('click', () => ip_showConfirmDeleteDayModal(dayIndex, groupId));
+        daySection.querySelector('.day-toggle-button').addEventListener('click', (e) => ip_handleToggleDayCollapse(e, dayIndex, groupId));
+        daySection.querySelector('.add-activity-button').addEventListener('click', () => ip_openActivityModal(groupId, dayIndex));
+    });
+    if (typeof Sortable !== 'undefined') {
+        new Sortable(daysContainer, { handle: '.day-header-container', animation: 150, ghostClass: 'sortable-ghost', onEnd: (evt) => { const itineraryData = quoteGroupsData[groupId].itineraryData; const movedDay = itineraryData.days.splice(evt.oldIndex, 1)[0]; itineraryData.days.splice(evt.newIndex, 0, movedDay); ip_recalculateAllDates(groupId); ip_render(groupId); } });
+        daysContainer.querySelectorAll('.activities-list').forEach(list => { new Sortable(list, { group: `shared-activities-${groupId}`, handle: '.ip-activity-card', animation: 150, ghostClass: 'sortable-ghost', onEnd: (evt) => { const fromDayIndex = parseInt(evt.from.dataset.dayIndex); const toDayIndex = parseInt(evt.to.dataset.dayIndex); const itineraryData = quoteGroupsData[groupId].itineraryData; const movedActivity = itineraryData.days[fromDayIndex].activities.splice(evt.oldIndex, 1)[0]; itineraryData.days[toDayIndex].activities.splice(evt.newIndex, 0, movedActivity); ip_render(groupId); } }); });
+    }
+}
+function ip_renderActivities(activitiesListElement, activities, dayIndex, groupId) {
+    activitiesListElement.innerHTML = '';
+    (activities || []).forEach((activity, activityIndex) => {
+        const card = document.createElement('div'); card.className = 'ip-activity-card activity-card';
+        card.dataset.activityId = activity.id; card.dataset.dayIndex = dayIndex; card.dataset.activityIndex = activityIndex;
+        let imageHTML = activity.imageUrl ? `<img src="${activity.imageUrl}" alt="${activity.title}" class="ip-card-image card-image" onerror="this.style.display='none';">` : '';
+        const descHTML = activity.description ? `<div class="card-description">${activity.description.replace(/\n/g, '<br>')}</div>` : '';
+        let locationText = activity.locationLink;
+        if (locationText && locationText.length > 35) { locationText = locationText.substring(0, 32) + '...'; }
+        const locHTML = activity.locationLink ? `<div class="card-location">📍 <a href="${activity.locationLink}" target="_blank" title="${activity.locationLink}">${locationText}</a></div>` : '';
+        const costHTML = activity.cost ? `<div class="card-cost">💰 ${activity.cost}</div>` : '';
+        const notesHTML = activity.notes ? `<div class="card-notes">📝 ${activity.notes.replace(/\n/g, '<br>')}</div>` : '';
+        card.innerHTML = `<div class="card-time-icon-area"><div class="card-icon">${activity.icon||'&nbsp;'}</div><div class="card-time" data-time-value="${activity.time||''}">${ip_formatTimeToHHMM(activity.time)}</div></div><div class="card-details-area"><div class="card-title">${activity.title||''}</div>${descHTML}${imageHTML}${locHTML}${costHTML}${notesHTML}</div><div class="card-actions-direct"><button class="icon-button edit-activity-button" title="수정">${ip_editIconSVG}</button><button class="icon-button duplicate-activity-button" title="복제">${ip_duplicateIconSVG}</button><button class="icon-button delete-activity-button" title="삭제">${ip_deleteIconSVG}</button></div>`;
+        activitiesListElement.appendChild(card);
+    });
+    activitiesListElement.addEventListener('click', e => {
+        const button = e.target.closest('button'); if (!button) return;
+        const card = button.closest('.ip-activity-card'); if (!card) return;
+        const dayIdx = parseInt(card.dataset.dayIndex); const activityIdx = parseInt(card.dataset.activityIndex);
+        if (button.classList.contains('edit-activity-button')) ip_openActivityModal(groupId, dayIdx, activityIdx);
+        else if (button.classList.contains('delete-activity-button')) ip_handleDeleteActivity(groupId, dayIdx, activityIdx);
+        else if (button.classList.contains('duplicate-activity-button')) ip_handleDuplicateActivity(groupId, dayIdx, activityIdx);
+    });
+}
+
+// --- 상세 일정표 데이터 조작 핸들러 ---
+function ip_addDay(groupId) {
+    const itineraryData = quoteGroupsData[groupId].itineraryData; let newDate;
+    if (itineraryData.days.length > 0) { const lastDate = new Date(itineraryData.days[itineraryData.days.length - 1].date + "T00:00:00Z"); newDate = new Date(lastDate.setDate(lastDate.getDate() + 1)); } else { newDate = new Date(); }
+    itineraryData.days.push({ date: dateToYyyyMmDd(newDate), activities: [], isCollapsed: false, editingDate: false });
+    ip_render(groupId);
+}
+function ip_handleDeleteActivity(groupId, dayIndex, activityIndex) { if (confirm("이 일정을 삭제하시겠습니까?")) { quoteGroupsData[groupId].itineraryData.days[dayIndex].activities.splice(activityIndex, 1); ip_render(groupId); } }
+function ip_handleDuplicateActivity(groupId, dayIndex, activityIndex) {
+    const itineraryData = quoteGroupsData[groupId].itineraryData;
+    const activityToDuplicate = itineraryData.days[dayIndex].activities[activityIndex];
+    if (activityToDuplicate) { const newActivity = JSON.parse(JSON.stringify(activityToDuplicate)); newActivity.id = ip_generateId(); newActivity.title = `${newActivity.title} (복사본)`; itineraryData.days[dayIndex].activities.splice(activityIndex + 1, 0, newActivity); ip_render(groupId); }
+}
+function ip_handleEditTripTitle(groupId) { quoteGroupsData[groupId].itineraryData.editingTitle = true; ip_render(groupId); }
+function ip_handleSaveTripTitle(groupId) { const container = document.getElementById(`itinerary-planner-container-${groupId}`); const input = container.querySelector(`#ip-headerTitleSection-${groupId} input`); quoteGroupsData[groupId].itineraryData.title = input.value; quoteGroupsData[groupId].itineraryData.editingTitle = false; ip_render(groupId); }
+function ip_handleCancelTripTitleEdit(groupId) { quoteGroupsData[groupId].itineraryData.editingTitle = false; ip_render(groupId); }
+function ip_handleEditDate(dayIndex, groupId) { quoteGroupsData[groupId].itineraryData.days.forEach((day, index) => { day.editingDate = (index === dayIndex); }); ip_render(groupId); }
+function ip_handleSaveDate(dayIndex, groupId, dateValue) {
+    const validatedDate = ip_parseAndValidateDateInput(dateValue);
+    if (validatedDate) {
+        quoteGroupsData[groupId].itineraryData.days[dayIndex].date = validatedDate;
+        quoteGroupsData[groupId].itineraryData.days[dayIndex].editingDate = false;
+        ip_recalculateAllDates(groupId); ip_render(groupId);
+    } else { showToastMessage("잘못된 날짜 형식입니다. (YYYY-MM-DD)", true); }
+}
+function ip_handleCancelDateEdit(dayIndex, groupId) { quoteGroupsData[groupId].itineraryData.days[dayIndex].editingDate = false; ip_render(groupId); }
+function ip_handleToggleDayCollapse(event, dayIndex, groupId) {
+    const day = quoteGroupsData[groupId].itineraryData.days[dayIndex]; if (day.editingDate) return; day.isCollapsed = !day.isCollapsed; ip_render(groupId);
+}
+function ip_handleActivityDoubleClick(event, groupId) {
+    const card = event.target.closest('.ip-activity-card');
+    if (card) { ip_openActivityModal(groupId, parseInt(card.dataset.dayIndex), parseInt(card.dataset.activityIndex)); }
+}
+
+// --- 상세 일정표 모달 관리 ---
+function ip_openActivityModal(groupId, dayIndex, activityIndex = -1) {
+    const modal = document.getElementById('ipActivityModal'); const form = document.getElementById('ipActivityForm');
+    modal.querySelector('#ipModalTitle').textContent = activityIndex > -1 ? '일정 수정' : '새 일정 추가';
+    form.reset();
+    form.querySelector('#ipActivityDayIndex').value = dayIndex; form.querySelector('#ipActivityIndex').value = activityIndex; form.querySelector('#ipGroupId').value = groupId;
+    const activityIconSelect = document.getElementById('ipActivityIconSelect');
+    activityIconSelect.innerHTML = ip_travelEmojis.map(emoji => `<option value="${emoji.value}">${emoji.display}</option>`).join('');
+    if (activityIndex > -1) {
+        const activity = quoteGroupsData[groupId].itineraryData.days[dayIndex].activities[activityIndex];
+        Object.keys(activity).forEach(key => { const input = form.querySelector(`#ipActivity${key.charAt(0).toUpperCase() + key.slice(1)}`); if (input) input.value = activity[key] || ''; });
+    }
+    modal.classList.remove('hidden');
+}
+function ip_handleActivityFormSubmit(event) {
+    event.preventDefault(); const form = event.target;
+    const groupId = form.querySelector('#ipGroupId').value; const dayIndex = parseInt(form.querySelector('#ipActivityDayIndex').value); const activityIndex = parseInt(form.querySelector('#ipActivityIndex').value);
+    let timeValue = form.querySelector('#ipActivityTimeInput').value.trim();
+    if (timeValue && (timeValue.length !== 4 || !/^\d{4}$/.test(timeValue))) { showToastMessage("시간은 HHMM 형식의 4자리 숫자로 입력하세요.", true); return; }
+    const itineraryData = quoteGroupsData[groupId].itineraryData;
+    const activityData = {
+        id: (activityIndex > -1 ? itineraryData.days[dayIndex].activities[activityIndex].id : ip_generateId()),
+        time: timeValue, icon: form.querySelector('#ipActivityIconSelect').value, title: form.querySelector('#ipActivityTitle').value,
+        description: form.querySelector('#ipActivityDescription').value, locationLink: form.querySelector('#ipActivityLocation').value,
+        imageUrl: form.querySelector('#ipActivityImageUrl').value, cost: form.querySelector('#ipActivityCost').value, notes: form.querySelector('#ipActivityNotes').value,
+    };
+    if (activityIndex > -1) itineraryData.days[dayIndex].activities[activityIndex] = activityData;
+    else itineraryData.days[dayIndex].activities.push(activityData);
+    document.getElementById('ipActivityModal').classList.add('hidden'); ip_render(groupId);
+}
+function ip_showConfirmDeleteDayModal(dayIndex, groupId) {
+    const modal = document.getElementById('ipConfirmDeleteDayModal');
+    modal.querySelector('#ipConfirmDeleteDayMessage').textContent = `DAY ${dayIndex + 1} 일정을 정말 삭제하시겠습니까?`;
+    modal.classList.remove('hidden');
+    const confirmBtn = document.getElementById('ipConfirmDeleteDayActionButton');
+    const newConfirmBtn = confirmBtn.cloneNode(true);
+    confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
+    newConfirmBtn.addEventListener('click', () => {
+        quoteGroupsData[groupId].itineraryData.days.splice(dayIndex, 1); ip_recalculateAllDates(groupId); ip_render(groupId); modal.classList.add('hidden');
+    }, { once: true });
+}
+
+// --- 상세 일정표 HTML/DB/파일 연동 ---
+// 이 코드는 '서식이 있는 HTML'로 복사하여 문제를 해결합니다.
+async function ip_handleCopyInlineHtml(groupId) {
+    const html = ip_generateInlineStyledHTML(quoteGroupsData[groupId].itineraryData, { 
+        includeStyles: false, 
+        makePageTitleEmptyForCopy: true // 이 옵션이 추가되었습니다.
+    });
+
+    try {
+        const blobHtml = new Blob([html], { type: 'text/html' });
+        const blobText = new Blob([html], { type: 'text/plain' });
+        await navigator.clipboard.write([
+            new ClipboardItem({ 'text/html': blobHtml, 'text/plain': blobText })
+        ]);
+        showToastMessage('일정표 HTML이 클립보드에 복사되었습니다.');
+    } catch (err) {
+        console.error("HTML 복사 실패, 텍스트로 재시도:", err);
+        try {
+            await navigator.clipboard.writeText(html);
+            showToastMessage('일정표 코드가 텍스트로 복사되었습니다 (HTML 형식 복사 실패).');
+        } catch (fallbackErr) {
+            showToastMessage('클립보드 복사에 최종적으로 실패했습니다.', true);
+        }
+    }
+}
+function ip_handleInlinePreview(groupId) {
+    const html = ip_generateInlineStyledHTML(quoteGroupsData[groupId].itineraryData, { includeStyles: true });
+    const previewWindow = window.open('', '_blank');
+    if (previewWindow) { previewWindow.document.write(html); previewWindow.document.close(); } else { showToastMessage("팝업이 차단되었습니다.", true); }
+}
+function ip_generateInlineStyledHTML(itineraryData, options = {}) {
+    let daysHTML = '';
+    (itineraryData.days || []).forEach((day, dayIndex) => {
+        let activitiesHTML = (day.activities || []).map(activity => {
+            const imageHTML = activity.imageUrl ? `<details open style="margin-top:8px;"><summary style="font-size:12px;color:#007bff;cursor:pointer;display:inline-block;">🖼️ 사진</summary><img src="${activity.imageUrl}" alt="${activity.title}" style="max-width:300px;height:auto;border-radius:4px;margin-top:8px;" onerror="this.style.display='none';"></details>` : '';
+            const locationHTML = activity.locationLink ? `<div style="font-size:12px;margin-top:4px;">📍 <a href="${activity.locationLink}" target="_blank" rel="noopener noreferrer" style="color:#007bff;text-decoration:none;">위치 보기</a></div>` : '';
+            const costHTML = activity.cost ? `<div style="font-size:12px;margin-top:4px;">💰 ${activity.cost}</div>` : '';
+            const notesHTML = activity.notes ? `<div style="font-size:12px;margin-top:4px;white-space:pre-wrap;">📝 ${activity.notes.replace(/\n/g, '<br>')}</div>` : '';
+            const descHTML = activity.description ? `<div style="font-size:12px;white-space:pre-wrap;">${activity.description.replace(/\n/g, '<br>')}</div>` : '';
+            return `<div style="background-color:white;border-radius:8px;border:1px solid #E0E0E0;padding:16px;margin-bottom:16px;display:flex;"><div style="width:100px;flex-shrink:0;"><div style="font-size:20px;margin-bottom:4px;">${activity.icon || '&nbsp;'}</div><div style="font-size:12px;font-weight:bold;">${ip_formatTimeToHHMM(activity.time) || '&nbsp;'}</div></div><div style="flex-grow:1;"><div style="font-size:13px;font-weight:bold;">${activity.title || ''}</div>${descHTML}${imageHTML}${locationHTML}${costHTML}${notesHTML}</div></div>`;
+        }).join('');
+        
+        daysHTML += `<div style="margin-bottom: 16px;"><details ${day.isCollapsed ? '' : 'open'}><summary style="display: flex; align-items: center; padding: 12px 8px; border-bottom: 1px solid #EEE; background-color: #fdfdfd; cursor: pointer;"><h2 style="font-size: 14px; font-weight: 600; margin:0;">${ip_formatDate(day.date, dayIndex + 1)}</h2></summary><div style="padding: 8px;"><div style="padding-top: .75rem;">${activitiesHTML || '<p style="font-size:12px;color:#777;">일정이 없습니다.</p>'}</div></div></details></div>`;
+    });
+
+    const styles = `body{font-family:-apple-system,sans-serif;margin:0;background:#f8f9fa;}main{max-width:768px;margin:auto;padding:1rem;}header{background:white;border-bottom:1px solid #E0E0E0;padding:1rem;text-align:center;}h1{font-size:18px;font-weight:bold;margin:0;}h2{font-size:14px;font-weight:600;margin:0;}summary{list-style:none;}summary::-webkit-details-marker{display:none;}`;
+    const styleTagHTML = options.includeStyles ? `<style>${styles}</style>` : '';
+
+    // [수정됨] 옵션에 따라 <title> 태그 내용을 결정
+    const pageDocumentTitle = options.makePageTitleEmptyForCopy ? ' ' : (itineraryData.title || "여행 일정");
+    
+    return `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>${pageDocumentTitle}</title>${styleTagHTML}</head><body><header><h1>${itineraryData.title}</h1></header><main>${daysHTML}</main></body></html>`;
+}
+function ip_recalculateAllDates(groupId) {
+    const itineraryData = quoteGroupsData[groupId].itineraryData;
+    if (itineraryData.days && itineraryData.days.length > 0 && itineraryData.days[0].date) {
+        let currentDate = new Date(itineraryData.days[0].date + "T00:00:00Z");
+        for (let i = 0; i < itineraryData.days.length; i++) {
+            itineraryData.days[i].date = dateToYyyyMmDd(currentDate);
+            currentDate.setDate(currentDate.getDate() + 1);
+        }
+    }
+}
+async function ip_openLoadTripModal(groupId) {
+    const modal = document.getElementById('ipLoadTemplateModal');
+    modal.classList.remove('hidden');
+    const listEl = modal.querySelector('#ipTemplateList');
+    const loadingMsg = modal.querySelector('#ipLoadingTemplateMsg');
+    const searchInput = modal.querySelector('#ipTemplateSearchInput');
+    listEl.innerHTML = ''; loadingMsg.style.display = 'block'; searchInput.value = '';
+    try {
+        const querySnapshot = await ipDb.collection("tripplan").orderBy("title").get();
+        const templates = [];
+        querySnapshot.forEach(doc => templates.push({ id: doc.id, ...doc.data() }));
+        loadingMsg.style.display = 'none';
+        
+        const renderList = (sets) => {
+            listEl.innerHTML = sets.length ? '' : '<li class="p-3 text-center text-gray-500">템플릿이 없습니다.</li>';
+            sets.forEach(template => {
+                const li = document.createElement('li');
+                li.className = 'p-3 hover:bg-gray-100 cursor-pointer';
+                li.textContent = template.title;
+                li.onclick = () => {
+                    if (confirm(`'${template.title}' 일정을 현재 견적에 불러오시겠습니까?\n(기존 일정은 모두 교체됩니다.)`)) {
+                        ip_loadTripFromFirestore(template.id, groupId);
+                        modal.classList.add('hidden');
+                    }
+                };
+                listEl.appendChild(li);
+            });
+        };
+        
+        searchInput.oninput = () => renderList(templates.filter(t => t.title.toLowerCase().includes(searchInput.value.toLowerCase())));
+        renderList(templates);
+
+    } catch (error) { loadingMsg.textContent = "템플릿 목록 로딩 실패"; showToastMessage("템플릿 로딩 중 오류 발생", true); }
+}
+async function ip_loadTripFromFirestore(tripId, groupId) {
+    try {
+        const doc = await ipDb.collection("tripplan").doc(tripId).get();
+        if (doc.exists) {
+            const loadedData = doc.data();
+            quoteGroupsData[groupId].itineraryData = {
+                title: loadedData.title || "제목 없음",
+                days: (loadedData.days || []).map((day, index) => ({...day, editingDate: false, isCollapsed: index !== 0 })),
+                editingTitle: false
+            };
+            showToastMessage(`'${loadedData.title}' 일정을 불러왔습니다.`);
+            ip_render(groupId);
+        } else { showToastMessage("선택한 일정을 찾을 수 없습니다.", true); }
+    } catch(error) { showToastMessage("일정 불러오기 중 오류 발생", true); console.error(error); }
+}
+// =======================================================================
+// 6. 핵심 기능 함수 (기존 메인 앱 함수들)
 // =======================================================================
 
 // --- 고객 정보 ---
@@ -572,7 +733,6 @@ function createCustomerCard(initialData = { name: '', phone: '', email: '' }) {
     });
     card.querySelector('.remove-customer-btn').addEventListener('click', () => { card.remove(); });
 }
-
 function getCustomerData() {
     const customers = [];
     const container = document.getElementById('customerInfoContainer');
@@ -598,14 +758,12 @@ const copyHtmlToClipboard = (htmlString) => {
     navigator.clipboard.writeText(htmlString).then(() => showToastMessage('HTML 소스 코드가 클립보드에 복사되었습니다.'))
     .catch(err => { console.error('클립보드 복사 실패:', err); showToastMessage('복사에 실패했습니다.', true); });
 };
-
 function copyToClipboard(text, fieldName = '텍스트') {
     if (!text || text.trim() === "") { showToastMessage('복사할 내용이 없습니다.', true); return; }
     navigator.clipboard.writeText(text).then(() => {
-        showToastMessage(`'${text}'\n(${fieldName}) 클립보드에 복사되었습니다.`);
+        showToastMessage(`'${text}' (${fieldName}) 클립보드에 복사되었습니다.`);
     }).catch(err => { console.error('클립보드 복사 실패:', err); showToastMessage('복사에 실패했습니다.', true); });
 }
-
 function showToastMessage(message, isError = false) {
     const toastContainer = document.getElementById('toast-container');
     if (!toastContainer) return;
@@ -627,16 +785,10 @@ function showToastMessage(message, isError = false) {
 
 
 // --- 저장 및 불러오기 ---
-/**
- * [수정] 현재 활성화된 그룹의 모든 UI 상태를 데이터 객체(`quoteGroupsData`)로 동기화합니다.
- * @param {string} groupId - 동기화할 그룹의 ID
- */
 function syncGroupUIToData(groupId) {
     if (!groupId || !quoteGroupsData[groupId]) return;
     const groupEl = document.getElementById(`group-content-${groupId}`);
     if (!groupEl) return;
-
-    // 계산기 데이터 동기화
     groupEl.querySelectorAll('.calculator-instance').forEach(instance => {
         const calcId = instance.dataset.calculatorId;
         const calculatorData = quoteGroupsData[groupId].calculators.find(c => c.id === calcId);
@@ -648,48 +800,36 @@ function syncGroupUIToData(groupId) {
             calculatorData.tableHTML = table.innerHTML;
         }
     });
-
-    // 오른쪽 패널 데이터 동기화
-    // (이 부분은 각 패널의 이벤트 리스너에서 실시간으로 처리하는 방식으로 변경하여, 저장 시점에 별도 호출 필요 없음)
-    
-    // [추가] 호텔 카드 메이커 데이터 동기화
     hm_syncCurrentHotelData(groupId);
+    if (typeof ip_syncUIToData === 'function') {
+        ip_syncUIToData(groupId);
+    }
 }
-
 async function getSaveDataBlob() {
-    // 저장 전, 현재 활성화된 그룹의 UI 상태를 데이터에 최종 반영
     if (activeGroupId) {
         syncGroupUIToData(activeGroupId);
     }
-    
-    const allData = { 
-        quoteGroupsData, 
-        groupCounter, 
-        activeGroupId, 
-        memoText: document.getElementById('memoText').value, 
-        customerInfo: getCustomerData() 
+    const allData = {
+        quoteGroupsData,
+        groupCounter,
+        activeGroupId,
+        memoText: document.getElementById('memoText').value,
+        customerInfo: getCustomerData()
     };
-    
     const doc = document.cloneNode(true);
     try {
-        // 외부 CSS와 JS를 인라인으로 삽입하여 단일 파일로 저장
         const styleResponse = await fetch('./style.css');
         const styleText = await styleResponse.text();
         const scriptResponse = await fetch('./script.js');
         const scriptText = await scriptResponse.text();
-        
         const styleTag = document.createElement('style');
         styleTag.textContent = styleText;
         doc.head.querySelector('link[href="style.css"]')?.replaceWith(styleTag);
-        
         const scriptTag = document.createElement('script');
         scriptTag.textContent = scriptText;
         doc.body.querySelector('script[src="script.js"]')?.replaceWith(scriptTag);
-        
-        // 데이터 저장
         const dataScriptTag = doc.getElementById('restored-data');
         if (dataScriptTag) { dataScriptTag.textContent = JSON.stringify(allData); }
-
         return new Blob([doc.documentElement.outerHTML], { type: 'text/html' });
     } catch (error) {
         console.error("CSS 또는 JS 파일을 포함하는 중 오류 발생:", error);
@@ -697,7 +837,6 @@ async function getSaveDataBlob() {
         return null;
     }
 }
-
 async function saveFile(isSaveAs = false, clickedButton = null) {
     const saveBtn = document.getElementById('saveBtn');
     const saveAsBtn = document.getElementById('saveAsBtn');
@@ -735,7 +874,6 @@ async function saveFile(isSaveAs = false, clickedButton = null) {
         if (clickedButton) { clickedButton.innerHTML = originalBtnHTML; }
     }
 }
-
 async function loadFile() {
     try {
         const [fileHandle] = await window.showOpenFilePicker({ types: [{ description: 'HTML 파일', accept: { 'text/html': ['.html'] } }] });
@@ -745,40 +883,31 @@ async function loadFile() {
         if (err.name !== 'AbortError') { console.error('파일 열기 실패:', err); showToastMessage('파일을 열지 못했습니다.', true); }
     }
 }
-
 async function loadDataIntoWindow(fileHandle, openInNewWindow) {
     try {
-        // 파일 읽기 권한 요청
         if ((await fileHandle.queryPermission({ mode: 'read' })) !== 'granted') {
             if ((await fileHandle.requestPermission({ mode: 'read' })) !== 'granted') {
                 showToastMessage('파일 읽기 권한이 필요합니다.', true);
                 return;
             }
         }
-
         const file = await fileHandle.getFile();
         const contents = await file.text();
         const parser = new DOMParser();
         const doc = parser.parseFromString(contents, 'text/html');
         const restoredDataScript = doc.getElementById('restored-data');
-
         if (restoredDataScript && restoredDataScript.textContent) {
             const restoredDataJSON = restoredDataScript.textContent;
-            
             if (openInNewWindow) {
-                // 새 창에서 열기: 세션 스토리지를 통해 데이터 전달
                 const uniqueKey = `PWA_LOAD_DATA_${Date.now()}`;
                 sessionStorage.setItem(uniqueKey, restoredDataJSON);
-                
                 const relativeUrl = `?loadDataKey=${uniqueKey}`;
                 const newWindow = window.open(relativeUrl, '_blank');
-                
                 if (!newWindow) {
                     showToastMessage('팝업이 차단되어 새 창을 열 수 없습니다. 팝업 차단을 해제해주세요.', true);
                     sessionStorage.removeItem(uniqueKey);
                 }
             } else {
-                // 현재 창에서 열기: 상태 복원 함수 직접 호출
                 try {
                     const restoredData = JSON.parse(restoredDataJSON);
                     restoreState(restoredData);
@@ -822,7 +951,6 @@ async function openRecentFilesModal() {
         renderRecentFileList(allHandles, recentFileSearchInput.value);
     };
 }
-
 function renderRecentFileList(fullList, searchTerm) {
     if (!recentFileListUl) return;
     const lowerCaseSearchTerm = searchTerm.toLowerCase();
@@ -856,13 +984,11 @@ function renderRecentFileList(fullList, searchTerm) {
                 e.stopPropagation();
                 if (confirm(`'${item.name}'을(를) 최근 파일 목록에서 삭제하시겠습니까?`)) {
                     await deleteFileHandle(item.name);
-                    // 목록 다시 그리기
                     const allHandles = await getAllFileHandles();
                     renderRecentFileList(allHandles, recentFileSearchInput.value);
                     showToastMessage(`'${item.name}'이(가) 최근 파일 목록에서 삭제되었습니다.`);
                 }
             });
-
             listItem.appendChild(titleSpan);
             listItem.appendChild(deleteButton);
             recentFileListUl.appendChild(listItem);
@@ -871,8 +997,6 @@ function renderRecentFileList(fullList, searchTerm) {
         recentFileListUl.innerHTML = `<li class="p-3 text-sm text-gray-500 text-center">최근 파일이 없거나, 검색 결과가 없습니다.</li>`;
     }
 }
-
-// --- 범용 목록 렌더링 함수 ---
 function renderFilteredList(options) {
     const { fullList, searchTerm, listElementId, clickHandler, itemTitleField = 'name' } = options;
     const listEl = document.getElementById(listElementId);
@@ -903,7 +1027,6 @@ async function loadAllInclusionDataSets() {
         return dataSets;
     } catch (error) { console.error("목록 불러오기 오류:", error); showToastMessage("목록을 불러오는 중 오류가 발생했습니다.", true); return []; }
 }
-
 async function openLoadInclusionsModal() {
     if (!activeGroupId) { showToastMessage("견적 그룹을 먼저 선택해주세요.", true); return; }
     const modal = document.getElementById('loadInclusionsModal');
@@ -920,12 +1043,11 @@ async function openLoadInclusionsModal() {
         applyInclusionData(item);
         modal.classList.add('hidden');
     };
-    renderFilteredList({ fullList: allSets, searchTerm: '', listElementId: 'inclusionsList', clickHandler });
+    renderFilteredList({ fullList: allSets, searchTerm: '', listElementId: 'inclusionsList', clickHandler, itemTitleField: 'name' });
     searchInput.oninput = () => {
-        renderFilteredList({ fullList: allSets, searchTerm: searchInput.value, listElementId: 'inclusionsList', clickHandler });
+        renderFilteredList({ fullList: allSets, searchTerm: searchInput.value, listElementId: 'inclusionsList', clickHandler, itemTitleField: 'name' });
     };
 }
-
 function applyInclusionData(item) {
     if (!activeGroupId) return;
     const groupData = quoteGroupsData[activeGroupId];
@@ -940,7 +1062,6 @@ function applyInclusionData(item) {
     groupEl.querySelector('.inclusion-exclusion-doc-name-display').textContent = `(${item.name})`;
     showToastMessage(`'${item.name}' 내역을 적용했습니다.`);
 }
-
 async function loadAllSnippets() {
     const dataSets = [];
     try {
@@ -950,14 +1071,12 @@ async function loadAllSnippets() {
         return dataSets;
     } catch (error) { console.error("자주 쓰는 문자 목록 불러오기 오류:", error); showToastMessage("자주 쓰는 문자 목록을 불러오는 중 오류가 발생했습니다.", true); return []; }
 }
-
 function applyMemoData(snippet) {
     const memoTextarea = document.getElementById('memoText');
     if (!memoTextarea) return;
     memoTextarea.value = snippet.content || '';
     showToastMessage(`'${snippet.name}' 내용을 메모에 적용했습니다.`);
 }
-
 async function openLoadMemoModal() {
     const modal = document.getElementById('loadMemoModal');
     const listEl = document.getElementById('memoList');
@@ -973,16 +1092,13 @@ async function openLoadMemoModal() {
         applyMemoData(item);
         modal.classList.add('hidden');
     };
-    renderFilteredList({ fullList: allSnippets, searchTerm: '', listElementId: 'memoList', clickHandler });
+    renderFilteredList({ fullList: allSnippets, searchTerm: '', listElementId: 'memoList', clickHandler, itemTitleField: 'name' });
     searchInput.oninput = () => {
-        renderFilteredList({ fullList: allSnippets, searchTerm: searchInput.value, listElementId: 'memoList', clickHandler });
+        renderFilteredList({ fullList: allSnippets, searchTerm: searchInput.value, listElementId: 'memoList', clickHandler, itemTitleField: 'name' });
     };
 }
 
 // --- 견적 그룹 관리 ---
-/**
- * [수정] 새 견적 그룹을 추가합니다. 호텔 카드 메이커 데이터도 함께 초기화됩니다.
- */
 function addNewGroup() {
     groupCounter++;
     const groupId = groupCounter;
@@ -991,23 +1107,26 @@ function addNewGroup() {
         calculators: [{ id: `calc_${Date.now()}`, pnr: '', tableHTML: null }],
         flightSchedule: [], 
         priceInfo: [],
-        inclusionText: '● 왕복 항공권\n● 호텔\n└ 조식포함\n└ 스탠다드 더블\n└ 2025-10-01(수) ~ 2025-10-05(일) (4박)\n* 1억원 여행자보험',
-        exclusionText: '● 개인경비\n● 식사 시 음료 및 주류\n● 매너팁',
         inclusionExclusionDocId: null,
         inclusionExclusionDocName: '새로운 포함/불포함 내역',
-        // [추가] 호텔카드 메이커 데이터 초기화
         hotelMakerData: {
             allHotelData: [{ nameKo: `새 호텔 1`, nameEn: "", website: "", image: "", description: "" }],
             currentHotelIndex: 0,
             currentHotelDocumentId: null,
             currentHotelDocumentName: "새 호텔 정보 모음"
+        },
+        itineraryData: {
+            title: "새 여행 일정표",
+            editingTitle: false,
+            days: [
+                { date: dateToYyyyMmDd(new Date()), activities: [], isCollapsed: false, editingDate: false }
+            ]
         }
     };
     createGroupUI(groupId);
     switchTab(groupId);
     showToastMessage(`새 견적 그룹 ${groupId}이(가) 추가되었습니다.`);
 }
-
 function deleteGroup(groupId) {
     if (Object.keys(quoteGroupsData).length <= 1) { showToastMessage('마지막 견적 그룹은 삭제할 수 없습니다.', true); return; }
     if (confirm(`견적 ${groupId}을(를) 삭제하시겠습니까?`)) {
@@ -1021,61 +1140,34 @@ function deleteGroup(groupId) {
         showToastMessage(`견적 그룹 ${groupId}이(가) 삭제되었습니다.`);
     }
 }
-
 function deleteActiveGroup() { if (activeGroupId) { deleteGroup(activeGroupId); } }
-
-/**
- * [수정] 활성 그룹 복사 시, 호텔 카드 데이터도 함께 복사됩니다.
- */
 function copyActiveGroup() {
     if (!activeGroupId) return;
-    
-    // 복사 전 현재 UI 상태를 데이터에 저장
     syncGroupUIToData(activeGroupId);
-
-    // JSON 직렬화/역직렬화를 통해 깊은 복사 수행
     const newGroupData = JSON.parse(JSON.stringify(quoteGroupsData[activeGroupId]));
-    
     groupCounter++;
     newGroupData.id = groupCounter;
-    // 계산기 ID는 고유해야 하므로 재생성
     newGroupData.calculators.forEach(calc => { calc.id = `calc_${Date.now()}_${Math.random()}`; });
-    
     quoteGroupsData[groupCounter] = newGroupData;
-
     createGroupUI(groupCounter);
     switchTab(groupCounter);
     showToastMessage(`견적 그룹 ${activeGroupId}이(가) 복사되어 새 그룹 ${groupCounter}이(가) 생성되었습니다.`);
 }
-
-/**
- * [수정] 탭 전환 시, 이전 그룹의 데이터를 동기화하고 새 그룹의 전체 UI를 다시 그립니다.
- */
 function switchTab(newGroupId) {
-    // 이전 탭의 데이터 동기화
     if (activeGroupId && activeGroupId !== newGroupId) {
         syncGroupUIToData(activeGroupId);
     }
-    
     activeGroupId = String(newGroupId);
-    
-    // 모든 탭의 활성 상태 업데이트
     document.querySelectorAll('.quote-tab').forEach(tab => {
         tab.classList.toggle('active', tab.dataset.groupId == newGroupId);
     });
-
-    // 컨텐츠 영역을 비우고 새 그룹의 UI를 그림
     const contentsContainer = document.getElementById('quoteGroupContentsContainer');
-    contentsContainer.innerHTML = ''; // 이전 그룹 UI 제거
+    contentsContainer.innerHTML = '';
     const groupEl = document.createElement('div');
     groupEl.className = 'calculation-group-content active';
     groupEl.id = `group-content-${newGroupId}`;
     contentsContainer.appendChild(groupEl);
-    
-    // 새 그룹 UI 초기화
     initializeGroup(groupEl, newGroupId);
-
-    setupEnterKeyListenerForForm();
 }
 
 
@@ -1090,63 +1182,58 @@ function createGroupUI(groupId) {
     tabEl.addEventListener('click', e => { if (e.target.tagName !== 'BUTTON') switchTab(groupId); });
     tabEl.querySelector('.close-tab-btn').addEventListener('click', () => deleteGroup(groupId));
 }
-
-/**
- * [수정] 그룹 UI 초기화 시, iframe 대신 호텔 카드 메이커 컨테이너를 생성하고 초기화 함수를 호출합니다.
- */
 function initializeGroup(groupEl, groupId) {
-    groupEl.innerHTML = `<div class="flex gap-6"> 
-        <div class="w-1/2 flex flex-col"> 
+    groupEl.innerHTML = `<div class="flex flex-col xl:flex-row gap-6"> 
+        <div class="xl:w-1/2 flex flex-col"> 
             <div id="calculators-wrapper-${groupId}" class="space-y-4"></div> 
             <div class="mt-4 flex gap-2">
                 <button type="button" class="btn btn-outline add-calculator-btn w-1/2"><i class="fas fa-plus mr-2"></i>견적 계산 추가</button>
-                <button type="button" class="btn btn-yellow-outline copy-last-calculator-btn w-1/2"><i class="fas fa-copy mr-2"></i>견적복사</button>
+                <button type="button" class="btn btn-outline copy-last-calculator-btn w-1/2"><i class="fas fa-copy mr-2"></i>견적 복사</button>
             </div> 
         </div> 
-        <div class="w-1/2 space-y-6 right-panel-container"> 
-            <section class="p-6 border border-gray-200 rounded-lg bg-gray-50"><div class="flex justify-between items-center mb-4"><h2 class="text-xl font-semibold text-gray-800">항공 스케줄</h2><div class="flex items-center space-x-2"><button type="button" class="btn btn-sm btn-secondary copy-flight-schedule-btn" title="항공 스케줄 HTML 복사"><i class="fas fa-clipboard"></i> 복사</button><button type="button" class="btn btn-sm btn-secondary parse-gds-btn">GDS 파싱</button><button type="button" class="btn btn-sm btn-secondary add-flight-subgroup-btn"><i class="fas fa-plus mr-1"></i> 스케줄 추가</button></div></div><div class="space-y-4 flight-schedule-container"></div></section> 
-            <section class="p-6 border border-gray-200 rounded-lg bg-gray-50"><div class="flex justify-between items-center mb-4"><h2 class="text-xl font-semibold text-gray-800">요금 안내</h2><div class="flex items-center space-x-2"><button type="button" class="btn btn-sm btn-secondary copy-price-info-btn" title="요금 안내 HTML 복사"><i class="fas fa-clipboard"></i> 복사</button><button type="button" class="btn btn-sm btn-secondary add-price-subgroup-btn"><i class="fas fa-plus mr-1"></i> 요금 그룹 추가</button></div></div><div class="space-y-4 price-info-container"></div></section> 
-            <section class="p-6 border border-gray-200 rounded-lg bg-gray-50">
+        <div class="xl:w-1/2 space-y-6 right-panel-container"> 
+            <section class="p-4 sm:p-6 border rounded-lg bg-gray-50/50">
                 <div class="flex justify-between items-center mb-4">
-                    <div class="flex items-center">
-                        <h2 class="text-xl font-semibold text-gray-800">포함/불포함 사항</h2>
-                        <span class="text-sm text-gray-500 ml-2 inclusion-exclusion-doc-name-display"></span>
-                    </div>
+                    <h2 class="text-xl font-semibold">항공 스케줄</h2>
                     <div class="flex items-center space-x-2">
-                        <button type="button" class="btn btn-sm btn-outline load-inclusion-exclusion-db-btn"><i class="fas fa-database mr-1"></i> DB 불러오기</button>
+                        <button type="button" class="btn btn-sm btn-outline copy-flight-schedule-btn" title="HTML 복사"><i class="fas fa-clipboard"></i> 코드 복사</button>
+                        <button type="button" class="btn btn-sm btn-primary parse-gds-btn">GDS</button>
+                        <button type="button" class="btn btn-sm btn-primary add-flight-subgroup-btn"><i class="fas fa-plus"></i> 추가</button>
                     </div>
                 </div>
-                <div class="flex gap-4">
-                    <div class="w-1/2 flex flex-col">
-                        <div class="flex items-center mb-1"><h3 class="font-medium">포함</h3><button type="button" class="ml-2 copy-inclusion-btn inline-copy-btn" title="포함 내역 복사"><i class="far fa-copy"></i></button></div>
-                        <textarea class="w-full flex-grow px-3 py-2 border border-gray-300 rounded-md shadow-sm inclusion-text" rows="5"></textarea>
-                    </div>
-                    <div class="w-1/2 flex flex-col">
-                        <div class="flex items-center mb-1"><h3 class="font-medium">불포함</h3><button type="button" class="ml-2 copy-exclusion-btn inline-copy-btn" title="불포함 내역 복사"><i class="far fa-copy"></i></button></div>
-                        <textarea class="w-full flex-grow px-3 py-2 border border-gray-300 rounded-md shadow-sm exclusion-text" rows="5"></textarea>
+                <div class="space-y-4 flight-schedule-container"></div>
+            </section> 
+            <section class="p-4 sm:p-6 border rounded-lg bg-gray-50/50">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-semibold">요금 안내</h2>
+                    <div class="flex items-center space-x-2">
+                        <button type="button" class="btn btn-sm btn-outline copy-price-info-btn" title="HTML 복사"><i class="fas fa-clipboard"></i> 코드 복사</button>
+                        <button type="button" class="btn btn-sm btn-primary add-price-subgroup-btn"><i class="fas fa-plus"></i> 추가</button>
                     </div>
                 </div>
+                <div class="space-y-4 price-info-container"></div>
             </section> 
-            
-            <section class="p-6 border border-gray-200 rounded-lg bg-gray-50">
-                <h2 class="text-xl font-semibold text-gray-800 mb-4">호텔카드 메이커</h2>
-                <div id="hotel-maker-container-${groupId}"></div>
+            <section class="p-4 sm:p-6 border rounded-lg bg-gray-50/50">
+                <div class="flex justify-between items-center mb-4">
+                    <div class="flex items-center"><h2 class="text-xl font-semibold">포함/불포함</h2><span class="text-sm text-gray-500 ml-2 inclusion-exclusion-doc-name-display"></span></div>
+                    <button type="button" class="btn btn-sm btn-primary load-inclusion-exclusion-db-btn"><i class="fas fa-database mr-1"></i> DB 불러오기</button>
+                </div>
+                <div class="flex flex-col sm:flex-row gap-4">
+                    <div class="w-full sm:w-1/2"><div class="flex items-center mb-1"><h3 class="font-medium">포함</h3><button type="button" class="ml-2 copy-inclusion-btn inline-copy-btn" title="포함 내역 복사"><i class="far fa-copy"></i></button></div><textarea class="w-full flex-grow px-3 py-2 border rounded-md shadow-sm inclusion-text" rows="5"></textarea></div>
+                    <div class="w-full sm:w-1/2"><div class="flex items-center mb-1"><h3 class="font-medium">불포함</h3><button type="button" class="ml-2 copy-exclusion-btn inline-copy-btn" title="불포함 내역 복사"><i class="far fa-copy"></i></button></div><textarea class="w-full flex-grow px-3 py-2 border rounded-md shadow-sm exclusion-text" rows="5"></textarea></div>
+                </div>
             </section> 
-            
-            <section class="p-6 border border-gray-200 rounded-lg bg-gray-50"><h2 class="text-xl font-semibold text-gray-800 mb-4">상세 일정표</h2><iframe src="./itinerary_planner/index.html" style="width: 100%; height: 800px; border: 1px solid #ccc; border-radius: 0.25rem;" allow="clipboard-write"></iframe></section> 
+            <section class="p-4 sm:p-6 border rounded-lg bg-gray-50/50"><h2 class="text-xl font-semibold mb-4">호텔카드 메이커</h2><div id="hotel-maker-container-${groupId}"></div></section> 
+            <section class="p-4 sm:p-6 border rounded-lg bg-gray-50/50"><div id="itinerary-planner-container-${groupId}"></div></section> 
         </div> 
     </div>`;
 
     const groupData = quoteGroupsData[groupId];
     if (!groupData) return;
-    
-    // 계산기 UI 초기화
     const calculatorsWrapper = groupEl.querySelector(`#calculators-wrapper-${groupId}`);
     if (groupData.calculators && groupData.calculators.length > 0) {
         groupData.calculators.forEach(calcData => createCalculatorInstance(calculatorsWrapper, groupId, calcData));
     }
-
-    // 오른쪽 패널 UI 초기화
     const flightContainer = groupEl.querySelector('.flight-schedule-container');
     if (groupData.flightSchedule) { groupData.flightSchedule.forEach(subgroup => createFlightSubgroup(flightContainer, subgroup, groupId)); }
     const priceContainer = groupEl.querySelector('.price-info-container');
@@ -1156,24 +1243,21 @@ function initializeGroup(groupEl, groupId) {
     if (inclusionTextEl) inclusionTextEl.value = groupData.inclusionText || '';
     if (exclusionTextEl) exclusionTextEl.value = groupData.exclusionText || '';
     groupEl.querySelector('.inclusion-exclusion-doc-name-display').textContent = `(${groupData.inclusionExclusionDocName || '새 내역'})`;
-    
-    // 이벤트 리스너 바인딩
     groupEl.querySelector('.add-calculator-btn').addEventListener('click', () => {
-        syncGroupUIToData(groupId); // 추가 전 상태 저장
+        syncGroupUIToData(groupId);
         const newCalcData = { id: `calc_${Date.now()}`, pnr: '', tableHTML: null };
         groupData.calculators.push(newCalcData);
-        createCalculatorInstance(calculatorsWrapper, groupId, newCalcData); // 새 인스턴스만 추가
+        createCalculatorInstance(calculatorsWrapper, groupId, newCalcData);
     });
     groupEl.querySelector('.copy-last-calculator-btn').addEventListener('click', () => {
         if (!groupData || groupData.calculators.length === 0) { showToastMessage('복사할 견적 계산이 없습니다.', true); return; }
-        syncGroupUIToData(groupId); // 복사 전 상태 저장
+        syncGroupUIToData(groupId);
         const lastCalculatorData = groupData.calculators[groupData.calculators.length - 1];
         const newCalcData = JSON.parse(JSON.stringify(lastCalculatorData));
-        newCalcData.id = `calc_${Date.now()}_${Math.random()}`; // 새 ID 부여
+        newCalcData.id = `calc_${Date.now()}_${Math.random()}`;
         groupData.calculators.push(newCalcData);
-        createCalculatorInstance(calculatorsWrapper, groupId, newCalcData); // 복사된 인스턴스 추가
+        createCalculatorInstance(calculatorsWrapper, groupId, newCalcData);
     });
-    // ... 기타 이벤트 리스너 바인딩 ...
     inclusionTextEl.addEventListener('input', e => { groupData.inclusionText = e.target.value; });
     exclusionTextEl.addEventListener('input', e => { groupData.exclusionText = e.target.value; });
     groupEl.querySelector('.copy-inclusion-btn').addEventListener('click', () => { copyToClipboard(inclusionTextEl.value, '포함 내역'); });
@@ -1189,8 +1273,7 @@ function initializeGroup(groupEl, groupId) {
     groupEl.querySelector('.add-price-subgroup-btn').addEventListener('click', () => {
         if (!groupData.priceInfo) groupData.priceInfo = [];
         const sg = {
-            id: `price_sub_${Date.now()}`,
-            title: "",
+            id: `price_sub_${Date.now()}`, title: "",
             rows: [{ item: "성인요금", price: 0, count: 1, remarks: "" }, { item: "소아요금", price: 0, count: 1, remarks: "만2~12세미만" }, { item: "유아요금", price: 0, count: 1, remarks: "만24개월미만" }]
         };
         groupData.priceInfo.push(sg);
@@ -1198,18 +1281,18 @@ function initializeGroup(groupEl, groupId) {
     });
     groupEl.querySelector('.copy-flight-schedule-btn').addEventListener('click', () => copyHtmlToClipboard(generateFlightScheduleInlineHtml(groupData.flightSchedule)));
     groupEl.querySelector('.copy-price-info-btn').addEventListener('click', () => copyHtmlToClipboard(generatePriceInfoInlineHtml(groupData.priceInfo)));
-
-    // [추가] 호텔카드 메이커 UI 초기화 호출
     const hotelMakerContainer = groupEl.querySelector(`#hotel-maker-container-${groupId}`);
     if (hotelMakerContainer) {
         initializeHotelMakerForGroup(hotelMakerContainer, groupId);
     }
+    const itineraryContainer = groupEl.querySelector(`#itinerary-planner-container-${groupId}`);
+    if (itineraryContainer) {
+        initializeItineraryPlannerForGroup(itineraryContainer, groupId);
+    }
 }
-
-// --- 계산기 관련 함수들 (기존 코드와 동일) ---
 function buildCalculatorDOM(calcContainer) {
     const content = document.createElement('div');
-    content.innerHTML = `<div class="split-container"><div class="pnr-pane"><label class="label-text font-semibold mb-2">PNR 정보</label><textarea class="w-full flex-grow px-3 py-2 border border-gray-300 rounded-md shadow-sm" placeholder="PNR 정보를 여기에 붙여넣으세요."></textarea></div><div class="resizer-handle"></div><div class="quote-pane"><div class="table-container"><table class="quote-table"><thead><tr class="header-row"><th><button type="button" class="btn btn-sm btn-primary add-person-type-btn"><i class="fas fa-plus"></i> 항목 추가</button></th></tr><tr class="count-row"><th></th></tr></thead><tbody></tbody><tfoot></tfoot></table></div></div></div>`;
+    content.innerHTML = `<div class="split-container"><div class="pnr-pane"><label class="label-text font-semibold mb-2">PNR 정보</label><textarea class="w-full flex-grow px-3 py-2 border rounded-md shadow-sm" placeholder="PNR 정보를 여기에 붙여넣으세요."></textarea></div><div class="resizer-handle"></div><div class="quote-pane"><div class="table-container"><table class="quote-table"><thead><tr class="header-row"><th><button type="button" class="btn btn-sm btn-primary add-person-type-btn"><i class="fas fa-plus"></i></button></th></tr><tr class="count-row"><th></th></tr></thead><tbody></tbody><tfoot></tfoot></table></div></div></div>`;
     const calculatorElement = content.firstElementChild;
     calcContainer.appendChild(calculatorElement);
     calculatorElement.querySelector('.add-person-type-btn').addEventListener('click', () => addPersonTypeColumn(calculatorElement, '아동', 1));
@@ -1224,12 +1307,10 @@ function buildCalculatorDOM(calcContainer) {
         } else { labelCell.innerHTML = `<span>${def.label}</span>`; }
     });
 }
-
 function createCalculatorInstance(wrapper, groupId, calcData) {
     const instanceContainer = document.createElement('div');
     instanceContainer.className = 'calculator-instance border p-4 rounded-lg relative bg-white shadow';
     instanceContainer.dataset.calculatorId = calcData.id;
-
     const deleteBtn = document.createElement('button');
     deleteBtn.type = 'button';
     deleteBtn.className = 'absolute top-2 right-2 text-gray-400 hover:text-red-600 z-10';
@@ -1246,7 +1327,6 @@ function createCalculatorInstance(wrapper, groupId, calcData) {
         }
     });
     instanceContainer.appendChild(deleteBtn);
-
     wrapper.appendChild(instanceContainer);
     buildCalculatorDOM(instanceContainer);
     if (calcData && calcData.tableHTML) {
@@ -1255,7 +1335,6 @@ function createCalculatorInstance(wrapper, groupId, calcData) {
         addPersonTypeColumn(instanceContainer, '성인', 1);
     }
 }
-
 function restoreCalculatorState(instanceContainer, calcData) {
     if (!instanceContainer || !calcData) return;
     const pnrTextarea = instanceContainer.querySelector('.pnr-pane textarea');
@@ -1265,7 +1344,6 @@ function restoreCalculatorState(instanceContainer, calcData) {
     else { addPersonTypeColumn(instanceContainer, '성인', 1); }
     calculateAll(instanceContainer);
 }
-
 function rebindCalculatorEventListeners(calcContainer) {
     const calcAll = () => calculateAll(calcContainer);
     calcContainer.querySelectorAll('input').forEach(el => { el.addEventListener('input', calcAll); });
@@ -1308,7 +1386,6 @@ function rebindCalculatorEventListeners(calcContainer) {
     });
     updateSummaryRow(calcContainer);
 }
-
 function makeEditable(element, inputType, onBlurCallback) {
     if (!element || element.querySelector('input')) return;
     const clickHandler = () => {
@@ -1342,7 +1419,6 @@ function makeEditable(element, inputType, onBlurCallback) {
     };
     element.addEventListener('click', clickHandler);
 }
-
 function getCellContent(rowId, colIndex, type) {
     const name = `group[${colIndex}][${rowId}]`;
     switch (type) {
@@ -1353,7 +1429,6 @@ function getCellContent(rowId, colIndex, type) {
         default: return '';
     }
 }
-
 function setupColumnEventListeners(calcContainer, colIndex, headerCell, countCell) {
     if (!headerCell || !countCell) return;
     const calcAllForGroup = () => calculateAll(calcContainer);
@@ -1376,7 +1451,6 @@ function setupColumnEventListeners(calcContainer, colIndex, headerCell, countCel
         }
     });
 }
-
 function addPersonTypeColumn(calcContainer, typeName = '성인', count = 1) {
     const table = calcContainer.querySelector('.quote-table');
     if (!table) return;
@@ -1397,7 +1471,6 @@ function addPersonTypeColumn(calcContainer, typeName = '성인', count = 1) {
     setupColumnEventListeners(calcContainer, colIndex, headerCell, countCell);
     calculateAll(calcContainer);
 }
-
 function addDynamicCostRow(calcContainer, label = '신규 항목') {
     const table = calcContainer.querySelector('.quote-table');
     if (!table) return;
@@ -1414,7 +1487,6 @@ function addDynamicCostRow(calcContainer, label = '신규 항목') {
     rebindCalculatorEventListeners(calcContainer);
     calculateAll(calcContainer);
 }
-
 function updateSummaryRow(calcContainer) {
     const table = calcContainer.querySelector('.quote-table');
     if (!table) return;
@@ -1431,7 +1503,6 @@ function updateSummaryRow(calcContainer) {
     summaryRow.cells[0].style.borderTop = "2px solid #a0aec0";
     summaryCell.style.borderTop = "2px solid #a0aec0";
 }
-
 function calculateAll(calcContainer) {
     if (!calcContainer) return;
     const table = calcContainer.querySelector('.quote-table');
@@ -1461,7 +1532,6 @@ function calculateAll(calcContainer) {
     summarySection.querySelector('.totalProfit').textContent = formatCurrency(grandTotalProfit);
     summarySection.querySelector('.totalProfitMargin').textContent = formatPercentage(grandTotalProfitMargin);
 }
-
 function updateCalculatedCell(table, colIndex, rowId, value) {
     const row = table.querySelector(`tbody tr[data-row-id="${rowId}"]`);
     if (row && row.cells[colIndex]) {
@@ -1470,75 +1540,85 @@ function updateCalculatedCell(table, colIndex, rowId, value) {
     }
 }
 
-// --- 오른쪽 패널 관련 함수들 (기존 코드와 동일) ---
+// --- 오른쪽 패널 관련 함수들 ---
 function createFlightSubgroup(container, subgroupData, groupId) {
     const subGroupDiv = document.createElement('div');
     subGroupDiv.className = 'dynamic-section flight-schedule-subgroup';
     subGroupDiv.id = subgroupData.id;
-    subGroupDiv.innerHTML = `<button type="button" class="delete-dynamic-section-btn" title="이 스케줄 그룹 삭제"><i class="fas fa-trash-alt"></i></button><div class="mb-2"><input type="text" class="w-full flex-grow px-3 py-2 border border-gray-300 rounded-md shadow-sm" placeholder="항공사 (예: 이스타항공)" value="${subgroupData.title || ''}"></div><div class="overflow-x-auto"><table class="flight-schedule-table"><thead><tr><th>편명</th><th>출발일</th><th>출발지</th><th>출발시간</th><th>도착일</th><th>도착지</th><th>도착시간</th><th style="width: 50px;">삭제</th></tr></thead><tbody></tbody></table></div><div class="add-row-btn-container pt-2"><button type="button" class="add-row-btn"><i class="fas fa-plus mr-1"></i> 행 추가</button></div>`;
+    subGroupDiv.innerHTML = `<button type="button" class="delete-dynamic-section-btn" title="삭제"><i class="fas fa-trash-alt"></i></button><div class="mb-2"><input type="text" class="w-full flex-grow px-3 py-2 border rounded-md shadow-sm" placeholder="항공사" value="${subgroupData.title || ''}"></div><div class="overflow-x-auto"><table class="flight-schedule-table"><thead><tr><th>편명</th><th>출발일</th><th>출발지</th><th>출발시간</th><th>도착일</th><th>도착지</th><th>도착시간</th><th style="width: 50px;"></th></tr></thead><tbody></tbody></table></div><div class="add-row-btn-container pt-2"><button type="button" class="add-row-btn"><i class="fas fa-plus mr-1"></i></button></div>`;
     const tbody = subGroupDiv.querySelector('tbody');
     subgroupData.rows.forEach(rowData => addFlightRow(tbody, rowData, subgroupData));
-    subGroupDiv.querySelector('.delete-dynamic-section-btn').addEventListener('click', () => { if (confirm('이 항공 스케줄 그룹을 삭제하시겠습니까?')) { quoteGroupsData[groupId].flightSchedule = quoteGroupsData[groupId].flightSchedule.filter(g => g.id !== subgroupData.id); subGroupDiv.remove(); } });
+    subGroupDiv.querySelector('.delete-dynamic-section-btn').addEventListener('click', () => { if (confirm('삭제?')) { quoteGroupsData[groupId].flightSchedule = quoteGroupsData[groupId].flightSchedule.filter(g => g.id !== subgroupData.id); subGroupDiv.remove(); } });
     subGroupDiv.querySelector('input[type="text"]').addEventListener('input', e => { subgroupData.title = e.target.value; });
     subGroupDiv.querySelector('.add-row-btn').addEventListener('click', () => { const newRowData = {}; subgroupData.rows.push(newRowData); addFlightRow(tbody, newRowData, subgroupData); });
     container.appendChild(subGroupDiv);
 }
-
 function addFlightRow(tbody, rowData, subgroupData) {
     const tr = document.createElement('tr');
     const fields = [{ key: 'flightNum', placeholder: 'ZE561' }, { key: 'depDate', placeholder: '07/09' }, { key: 'originCity', placeholder: 'ICN' }, { key: 'depTime', placeholder: '20:55' }, { key: 'arrDate', placeholder: '07/09' }, { key: 'destCity', placeholder: 'CXR' }, { key: 'arrTime', placeholder: '23:55' }];
-    tr.innerHTML = fields.map(f => `<td><input type="text" class="flight-schedule-input" data-field="${f.key}" value="${rowData[f.key] || ''}" placeholder="${f.placeholder}"></td>`).join('') + `<td class="text-center"><button type="button" class="delete-row-btn" title="이 행 삭제"><i class="fas fa-trash"></i></button></td>`;
+    tr.innerHTML = fields.map(f => `<td><input type="text" class="flight-schedule-input" data-field="${f.key}" value="${rowData[f.key] || ''}" placeholder="${f.placeholder}"></td>`).join('') + `<td class="text-center"><button type="button" class="delete-row-btn" title="삭제"><i class="fas fa-trash"></i></button></td>`;
     tbody.appendChild(tr);
     tr.querySelectorAll('input').forEach(input => input.addEventListener('input', e => { const field = e.target.dataset.field; rowData[field] = e.target.value; }));
     tr.querySelector('.delete-row-btn').addEventListener('click', () => { const rowIndex = Array.from(tbody.children).indexOf(tr); subgroupData.rows.splice(rowIndex, 1); tr.remove(); });
 }
-
 function createPriceSubgroup(container, subgroupData, groupId) {
     const subGroupDiv = document.createElement('div');
     subGroupDiv.className = 'dynamic-section price-subgroup';
     subGroupDiv.id = subgroupData.id;
-    subGroupDiv.innerHTML = `<button type="button" class="delete-dynamic-section-btn" title="이 요금 그룹 삭제"><i class="fas fa-trash-alt"></i></button><input type="text" class="w-full flex-grow px-3 py-2 border border-gray-300 rounded-md shadow-sm" placeholder="견적설명 (예: 인천출발, A객실)" value="${subgroupData.title || ''}"><table class="price-table"><thead><tr><th style="width:25%">내역</th><th>1인당금액</th><th>인원</th><th>총금액</th><th style="width:30%">비고</th><th style="width:50px">삭제</th></tr></thead><tbody></tbody><tfoot><tr><td colspan="3" class="text-right font-bold pr-2">총 합계</td><td class="grand-total">0</td><td colspan="2"><button type="button" class="add-row-btn"><i class="fas fa-plus mr-1"></i>행 추가</button></td></tr></tfoot></table>`;
+    subGroupDiv.innerHTML = `<button type="button" class="delete-dynamic-section-btn" title="삭제"><i class="fas fa-trash-alt"></i></button><input type="text" class="w-full flex-grow px-3 py-2 border rounded-md shadow-sm mb-2" placeholder="견적설명" value="${subgroupData.title || ''}"><table class="price-table"><thead><tr><th style="width:25%">내역</th><th>1인당금액</th><th>인원</th><th>총금액</th><th style="width:30%">비고</th><th style="width:50px"></th></tr></thead><tbody></tbody><tfoot><tr><td colspan="3" class="text-right font-bold pr-2">총 합계</td><td class="grand-total">0</td><td colspan="2"><button type="button" class="add-row-btn"><i class="fas fa-plus mr-1"></i></button></td></tr></tfoot></table>`;
     const tbody = subGroupDiv.querySelector('tbody');
     subgroupData.rows.forEach(rowData => addPriceRow(tbody, rowData, subgroupData, subGroupDiv, groupId));
     updateGrandTotal(subGroupDiv, groupId);
-    subGroupDiv.querySelector('.delete-dynamic-section-btn').addEventListener('click', () => { if (confirm('이 요금 그룹을 삭제하시겠습니까?')) { quoteGroupsData[groupId].priceInfo = quoteGroupsData[groupId].priceInfo.filter(g => g.id !== subgroupData.id); subGroupDiv.remove(); } });
+    subGroupDiv.querySelector('.delete-dynamic-section-btn').addEventListener('click', () => { if (confirm('삭제?')) { quoteGroupsData[groupId].priceInfo = quoteGroupsData[groupId].priceInfo.filter(g => g.id !== subgroupData.id); subGroupDiv.remove(); } });
     subGroupDiv.querySelector('input.w-full').addEventListener('input', e => { subgroupData.title = e.target.value; });
     subGroupDiv.querySelector('.add-row-btn').addEventListener('click', () => { const newRow = { item: "", price: 0, count: 1, remarks: "" }; subgroupData.rows.push(newRow); addPriceRow(tbody, newRow, subgroupData, subGroupDiv, groupId); });
     container.appendChild(subGroupDiv);
 }
-
 function addPriceRow(tbody, rowData, subgroupData, subGroupDiv, groupId) {
     const tr = document.createElement('tr');
     const fields = [{ key: 'item', align: 'center' }, { key: 'price', align: 'center' }, { key: 'count', align: 'center' }, { key: 'total', align: 'center', readonly: true }, { key: 'remarks', align: 'center' }];
-    tr.innerHTML = fields.map(f => `<td><input type="text" class="text-${f.align}" data-field="${f.key}" value="${rowData[f.key] || ''}" ${f.readonly ? 'readonly' : ''}></td>`).join('') + `<td><button type="button" class="delete-row-btn"><i class="fas fa-trash"></i></button></td>`;
+    tr.innerHTML = fields.map(f => `<td><input type="text" class="text-${f.align}" data-field="${f.key}" value="${rowData[f.key] !== undefined ? (f.key === 'price' || f.key === 'total' ? (parseFloat(String(rowData[f.key]).replace(/,/g, '')) || 0).toLocaleString() : rowData[f.key]) : ''}" ${f.readonly ? 'readonly' : ''}></td>`).join('') + `<td><button type="button" class="delete-row-btn"><i class="fas fa-trash"></i></button></td>`;
     tbody.appendChild(tr);
     const updateRow = () => {
-        const price = parseFloat(rowData.price) || 0;
-        const count = parseInt(rowData.count) || 0;
+        const price = parseFloat(String(rowData.price).replace(/,/g, '')) || 0;
+        const count = parseInt(String(rowData.count).replace(/,/g, '')) || 0;
         const total = price * count;
         rowData.total = total;
         const totalInput = tr.querySelector('[data-field="total"]');
         if (totalInput) totalInput.value = total.toLocaleString();
         updateGrandTotal(subGroupDiv, groupId);
     };
-    tr.querySelectorAll('input:not([readonly])').forEach(input => input.addEventListener('input', e => { rowData[e.target.dataset.field] = e.target.value.replace(/,/g, ''); updateRow(); }));
+    tr.querySelectorAll('input:not([readonly])').forEach(input => {
+        input.addEventListener('input', e => {
+            let value = e.target.value;
+            const field = e.target.dataset.field;
+            if (field === 'price' || field === 'count') {
+                value = value.replace(/,/g, '');
+            }
+            rowData[field] = value;
+            updateRow();
+        });
+        if (input.dataset.field === 'price' || input.dataset.field === 'count') {
+            input.addEventListener('blur', e => {
+                const numValue = parseFloat(e.target.value.replace(/,/g, '')) || 0;
+                e.target.value = numValue.toLocaleString();
+            });
+        }
+    });
     tr.querySelector('.delete-row-btn').addEventListener('click', () => { if (subgroupData.rows.length > 1) { const rowIndex = Array.from(tbody.children).indexOf(tr); subgroupData.rows.splice(rowIndex, 1); tr.remove(); updateGrandTotal(subGroupDiv, groupId); } else { showToastMessage('최소 한 개의 요금 항목은 유지해야 합니다.', true); } });
     updateRow();
 }
-
 function updateGrandTotal(subGroupDiv, groupId) {
     const subgroupData = quoteGroupsData[groupId]?.priceInfo.find(g => g.id === subGroupDiv.id);
     if (!subgroupData) return;
-    const grandTotal = subgroupData.rows.reduce((sum, row) => (sum + (parseFloat(row.price) || 0) * (parseInt(row.count) || 0)), 0);
+    const grandTotal = subgroupData.rows.reduce((sum, row) => (sum + (parseFloat(String(row.price).replace(/,/g, '')) || 0) * (parseInt(String(row.count).replace(/,/g, '')) || 0)), 0);
     subGroupDiv.querySelector('.grand-total').textContent = grandTotal.toLocaleString();
 }
-
 function generateInclusionExclusionInlineHtml(inclusionText, exclusionText) { 
     const i = inclusionText ? inclusionText.replace(/\n/g, '<br>') : ''; 
     const e = exclusionText ? exclusionText.replace(/\n/g, '<br>') : ''; 
     return `<table style="width:100%;border-collapse:collapse;font-family:sans-serif;font-size:12px"><tbody><tr><td style="vertical-align:top;width:50%;padding-right:10px"><h3 style="font-size:16px;font-weight:600;margin-bottom:8px">포함</h3><div style="padding:8px;border:1px solid #eee;min-height:100px">${i}</div></td><td style="vertical-align:top;width:50%;padding-left:10px"><h3 style="font-size:16px;font-weight:600;margin-bottom:8px">불포함</h3><div style="padding:8px;border:1px solid #eee;min-height:100px">${e}</div></td></tr></tbody></table>`; 
 }
-
 function generatePriceInfoInlineHtml(priceData) {
     let html = '';
     if (priceData) {
@@ -1546,13 +1626,12 @@ function generatePriceInfoInlineHtml(priceData) {
             if (subgroup.title) { html += `<h4 style="font-size:14px;font-weight:600;margin-bottom:8px">${subgroup.title}</h4>`; }
             html += `<table style="width:100%;border-collapse:collapse;font-family:sans-serif;font-size:12px;margin-bottom:16px"><thead><tr style="background-color:#f9fafb"><th style="border:1px solid #ddd;padding:8px;text-align:center">내역</th><th style="border:1px solid #ddd;padding:8px;text-align:center">1인당 금액</th><th style="border:1px solid #ddd;padding:8px;text-align:center">인원</th><th style="border:1px solid #ddd;padding:8px;text-align:center">총 금액</th><th style="border:1px solid #ddd;padding:8px;text-align:center">비고</th></tr></thead><tbody>`;
             let grandTotal = 0;
-            subgroup.rows.forEach(row => { const p = parseFloat(row.price) || 0; const c = parseInt(row.count) || 0; const t = p * c; grandTotal += t; html += `<tr><td style="border:1px solid #ddd;padding:8px">${row.item || ''}</td><td style="border:1px solid #ddd;padding:8px;text-align:right">${p.toLocaleString()}</td><td style="border:1px solid #ddd;padding:8px;text-align:center">${c}</td><td style="border:1px solid #ddd;padding:8px;text-align:right">${t.toLocaleString()}</td><td style="border:1px solid #ddd;padding:8px">${row.remarks || ''}</td></tr>`; });
+            subgroup.rows.forEach(row => { const p = parseFloat(String(row.price).replace(/,/g, '')) || 0; const c = parseInt(String(row.count).replace(/,/g, '')) || 0; const t = p * c; grandTotal += t; html += `<tr><td style="border:1px solid #ddd;padding:8px">${row.item || ''}</td><td style="border:1px solid #ddd;padding:8px;text-align:right">${p.toLocaleString()}</td><td style="border:1px solid #ddd;padding:8px;text-align:center">${c}</td><td style="border:1px solid #ddd;padding:8px;text-align:right">${t.toLocaleString()}</td><td style="border:1px solid #ddd;padding:8px">${row.remarks || ''}</td></tr>`; });
             html += `</tbody><tfoot><tr style="font-weight:bold"><td colspan="3" style="border:1px solid #ddd;padding:8px;text-align:right">총 합계</td><td style="border:1px solid #ddd;padding:8px;text-align:right">${grandTotal.toLocaleString()}</td><td style="border:1px solid #ddd;padding:8px"></td></tr></tfoot></table>`;
         });
     }
     return html;
 }
-
 function generateFlightScheduleInlineHtml(flightData) { 
     let html = ''; 
     if(flightData) {
@@ -1565,42 +1644,9 @@ function generateFlightScheduleInlineHtml(flightData) {
     return html; 
 }
 
-function setupEnterKeyListenerForForm() {
-    const form = document.getElementById('quoteForm');
-    if (!form) return;
-    const focusableElements = form.querySelectorAll('input, textarea, button:not([type="submit"]):not([type="reset"]), select');
-    focusableElements.forEach((element, index) => {
-        element.removeEventListener('keydown', handleEnterKey);
-        element.addEventListener('keydown', handleEnterKey);
-    });
-}
-
-function handleEnterKey(e) {
-    if (e.key === 'Enter') {
-        if (e.target.tagName === 'TEXTAREA') { return; }
-        e.preventDefault();
-        const formElements = Array.from(document.getElementById('quoteForm').querySelectorAll('input, textarea, button:not([type="submit"]):not([type="reset"]), select'));
-        const currentIndex = formElements.indexOf(e.target);
-        let nextIndex = currentIndex + 1;
-        let nextElement = formElements[nextIndex];
-        while (nextElement && (nextElement.disabled || nextElement.readOnly || nextElement.offsetParent === null)) {
-            nextIndex++;
-            nextElement = formElements[nextIndex];
-        }
-        if (nextElement) {
-            nextElement.focus();
-            if (nextElement.tagName === 'INPUT' || nextElement.tagName === 'TEXTAREA') { nextElement.select(); }
-        } else { e.target.blur(); }
-    }
-}
-
-
 // =======================================================================
-// 6. 시스템 시작 (DOM 로드 후 실행)
+// 7. 시스템 시작 (DOM 로드 후 실행)
 // =======================================================================
-/**
- * [수정] 저장된 상태 복원 시, 호텔 카드 메이커 데이터가 없는 구버전 파일을 위해 기본값을 설정합니다.
- */
 function restoreState(data) {
     document.getElementById('customerInfoContainer').innerHTML = '';
     document.getElementById('quoteGroupTabs').innerHTML = '';
@@ -1608,7 +1654,6 @@ function restoreState(data) {
     
     quoteGroupsData = data.quoteGroupsData || {};
 
-    // [추가] 구버전 파일 호환성을 위해 hotelMakerData가 없으면 추가
     Object.values(quoteGroupsData).forEach(group => {
         if (!group.hotelMakerData) {
             group.hotelMakerData = {
@@ -1616,6 +1661,13 @@ function restoreState(data) {
                 currentHotelIndex: 0,
                 currentHotelDocumentId: null,
                 currentHotelDocumentName: "새 호텔 정보 모음"
+            };
+        }
+        if (!group.itineraryData) {
+             group.itineraryData = {
+                title: "새 여행 일정표",
+                editingTitle: false,
+                days: [{ date: dateToYyyyMmDd(new Date()), activities: [], isCollapsed: false, editingDate: false }]
             };
         }
     });
@@ -1634,112 +1686,58 @@ function restoreState(data) {
     else { 
         addNewGroup(); 
     }
-    setupEnterKeyListenerForForm();
 }
-
 function initializeNewSession() {
     createCustomerCard();
     addNewGroup();
-    setupEnterKeyListenerForForm();
+    // [수정] 새 세션 시작 시 메모장에 기본 텍스트를 설정합니다.
+    document.getElementById('memoText').value = '지원어려울시 업셀링 요청';
 }
-
-document.addEventListener('DOMContentLoaded', () => {
-    initDB();
-
-    recentFilesModal = document.getElementById('recentFilesModal');
-    recentFileSearchInput = document.getElementById('recentFileSearchInput');
-    recentFileListUl = document.getElementById('recentFileList');
-    loadingRecentFileListMsg = document.getElementById('loadingRecentFileListMsg');
-    cancelRecentFilesModalButton = document.getElementById('cancelRecentFilesModalButton');
-    closeRecentFilesModalButton = document.getElementById('closeRecentFilesModalButton');
-
-    const urlParams = new URLSearchParams(window.location.search);
-    const loadDataKey = urlParams.get('loadDataKey');
-    
-    if (loadDataKey) {
-        const restoredDataJSON = sessionStorage.getItem(loadDataKey);
-        sessionStorage.removeItem(loadDataKey);
-
-        const newUrl = new URL(window.location.href);
-        newUrl.searchParams.delete('loadDataKey');
-        history.replaceState({}, '', newUrl);
-
-        if (restoredDataJSON) {
-            try {
-                const restoredData = JSON.parse(restoredDataJSON);
-                restoreState(restoredData);
-            } catch(e) {
-                console.error("세션에서 불러온 데이터를 파싱하는 데 실패했습니다.", e);
-                initializeNewSession();
-            }
-        } else {
-            initializeNewSession();
-        }
-    } else {
-        const restoredDataScript = document.getElementById('restored-data');
-        let restoredData = null;
-        if (restoredDataScript && restoredDataScript.textContent.trim()) {
-            try { restoredData = JSON.parse(restoredDataScript.textContent); }
-            catch (e) { console.error("저장된 데이터를 파싱하는 데 실패했습니다.", e); restoredData = null; }
-        }
-        if (restoredData) { 
-            restoreState(restoredData); 
-        } else { 
-            initializeNewSession(); 
-        }
-    }
-
-    // 전역 이벤트 리스너 설정
+function setupGlobalEventListeners() {
     document.getElementById('addCustomerBtn').addEventListener('click', () => createCustomerCard());
     document.getElementById('newGroupBtn').addEventListener('click', addNewGroup);
     document.getElementById('copyGroupBtn').addEventListener('click', copyActiveGroup);
     document.getElementById('deleteGroupBtn').addEventListener('click', deleteActiveGroup);
-    document.getElementById('newWindowBtn').addEventListener('click', () => {
-        window.open(window.location.href, '_blank');
-    });
+    document.getElementById('newWindowBtn').addEventListener('click', () => window.open(window.location.href, '_blank'));
     document.getElementById('saveBtn').addEventListener('click', (event) => saveFile(false, event.currentTarget));
     document.getElementById('saveAsBtn').addEventListener('click', (event) => saveFile(true, event.currentTarget));
     const loadFileLabel = document.querySelector('label[for="loadFile"]');
     if (loadFileLabel) { loadFileLabel.addEventListener('click', (event) => { event.preventDefault(); loadFile(); }); }
-    
-    const quoteForm = document.getElementById('quoteForm');
-    if (quoteForm.querySelector('button[type="reset"]')) {
-        quoteForm.addEventListener('reset', (e) => { 
-            e.preventDefault(); 
-            if (confirm("작성중인 모든 내용을 삭제하고 새로 시작하시겠습니까?")) { 
-                window.location.reload(); 
-            } 
-        });
-    }
-
     document.getElementById('copyMemoBtn')?.addEventListener('click', () => {
         const memoTextarea = document.getElementById('memoText');
-        if (memoTextarea) {
-            copyToClipboard(memoTextarea.value, '메모');
-        }
+        if (memoTextarea) { copyToClipboard(memoTextarea.value, '메모'); }
     });
-
     document.getElementById('closeLoadInclusionsModalBtn')?.addEventListener('click', () => document.getElementById('loadInclusionsModal').classList.add('hidden'));
     document.getElementById('cancelLoadInclusionsModalBtn')?.addEventListener('click', () => document.getElementById('loadInclusionsModal').classList.add('hidden'));
     document.getElementById('loadMemoFromDbBtn')?.addEventListener('click', openLoadMemoModal);
     document.getElementById('closeLoadMemoModalBtn')?.addEventListener('click', () => document.getElementById('loadMemoModal').classList.add('hidden'));
     document.getElementById('cancelLoadMemoModalBtn')?.addEventListener('click', () => document.getElementById('loadMemoModal').classList.add('hidden'));
-    
     const recentFilesBtn = document.getElementById('recentFilesBtn');
     if (recentFilesBtn) { recentFilesBtn.addEventListener('click', openRecentFilesModal); }
     if (cancelRecentFilesModalButton) { cancelRecentFilesModalButton.addEventListener('click', () => { if (recentFilesModal) recentFilesModal.classList.add('hidden'); }); }
     if (closeRecentFilesModalButton) { closeRecentFilesModalButton.addEventListener('click', () => { if (recentFilesModal) recentFilesModal.classList.add('hidden'); }); }
-    if (recentFileSearchInput) { recentFileSearchInput.addEventListener('input', () => { /* openRecentFilesModal에서 oninput을 설정하므로 여기서는 생략 */ }); }
 
-    // 리사이저 핸들 이벤트
+    // 메인 HTML에 있는 일정표 모달 이벤트 리스너
+    const ipActivityForm = document.getElementById('ipActivityForm');
+    if (ipActivityForm) {
+        ipActivityForm.addEventListener('submit', ip_handleActivityFormSubmit);
+    }
+    const ipCancelActivityBtn = document.getElementById('ipCancelActivityButton');
+    if (ipCancelActivityBtn) {
+        ipCancelActivityBtn.addEventListener('click', () => document.getElementById('ipActivityModal').classList.add('hidden'));
+    }
+    const ipCancelDeleteBtn = document.getElementById('ipCancelDeleteDayButton');
+    if (ipCancelDeleteBtn) {
+        ipCancelDeleteBtn.addEventListener('click', () => document.getElementById('ipConfirmDeleteDayModal').classList.add('hidden'));
+    }
+}
+function setupKeydownListeners() {
     let isResizing = false;
     let pnrPaneToResize = null;
     let splitContainerToResize = null;
     document.addEventListener('mousedown', (e) => { if (e.target.matches('.resizer-handle')) { isResizing = true; splitContainerToResize = e.target.closest('.split-container'); if (!splitContainerToResize) return; pnrPaneToResize = splitContainerToResize.querySelector('.pnr-pane'); if (!pnrPaneToResize) return; e.preventDefault(); document.body.style.cursor = 'col-resize'; } });
     document.addEventListener('mousemove', (e) => { if (!isResizing) return; const rect = splitContainerToResize.getBoundingClientRect(); let newWidth = e.clientX - rect.left; if (newWidth < 150) newWidth = 150; if (newWidth > rect.width - 350) newWidth = rect.width - 350; pnrPaneToResize.style.width = newWidth + 'px'; });
     document.addEventListener('mouseup', () => { if (isResizing) { isResizing = false; pnrPaneToResize = null; splitContainerToResize = null; document.body.style.cursor = 'default'; } });
-
-    // 단축키 이벤트
     document.addEventListener('keydown', (event) => {
         if (!event.shiftKey && !event.ctrlKey && !event.altKey) {
             switch (event.code) {
@@ -1755,4 +1753,42 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     });
+}
+document.addEventListener('DOMContentLoaded', () => {
+    initDB();
+
+    recentFilesModal = document.getElementById('recentFilesModal');
+    recentFileSearchInput = document.getElementById('recentFileSearchInput');
+    recentFileListUl = document.getElementById('recentFileList');
+    loadingRecentFileListMsg = document.getElementById('loadingRecentFileListMsg');
+    cancelRecentFilesModalButton = document.getElementById('cancelRecentFilesModalButton');
+    closeRecentFilesModalButton = document.getElementById('closeRecentFilesModalButton');
+    
+    const urlParams = new URLSearchParams(window.location.search);
+    const loadDataKey = urlParams.get('loadDataKey');
+    
+    if (loadDataKey) {
+        const restoredDataJSON = sessionStorage.getItem(loadDataKey);
+        sessionStorage.removeItem(loadDataKey);
+        const newUrl = new URL(window.location.href);
+        newUrl.searchParams.delete('loadDataKey');
+        history.replaceState({}, '', newUrl);
+        if (restoredDataJSON) {
+            try {
+                const restoredData = JSON.parse(restoredDataJSON);
+                restoreState(restoredData);
+            } catch(e) { console.error("세션 데이터 파싱 실패:", e); initializeNewSession(); }
+        } else { initializeNewSession(); }
+    } else {
+        const restoredDataScript = document.getElementById('restored-data');
+        let restoredData = null;
+        if (restoredDataScript && restoredDataScript.textContent.trim()) {
+            try { restoredData = JSON.parse(restoredDataScript.textContent); }
+            catch (e) { console.error("저장 데이터 파싱 실패:", e); restoredData = null; }
+        }
+        if (restoredData) { restoreState(restoredData); } 
+        else { initializeNewSession(); }
+    }
+    setupGlobalEventListeners();
+    setupKeydownListeners();
 });
