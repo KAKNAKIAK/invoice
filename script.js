@@ -126,10 +126,9 @@ function addFlightsFromParser(parsedFlights) {
 }
 
 // =======================================================================
-// ▼▼▼ 4. 호텔카드 메이커 (Hotel Maker) 통합 코드 ▼▼▼
+// ▼▼▼ 4. 호텔카드 메이커 (Hotel Maker) 통합 코드 (사용자 제공 버전 기반) ▼▼▼
 // =======================================================================
 
-// --- 호텔카드 메이커 전용 Firebase 설정 ---
 const hmFirebaseConfig = {
     apiKey: "AIzaSyDsV5PGKMFdCDKgFfl077-DuaYv6N5kVNs",
     authDomain: "hotelinformation-app.firebaseapp.com",
@@ -142,14 +141,7 @@ const hmFirebaseConfig = {
 const hmFbApp = firebase.initializeApp(hmFirebaseConfig, 'hotelMakerApp');
 const hmDb = firebase.firestore(hmFbApp);
 
-/**
- * 호텔카드 메이커의 전체 UI를 생성하고 이벤트 리스너를 바인딩합니다.
- * 이 함수는 탭이 전환되거나 그룹이 생성될 때 호출되어 해당 그룹에 맞는 호텔카드 메이커를 그립니다.
- * @param {HTMLElement} container - 호텔카드 메이커 UI가 들어갈 부모 요소
- * @param {string} groupId - 현재 활성화된 견적 그룹의 ID
- */
 function initializeHotelMakerForGroup(container, groupId) {
-    // 1. UI HTML 구조 생성
     container.innerHTML = `
         <div class="hm-controls flex flex-wrap gap-2 justify-end mb-4">
             <button id="hm-copyHtmlBtn-${groupId}" class="btn btn-sm btn-outline"><i class="fas fa-copy"></i> 코드 복사</button>
@@ -162,19 +154,18 @@ function initializeHotelMakerForGroup(container, groupId) {
         <div id="hm-hotelEditorForm-${groupId}" class="hm-editor-form">
             <div class="input-card-group bg-white p-4 rounded-lg border border-gray-200">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div class="form-field"><input type="text" id="hm-hotelNameKo-${groupId}" class="input-field" placeholder="호텔명 (한글)"><label for="hm-hotelNameKo-${groupId}">호텔명 (한글)</label></div>
-                    <div class="form-field"><input type="text" id="hm-hotelNameEn-${groupId}" class="input-field" placeholder="호텔명 (영문)"><label for="hm-hotelNameEn-${groupId}">호텔명 (영문)</label></div>
+                    <div class="form-field"><input type="text" id="hm-hotelNameKo-${groupId}" class="input-field" placeholder=" "><label for="hm-hotelNameKo-${groupId}">호텔명 (한글)</label></div>
+                    <div class="form-field"><input type="text" id="hm-hotelNameEn-${groupId}" class="input-field" placeholder=" "><label for="hm-hotelNameEn-${groupId}">호텔명 (영문)</label></div>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                    <div class="form-field"><input type="url" id="hm-hotelWebsite-${groupId}" class="input-field" placeholder="호텔 웹사이트"><label for="hm-hotelWebsite-${groupId}">호텔 웹사이트</label></div>
-                    <div class="form-field"><input type="url" id="hm-hotelImage-${groupId}" class="input-field" placeholder="대표 이미지 URL"><label for="hm-hotelImage-${groupId}">대표 이미지 URL</label></div>
+                    <div class="form-field"><input type="url" id="hm-hotelWebsite-${groupId}" class="input-field" placeholder=" "><label for="hm-hotelWebsite-${groupId}">호텔 웹사이트</label></div>
+                    <div class="form-field"><input type="url" id="hm-hotelImage-${groupId}" class="input-field" placeholder=" "><label for="hm-hotelImage-${groupId}">대표 이미지 URL</label></div>
                 </div>
-                <div class="form-field mt-4"><textarea id="hm-hotelDescription-${groupId}" class="input-field" rows="4" placeholder="간단 설명 (줄바꿈으로 항목 구분)"></textarea><label for="hm-hotelDescription-${groupId}">간단 설명</label></div>
+                <div class="form-field mt-4"><textarea id="hm-hotelDescription-${groupId}" class="input-field" rows="4" placeholder=" "></textarea><label for="hm-hotelDescription-${groupId}">간단 설명</label></div>
             </div>
         </div>
     `;
 
-    // 2. 이벤트 리스너 바인딩
     document.getElementById(`hm-copyHtmlBtn-${groupId}`).addEventListener('click', () => hm_copyOptimizedHtml(groupId));
     document.getElementById(`hm-previewHotelBtn-${groupId}`).addEventListener('click', () => hm_previewHotelInfo(groupId));
     document.getElementById(`hm-loadHotelHtmlBtn-${groupId}`).addEventListener('click', () => hm_openLoadHotelSetModal(groupId));
@@ -184,30 +175,20 @@ function initializeHotelMakerForGroup(container, groupId) {
     editorForm.querySelectorAll('input, textarea').forEach(input => {
         input.addEventListener('input', () => {
             hm_syncCurrentHotelData(groupId);
-            // 이름이 변경되면 탭 제목도 실시간으로 업데이트
             if (input.id.includes('hotelNameKo')) {
                 hm_renderTabs(groupId);
             }
         });
     });
 
-    // 3. 초기 렌더링 호출
     hm_render(groupId);
 }
 
-/**
- * 호텔카드 메이커의 전체 UI를 다시 그립니다. (탭, 에디터)
- * @param {string} groupId - 현재 그룹 ID
- */
 function hm_render(groupId) {
     hm_renderTabs(groupId);
     hm_renderEditorForCurrentHotel(groupId);
 }
 
-/**
- * 현재 활성화된 호텔의 데이터를 UI의 입력 필드 값과 동기화하여 데이터 객체에 저장합니다.
- * @param {string} groupId - 현재 그룹 ID
- */
 function hm_syncCurrentHotelData(groupId) {
     const hotelData = quoteGroupsData[groupId]?.hotelMakerData;
     if (!hotelData || hotelData.currentHotelIndex === -1 || hotelData.currentHotelIndex >= hotelData.allHotelData.length) return;
@@ -225,10 +206,6 @@ function hm_syncCurrentHotelData(groupId) {
     currentHotel.description = groupEl.querySelector(`#hm-hotelDescription-${groupId}`).value.trim();
 }
 
-/**
- * 특정 그룹의 호텔 탭 목록을 렌더링합니다.
- * @param {string} groupId - 현재 그룹 ID
- */
 function hm_renderTabs(groupId) {
     const groupEl = document.getElementById(`group-content-${groupId}`);
     if (!groupEl) return;
@@ -238,7 +215,6 @@ function hm_renderTabs(groupId) {
     const tabsContainer = groupEl.querySelector(`#hm-hotelTabsContainer-${groupId}`);
     const addBtn = groupEl.querySelector(`#hm-addHotelTabBtn-${groupId}`);
 
-    // 기존 탭 삭제 (추가 버튼 제외)
     tabsContainer.querySelectorAll('.hotel-tab-button:not([id^="hm-addHotelTabBtn-"])').forEach(tab => tab.remove());
 
     hotelData.allHotelData.forEach((hotel, index) => {
@@ -259,10 +235,6 @@ function hm_renderTabs(groupId) {
     });
 }
 
-/**
- * 현재 선택된 호텔에 대한 정보를 편집기에 표시합니다.
- * @param {string} groupId - 현재 그룹 ID
- */
 function hm_renderEditorForCurrentHotel(groupId) {
     const groupEl = document.getElementById(`group-content-${groupId}`);
     if (!groupEl) return;
@@ -272,7 +244,7 @@ function hm_renderEditorForCurrentHotel(groupId) {
 
     if (hotelData.currentHotelIndex === -1 || !hotelData.allHotelData[hotelData.currentHotelIndex]) {
         editorForm.classList.add('disabled');
-        editorForm.querySelectorAll('input, textarea').forEach(el => { el.value = ''; });
+        editorForm.querySelectorAll('input, textarea').forEach(el => { el.value = ''; el.placeholder = ' '; });
         return;
     }
 
@@ -283,13 +255,9 @@ function hm_renderEditorForCurrentHotel(groupId) {
     groupEl.querySelector(`#hm-hotelWebsite-${groupId}`).value = hotel.website || '';
     groupEl.querySelector(`#hm-hotelImage-${groupId}`).value = hotel.image || '';
     groupEl.querySelector(`#hm-hotelDescription-${groupId}`).value = hotel.description || '';
+    editorForm.querySelectorAll('input, textarea').forEach(el => { if(el.value) el.placeholder = ' '; });
 }
 
-/**
- * 호텔 탭을 전환합니다.
- * @param {string} groupId - 현재 그룹 ID
- * @param {number} index - 전환할 탭의 인덱스
- */
 function hm_switchTab(groupId, index) {
     hm_syncCurrentHotelData(groupId);
     const hotelData = quoteGroupsData[groupId].hotelMakerData;
@@ -297,10 +265,6 @@ function hm_switchTab(groupId, index) {
     hm_render(groupId);
 }
 
-/**
- * 새로운 호텔을 추가합니다.
- * @param {string} groupId - 현재 그룹 ID
- */
 function hm_addHotel(groupId) {
     hm_syncCurrentHotelData(groupId);
     const hotelData = quoteGroupsData[groupId].hotelMakerData;
@@ -309,11 +273,6 @@ function hm_addHotel(groupId) {
     hm_switchTab(groupId, hotelData.allHotelData.length - 1);
 }
 
-/**
- * 특정 호텔을 삭제합니다.
- * @param {string} groupId - 현재 그룹 ID
- * @param {number} indexToDelete - 삭제할 호텔의 인덱스
- */
 function hm_deleteHotel(groupId, indexToDelete) {
     const hotelData = quoteGroupsData[groupId].hotelMakerData;
     const hotelName = hotelData.allHotelData[indexToDelete].nameKo || `새 호텔 ${indexToDelete + 1}`;
@@ -332,10 +291,6 @@ function hm_deleteHotel(groupId, indexToDelete) {
     hm_render(groupId);
 }
 
-/**
- * 선택된 호텔 카드의 HTML 코드를 클립보드에 복사합니다.
- * @param {string} groupId - 현재 그룹 ID
- */
 function hm_copyOptimizedHtml(groupId) {
     hm_syncCurrentHotelData(groupId);
     const hotelData = quoteGroupsData[groupId].hotelMakerData;
@@ -350,10 +305,6 @@ function hm_copyOptimizedHtml(groupId) {
         .catch(err => showToastMessage('복사에 실패했습니다.', true));
 }
 
-/**
- * 호텔 정보 미리보기 창을 엽니다.
- * @param {string} groupId - 현재 그룹 ID
- */
 function hm_previewHotelInfo(groupId) {
     hm_syncCurrentHotelData(groupId);
     const hotelData = quoteGroupsData[groupId].hotelMakerData;
@@ -372,12 +323,7 @@ function hm_previewHotelInfo(groupId) {
     }
 }
 
-/**
- * DB에서 호텔 정보 세트를 불러오는 모달을 엽니다.
- * @param {string} groupId - 현재 그룹 ID
- */
 async function hm_openLoadHotelSetModal(groupId) {
-    // 모달 UI가 이미 있으면 제거하고 새로 생성
     let modal = document.getElementById('hm_loadHotelSetModal');
     if (modal) modal.remove();
 
@@ -386,16 +332,11 @@ async function hm_openLoadHotelSetModal(groupId) {
     modal.className = "fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center z-50";
     modal.innerHTML = `
         <div class="relative p-5 border w-11/12 md:w-1/2 lg:w-1/3 shadow-lg rounded-md bg-white">
-            <div class="flex justify-between items-center mb-3">
-                <h3 class="text-lg font-medium leading-6 text-gray-900">저장된 호텔 정보 불러오기</h3>
-                <button id="hm_closeLoadHotelSetModalButton" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
-            </div>
+            <div class="flex justify-between items-center mb-3"><h3 class="text-lg font-medium">저장된 호텔 정보 불러오기</h3><button id="hm_closeLoadHotelSetModalButton" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button></div>
             <input type="text" id="hm_hotelSetSearchInput" placeholder="저장된 이름으로 검색..." class="w-full p-2 mb-3 border rounded-md">
-            <ul id="hm_hotelSetListForLoad" class="mt-2 h-60 overflow-y-auto border rounded-md divide-y divide-gray-200"></ul>
-            <div id="hm_loadingHotelSetListMsg" class="mt-2 text-sm text-gray-500" style="display:none;">목록을 불러오는 중...</div>
-            <div class="mt-4">
-                <button id="hm_cancelLoadHotelSetModalButton" class="btn btn-outline w-full">닫기</button>
-            </div>
+            <ul id="hm_hotelSetListForLoad" class="mt-2 h-60 overflow-y-auto border rounded-md divide-y"></ul>
+            <div id="hm_loadingHotelSetListMsg" class="mt-2 text-sm" style="display:none;">목록을 불러오는 중...</div>
+            <div class="mt-4"><button id="hm_cancelLoadHotelSetModalButton" class="btn btn-outline w-full">닫기</button></div>
         </div>
     `;
     document.body.appendChild(modal);
@@ -404,7 +345,6 @@ async function hm_openLoadHotelSetModal(groupId) {
     modal.querySelector('#hm_closeLoadHotelSetModalButton').addEventListener('click', closeModal);
     modal.querySelector('#hm_cancelLoadHotelSetModalButton').addEventListener('click', closeModal);
 
-    // 데이터 로드 및 렌더링
     const listEl = modal.querySelector('#hm_hotelSetListForLoad');
     const loadingMsg = modal.querySelector('#hm_loadingHotelSetListMsg');
     const searchInput = modal.querySelector('#hm_hotelSetSearchInput');
@@ -419,11 +359,7 @@ async function hm_openLoadHotelSetModal(groupId) {
         loadingMsg.style.display = 'none';
 
         const renderList = (sets) => {
-            listEl.innerHTML = '';
-            if (sets.length === 0) {
-                listEl.innerHTML = `<li class="p-3 text-center text-gray-500">결과가 없습니다.</li>`;
-                return;
-            }
+            listEl.innerHTML = sets.length ? '' : `<li class="p-3 text-center text-gray-500">결과가 없습니다.</li>`;
             sets.forEach(set => {
                 const li = document.createElement('li');
                 li.className = 'p-3 hover:bg-gray-100 cursor-pointer';
@@ -451,23 +387,15 @@ async function hm_openLoadHotelSetModal(groupId) {
     }
 }
 
-/**
- * DB에서 불러온 호텔 목록을 현재 그룹에 추가합니다.
- * @param {string} groupId - 현재 그룹 ID
- * @param {Array} hotelsToAdd - 추가할 호텔 데이터 배열
- */
 function hm_addHotelsFromDbToGroup(groupId, hotelsToAdd) {
     if (!hotelsToAdd || hotelsToAdd.length === 0) return;
-
     hm_syncCurrentHotelData(groupId);
     const hotelData = quoteGroupsData[groupId].hotelMakerData;
     
-    // 현재 목록이 비어있고 첫 호텔이 기본값("새 호텔 1")이면, 불러온 데이터로 대체
     if (hotelData.allHotelData.length === 1 && hotelData.allHotelData[0].nameKo.startsWith('새 호텔')) {
         hotelData.allHotelData = JSON.parse(JSON.stringify(hotelsToAdd));
         hotelData.currentHotelIndex = 0;
     } else {
-        // 아니면 기존 목록 뒤에 추가
         hotelData.allHotelData.push(...JSON.parse(JSON.stringify(hotelsToAdd)));
         hotelData.currentHotelIndex = hotelData.allHotelData.length - hotelsToAdd.length;
     }
@@ -475,52 +403,23 @@ function hm_addHotelsFromDbToGroup(groupId, hotelsToAdd) {
     hm_render(groupId);
 }
 
-/**
- * 호텔 카드의 HTML을 생성하는 헬퍼 함수입니다.
- * @param {object} hotel - 호텔 정보 객체
- * @returns {string} 생성된 HTML 문자열
- */
 function hm_generateHotelCardHtml(hotel) {
     const placeholderImage = 'https://placehold.co/400x300/e2e8f0/cbd5e0?text=No+Image';
     const currentHotelImage = (typeof hotel.image === 'string' && hotel.image.startsWith('http')) ? hotel.image : placeholderImage;
 
     const descriptionItems = hotel.description ? hotel.description.split('\n').filter(line => line.trim() !== '') : [];
     const descriptionHtml = descriptionItems.map(item => `
-        <div style="margin-bottom: 6px; line-height: 1.6;">
-            <span style="font-size: 12px; color: #34495e;">${item.replace(/● /g, '')}</span>
-        </div>`).join('');
+        <div style="margin-bottom: 6px; line-height: 1.6;"><span style="font-size: 12px; color: #34495e;">${item.replace(/● /g, '')}</span></div>`).join('');
 
     const websiteButtonHtml = hotel.website ? `
-        <div style="margin-top: 20px;">
-            <a href="${hotel.website}" target="_blank" style="background-color: #3498db; color: #ffffff; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 500; font-size: 12px;">웹사이트 바로가기</a>
-        </div>` : '';
+        <div style="margin-top: 20px;"><a href="${hotel.website}" target="_blank" style="background-color: #3498db; color: #ffffff; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 500; font-size: 12px;">웹사이트 바로가기</a></div>` : '';
 
     return `
-      <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 750px; font-family: 'Malgun Gothic', '맑은 고딕', sans-serif; border-collapse: separate; border-spacing: 24px;">
-        <tbody>
-          <tr>
-            <td width="320" style="width: 320px; vertical-align: top;">
-              <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); overflow: hidden;">
-                <tbody>
-                  <tr><td><img src="${currentHotelImage}" alt="${hotel.nameKo || '호텔 이미지'}" width="320" style="width: 100%; height: auto; display: block;" onerror="this.onerror=null; this.src='${placeholderImage}';"></td></tr>
-                  <tr><td style="padding: 16px 20px;"><div style="font-size: 14px; font-weight: bold; color: #2c3e50;">${hotel.nameKo || '호텔명 없음'}</div>${hotel.nameEn ? `<div style="font-size: 12px; color: #7f8c8d; margin-top: 4px;">${hotel.nameEn}</div>` : ''}</td></tr>
-                </tbody>
-              </table>
-            </td>
-            <td style="vertical-align: middle;"><div>${descriptionHtml}${websiteButtonHtml}</div></td>
-          </tr>
-        </tbody>
-      </table>`;
+      <table border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 750px; font-family: 'Malgun Gothic', '맑은 고딕', sans-serif; border-collapse: separate; border-spacing: 24px;"><tbody><tr><td width="320" style="width: 320px; vertical-align: top;"><table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); overflow: hidden;"><tbody><tr><td><img src="${currentHotelImage}" alt="${hotel.nameKo || '호텔 이미지'}" width="320" style="width: 100%; height: auto; display: block;" onerror="this.onerror=null; this.src='${placeholderImage}';"></td></tr><tr><td style="padding: 16px 20px;"><div style="font-size: 14px; font-weight: bold; color: #2c3e50;">${hotel.nameKo || '호텔명 없음'}</div>${hotel.nameEn ? `<div style="font-size: 12px; color: #7f8c8d; margin-top: 4px;">${hotel.nameEn}</div>` : ''}</td></tr></tbody></table></td><td style="vertical-align: middle;"><div>${descriptionHtml}${websiteButtonHtml}</div></td></tr></tbody></table>`;
 }
 
-/**
- * 미리보기용 전체 HTML 페이지를 생성합니다.
- * @param {Array} data - 모든 호텔 데이터 배열
- * @returns {string} 생성된 HTML 페이지 문자열
- */
 function hm_generateFullPreviewHtml(data) {
     const hotelName = data.length > 0 ? data[0].nameKo : '호텔';
-    // Swiper 라이브러리 추가 (여러 호텔일 경우 슬라이더 기능)
     const sliderHead = data.length > 1 ? `<link rel="stylesheet" href="https://unpkg.com/swiper/swiper-bundle.min.css" /><script src="https://unpkg.com/swiper/swiper-bundle.min.js"></script>` : '';
     const sliderBodyScript = data.length > 1 ? `<script>new Swiper('.swiper', {loop: true, pagination: {el: '.swiper-pagination', clickable: true}, navigation: {nextEl: '.swiper-button-next', prevEl: '.swiper-button-prev'}});</script>` : '';
     
@@ -537,6 +436,7 @@ function hm_generateFullPreviewHtml(data) {
     return `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>호텔 안내: ${hotelName}</title>${sliderHead}<style>body{font-family:'Malgun Gothic',sans-serif;background-color:#f0f2f5;display:flex;justify-content:center;align-items:center;min-height:100vh;padding:2rem;box-sizing:border-box;margin:0;}.swiper-slide{display:flex;justify-content:center;align-items:center;}</style></head><body>${bodyContent}${sliderBodyScript}</body></html>`;
 }
 
+// =======================================================================
 // ▲▲▲ 4. 호텔카드 메이커 (Hotel Maker) 통합 코드 끝 ▲▲▲
 // =======================================================================
 // =======================================================================
@@ -1267,7 +1167,7 @@ function addNewGroup() {
         flightSchedule: [], 
         priceInfo: [],
         inclusionExclusionDocId: null,
-        inclusionExclusionDocName: '',
+        inclusionExclusionDocName: '새로운 포함/불포함 내역',
         hotelMakerData: {
             allHotelData: [{ nameKo: `새 호텔 1`, nameEn: "", website: "", image: "", description: "" }],
             currentHotelIndex: 0,
