@@ -815,7 +815,19 @@ function getCustomerData() {
     return customers;
 }
 
-const evaluateMath = (expression) => { if (typeof expression !== 'string' || !expression) return 0; const s = expression.replace(/,/g, ''); if (!/^[0-9+\-*/().\s]+$/.test(s)) { return parseFloat(s) || 0; } try { return new Function('return ' + s)(); } catch (e) { return parseFloat(s) || 0; } };
+const evaluateMath = (expression) => { 
+    if (typeof expression !== 'string' || !expression) return 0; 
+    const formula = expression.startsWith('=') ? expression.substring(1) : expression;
+    const s = formula.replace(/,/g, ''); 
+    if (!/^[0-9+\-*/().\s]+$/.test(s)) { 
+        return parseFloat(s) || 0; 
+    } 
+    try { 
+        return new Function('return ' + s)(); 
+    } catch (e) { 
+        return parseFloat(s) || 0; 
+    } 
+};
 const formatCurrency = (amount) => new Intl.NumberFormat('ko-KR').format(Math.round(amount)) + ' 원';
 const formatPercentage = (value) => (isNaN(value) || !isFinite(value) ? 0 : value * 100).toFixed(2) + ' %';
 const copyHtmlToClipboard = (htmlString) => {
@@ -859,7 +871,14 @@ function syncGroupUIToData(groupId) {
         calculatorData.pnr = instance.querySelector('.pnr-pane textarea').value;
         const table = instance.querySelector('.quote-table');
         if (table) {
-            table.querySelectorAll('input[type="text"]').forEach(input => input.setAttribute('value', input.value));
+            table.querySelectorAll('input[type="text"]').forEach(input => {
+                input.setAttribute('value', input.value);
+                if (input.dataset.formula) {
+                    input.setAttribute('data-formula', input.dataset.formula);
+                } else {
+                    input.removeAttribute('data-formula');
+                }
+            });
             calculatorData.tableHTML = table.innerHTML;
         }
     });
@@ -1397,52 +1416,137 @@ function restoreCalculatorState(instanceContainer, calcData) {
     const pnrTextarea = instanceContainer.querySelector('.pnr-pane textarea');
     if (pnrTextarea) pnrTextarea.value = calcData.pnr || '';
     const table = instanceContainer.querySelector('.quote-table');
-    if (table && calcData.tableHTML) { table.innerHTML = calcData.tableHTML; rebindCalculatorEventListeners(instanceContainer); }
+    if (table && calcData.tableHTML) { 
+        table.innerHTML = calcData.tableHTML; 
+        table.querySelectorAll('input[data-formula]').forEach(input => {
+            const formula = input.getAttribute('data-formula');
+            input.dataset.formula = formula;
+        });
+        rebindCalculatorEventListeners(instanceContainer); 
+    }
     else { addPersonTypeColumn(instanceContainer, '성인', 1); }
     calculateAll(instanceContainer);
 }
+
+// =======================================================================
+// 7. [수정] 견적 계산기 핵심 로직 (엑셀 방식 + Enter 키 기능 적용)
+// =======================================================================
+
+/**
+ * Excel과 유사한 입력 필드 동작을 설정합니다. (Enter 키 기능 추가)
+ * @param {HTMLInputElement} input - 적용할 입력 필드 요소
+ * @param {Function} onBlurCallback - blur 이벤트 발생 시 호출될 콜백 함수
+ */
+function setupExcelLikeInput(input, onBlurCallback) {
+    input.addEventListener('focus', (e) => {
+        const formula = e.target.dataset.formula;
+        if (formula) {
+            e.target.value = formula;
+        }
+    });
+
+    input.addEventListener('blur', (e) => {
+        const rawValue = e.target.value.trim();
+        if (rawValue.startsWith('=')) {
+            e.target.dataset.formula = rawValue;
+            const expression = rawValue.substring(1);
+            const result = evaluateMath(expression);
+            e.target.value = isNaN(result) ? 'Error' : Math.round(result).toLocaleString();
+        } else {
+            delete e.target.dataset.formula;
+            const numericValue = parseFloat(rawValue.replace(/,/g, '')) || 0;
+            e.target.value = numericValue.toLocaleString();
+        }
+        if (onBlurCallback) onBlurCallback();
+    });
+
+    // Enter 키 이벤트 핸들러 추가
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault(); // 기본 동작(폼 제출 등) 방지
+
+            const currentCell = e.target.closest('td');
+            if (!currentCell) return;
+            const currentRow = currentCell.closest('tr');
+            const tableBody = currentRow.closest('tbody');
+            const allRows = Array.from(tableBody.querySelectorAll('tr'));
+            const currentRowIndex = allRows.indexOf(currentRow);
+            const currentCellIndex = Array.from(currentRow.children).indexOf(currentCell);
+
+            // 현재 입력칸의 blur 이벤트를 실행하여 계산 및 값 표시
+            e.target.blur();
+
+            // 다음 행에서 동일한 컬럼의 입력 필드를 찾아 포커스
+            for (let i = currentRowIndex + 1; i < allRows.length; i++) {
+                const nextCell = allRows[i].cells[currentCellIndex];
+                if (nextCell) {
+                    const nextInput = nextCell.querySelector('input[type="text"]');
+                    if (nextInput) {
+                        nextInput.focus();
+                        nextInput.select(); // 내용을 전체 선택하여 바로 수정 가능하도록
+                        return; // 다음 입력 필드를 찾았으므로 반복 종료
+                    }
+                }
+            }
+        }
+    });
+}
+
+/**
+ * 계산기 내 모든 이벤트 리스너를 다시 바인딩합니다.
+ * @param {HTMLElement} calcContainer - 계산기 인스턴스 컨테이너
+ */
 function rebindCalculatorEventListeners(calcContainer) {
     const calcAll = () => calculateAll(calcContainer);
-    calcContainer.querySelectorAll('input').forEach(el => { el.addEventListener('input', calcAll); });
+
+    calcContainer.querySelectorAll('.cost-item, .sales-price').forEach(input => {
+        setupExcelLikeInput(input, calcAll);
+    });
+
     calcContainer.querySelectorAll('.person-type-name-span').forEach(span => { makeEditable(span, 'text', calcAll); });
     calcContainer.querySelectorAll('.person-count-span').forEach(span => { makeEditable(span, 'number', calcAll); });
-    calcContainer.querySelectorAll('.dynamic-row-label-span').forEach(span => { makeEditable(span, 'text', () => { }); });
+    calcContainer.querySelectorAll('.dynamic-row-label-span').forEach(span => { makeEditable(span, 'text', () => {}); });
+    
     calcContainer.querySelectorAll('th .remove-col-btn').forEach((btn) => {
-        const headerCell = btn.closest('th');
-        if (!headerCell) return;
-        const colIndex = Array.from(headerCell.parentNode.children).indexOf(headerCell);
         btn.addEventListener('click', () => {
-            if (!confirm('해당 항목을 삭제하시겠습니까?')) return;
-            calcContainer.querySelectorAll('.quote-table tr').forEach(row => row.cells[colIndex]?.remove());
-            updateSummaryRow(calcContainer); calcAll();
+            const headerCell = btn.closest('th');
+            if (!headerCell) return;
+            const colIndex = Array.from(headerCell.parentNode.children).indexOf(headerCell);
+            if (confirm('해당 항목을 삭제하시겠습니까?')) {
+                calcContainer.querySelectorAll('.quote-table tr').forEach(row => row.cells[colIndex]?.remove());
+                updateSummaryRow(calcContainer);
+                calcAll();
+            }
         });
     });
+
     calcContainer.querySelectorAll('.dynamic-row-delete-btn').forEach(btn => {
-        btn.addEventListener('click', () => { if (confirm('해당 항목을 삭제하시겠습니까?')) { btn.closest('tr').remove(); calcAll(); } });
+        btn.addEventListener('click', () => { 
+            if (confirm('해당 항목을 삭제하시겠습니까?')) {
+                btn.closest('tr').remove();
+                calcAll();
+            } 
+        });
     });
+    
     const addPersonBtn = calcContainer.querySelector('.add-person-type-btn');
     if (addPersonBtn) { addPersonBtn.addEventListener('click', () => addPersonTypeColumn(calcContainer, '아동', 1)); }
+    
     const addRowBtn = calcContainer.querySelector('.add-dynamic-row-btn');
     if (addRowBtn) { addRowBtn.addEventListener('click', () => addDynamicCostRow(calcContainer)); }
-    calcContainer.querySelectorAll('.cost-item, .sales-price').forEach(input => {
-        const updateTooltip = () => {
-            const expression = input.value;
-            if (expression && /[+\-*/]/.test(expression)) {
-                const result = evaluateMath(expression);
-                input.title = ` ${new Intl.NumberFormat('ko-KR').format(Math.round(result))}`;
-            } else { input.title = ''; }
-        };
-        input.addEventListener('mouseover', updateTooltip);
-        input.addEventListener('focus', updateTooltip);
-    });
+    
     calcContainer.querySelectorAll('.sales-price').forEach(input => {
         input.addEventListener('dblclick', (event) => {
-            const calculatedValue = evaluateMath(event.target.value).toString();
+            const expression = event.target.dataset.formula || event.target.value;
+            const calculatedValue = evaluateMath(expression).toString();
             copyToClipboard(calculatedValue, '상품가');
         });
     });
+
     updateSummaryRow(calcContainer);
 }
+
+
 function makeEditable(element, inputType, onBlurCallback) {
     if (!element || element.querySelector('input')) return;
     const clickHandler = () => {
@@ -1476,13 +1580,23 @@ function makeEditable(element, inputType, onBlurCallback) {
     };
     element.addEventListener('click', clickHandler);
 }
+
 function getCellContent(rowId, colIndex, type) {
     const name = `group[${colIndex}][${rowId}]`;
+    let initialValue = ''; // 기본값을 '0'으로 설정
+    if (type === 'costInput') {
+        if (rowId === 'insurance') {
+            initialValue = '5,000';
+        }
+    }
     switch (type) {
-        case 'costInput': return `<input type="text" class="input-field-sm cost-item" name="${name}" value="${rowId === 'insurance' ? '5000' : ''}" placeholder="0">`;
-        case 'salesInput': return `<input type="text" class="input-field-sm sales-price" name="${name}" value="0" placeholder="0">`;
-        case 'calculated': return `<div class="calculated-field" data-row-id="${rowId}">0 원</div>`;
-        case 'calculatedPercentage': return `<div class="calculated-field" data-row-id="${rowId}">0.00 %</div>`;
+        case 'costInput':
+        case 'salesInput':
+             return `<input type="text" class="input-field-sm ${type === 'salesInput' ? 'sales-price' : 'cost-item'}" name="${name}" value="${initialValue}" placeholder="">`;
+        case 'calculated': 
+            return `<div class="calculated-field" data-row-id="${rowId}">0 원</div>`;
+        case 'calculatedPercentage': 
+            return `<div class="calculated-field" data-row-id="${rowId}">0.00 %</div>`;
         default: return '';
     }
 }
@@ -1491,22 +1605,6 @@ function setupColumnEventListeners(calcContainer, colIndex, headerCell, countCel
     const calcAllForGroup = () => calculateAll(calcContainer);
     makeEditable(headerCell.querySelector('.person-type-name-span'), 'text', calcAllForGroup);
     makeEditable(countCell.querySelector('.person-count-span'), 'number', calcAllForGroup);
-    const removeBtn = headerCell.querySelector('.remove-col-btn');
-    if (removeBtn) {
-        removeBtn.addEventListener('click', () => {
-            if (!confirm(`'${headerCell.textContent.trim()}' 항목을 삭제하시겠습니까?`)) return;
-            calcContainer.querySelectorAll('.quote-table tr').forEach(row => { if (row.cells.length > colIndex) row.deleteCell(colIndex); });
-            updateSummaryRow(calcContainer);
-            calcAllForGroup();
-        });
-    }
-    calcContainer.querySelectorAll('tbody tr').forEach(tr => {
-        const cell = tr.cells[colIndex];
-        if (cell) {
-            const input = cell.querySelector('input');
-            if (input) input.addEventListener('input', calcAllForGroup);
-        }
-    });
 }
 function addPersonTypeColumn(calcContainer, typeName = '성인', count = 1) {
     const table = calcContainer.querySelector('.quote-table');
@@ -1524,8 +1622,10 @@ function addPersonTypeColumn(calcContainer, typeName = '성인', count = 1) {
         const rowDef = ROW_DEFINITIONS.find(r => r.id === rowId) || { type: 'costInput' };
         tr.insertCell(-1).innerHTML = getCellContent(rowId, colIndex, rowDef.type);
     });
+    
+    rebindCalculatorEventListeners(calcContainer);
+    
     updateSummaryRow(calcContainer);
-    setupColumnEventListeners(calcContainer, colIndex, headerCell, countCell);
     calculateAll(calcContainer);
 }
 function addDynamicCostRow(calcContainer, label = '신규 항목') {
@@ -1541,6 +1641,7 @@ function addDynamicCostRow(calcContainer, label = '신규 항목') {
     newRow.dataset.rowId = rowId;
     newRow.insertCell(0).innerHTML = `<div class="flex items-center"><button type="button" class="dynamic-row-delete-btn"><i class="fas fa-trash-alt"></i></button><span class="dynamic-row-label-span ml-2">${label}</span></div>`;
     for (let i = 1; i < numCols; i++) { newRow.insertCell(i).innerHTML = getCellContent(rowId, i, 'costInput'); }
+    
     rebindCalculatorEventListeners(calcContainer);
     calculateAll(calcContainer);
 }
@@ -1560,35 +1661,7 @@ function updateSummaryRow(calcContainer) {
     summaryRow.cells[0].style.borderTop = "2px solid #a0aec0";
     summaryCell.style.borderTop = "2px solid #a0aec0";
 }
-function calculateAll(calcContainer) {
-    if (!calcContainer) return;
-    const table = calcContainer.querySelector('.quote-table');
-    if (!table) return;
-    const headerRow = table.querySelector('.header-row');
-    if (!headerRow) return;
-    let grandTotalSales = 0, grandTotalProfit = 0;
-    for (let i = 1; i < headerRow.cells.length; i++) {
-        const countCell = table.querySelector(`.count-row th:nth-child(${i + 1})`);
-        const count = countCell ? parseInt(countCell.textContent.replace(/,/g, ''), 10) || 0 : 0;
-        let netCost = 0;
-        table.querySelectorAll(`tbody tr td:nth-child(${i + 1}) .cost-item`).forEach(input => { netCost += evaluateMath(input.value); });
-        const salesPriceInput = table.querySelector(`tbody tr td:nth-child(${i + 1}) .sales-price`);
-        const salesPrice = salesPriceInput ? evaluateMath(salesPriceInput.value) : 0;
-        const profitPerPerson = salesPrice - netCost;
-        const profitMargin = salesPrice > 0 ? (profitPerPerson / salesPrice) : 0;
-        updateCalculatedCell(table, i, 'netCost', formatCurrency(netCost));
-        updateCalculatedCell(table, i, 'profitPerPerson', formatCurrency(profitPerPerson));
-        updateCalculatedCell(table, i, 'profitMargin', formatPercentage(profitMargin));
-        grandTotalSales += salesPrice * count;
-        grandTotalProfit += profitPerPerson * count;
-    }
-    const grandTotalProfitMargin = grandTotalSales > 0 ? (grandTotalProfit / grandTotalSales) : 0;
-    const summarySection = calcContainer.querySelector('.totals-summary-section');
-    if (!summarySection) return;
-    summarySection.querySelector('.totalSalesPrice').textContent = formatCurrency(grandTotalSales);
-    summarySection.querySelector('.totalProfit').textContent = formatCurrency(grandTotalProfit);
-    summarySection.querySelector('.totalProfitMargin').textContent = formatPercentage(grandTotalProfitMargin);
-}
+
 function updateCalculatedCell(table, colIndex, rowId, value) {
     const row = table.querySelector(`tbody tr[data-row-id="${rowId}"]`);
     if (row && row.cells[colIndex]) {
@@ -1597,6 +1670,49 @@ function updateCalculatedCell(table, colIndex, rowId, value) {
     }
 }
 
+function calculateAll(calcContainer) {
+    if (!calcContainer) return;
+    const table = calcContainer.querySelector('.quote-table');
+    if (!table) return;
+    const headerRow = table.querySelector('.header-row');
+    if (!headerRow) return;
+    let grandTotalSales = 0, grandTotalProfit = 0;
+    
+    for (let i = 1; i < headerRow.cells.length; i++) {
+        const countCell = table.querySelector(`.count-row th:nth-child(${i + 1})`);
+        const count = countCell ? parseInt(countCell.textContent.replace(/,/g, ''), 10) || 0 : 0;
+        let netCost = 0;
+
+        table.querySelectorAll(`tbody tr td:nth-child(${i + 1}) .cost-item`).forEach(input => {
+            const expression = input.dataset.formula || input.value;
+            netCost += evaluateMath(expression);
+        });
+
+        const salesPriceInput = table.querySelector(`tbody tr td:nth-child(${i + 1}) .sales-price`);
+        const salesPriceExpression = salesPriceInput ? (salesPriceInput.dataset.formula || salesPriceInput.value) : '0';
+        const salesPrice = evaluateMath(salesPriceExpression);
+
+        const profitPerPerson = salesPrice - netCost;
+        const profitMargin = salesPrice > 0 ? (profitPerPerson / salesPrice) : 0;
+        
+        updateCalculatedCell(table, i, 'netCost', formatCurrency(netCost));
+        updateCalculatedCell(table, i, 'profitPerPerson', formatCurrency(profitPerPerson));
+        updateCalculatedCell(table, i, 'profitMargin', formatPercentage(profitMargin));
+        
+        grandTotalSales += salesPrice * count;
+        grandTotalProfit += profitPerPerson * count;
+    }
+    
+    const grandTotalProfitMargin = grandTotalSales > 0 ? (grandTotalProfit / grandTotalSales) : 0;
+    const summarySection = calcContainer.querySelector('.totals-summary-section');
+    if (!summarySection) return;
+    summarySection.querySelector('.totalSalesPrice').textContent = formatCurrency(grandTotalSales);
+    summarySection.querySelector('.totalProfit').textContent = formatCurrency(grandTotalProfit);
+    summarySection.querySelector('.totalProfitMargin').textContent = formatPercentage(grandTotalProfitMargin);
+}
+// =======================================================================
+// 8. 기타 유틸리티 함수 (기존 코드 유지)
+// =======================================================================
 function createFlightSubgroup(container, subgroupData, groupId) {
     const subGroupDiv = document.createElement('div');
     subGroupDiv.className = 'dynamic-section flight-schedule-subgroup';
