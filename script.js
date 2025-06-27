@@ -1020,7 +1020,7 @@ function renderRecentFileList(fullList, searchTerm) {
     if (filteredList.length > 0) {
         filteredList.forEach(item => {
             const listItem = document.createElement('li');
-            listItem.className = 'flex justify-between items-center p-3 hover:bg-gray-50 cursor-pointer';
+            listItem.className = 'flex justify-between items-center p-3 hover:bg-gray-100 cursor-pointer';
             
             const titleSpan = document.createElement('span');
             titleSpan.textContent = item.name;
@@ -1780,6 +1780,20 @@ function setupGlobalEventListeners() {
     const ipCancelDeleteBtn = document.getElementById('ipCancelDeleteDayButton');
     if (ipCancelDeleteBtn) {
         ipCancelDeleteBtn.addEventListener('click', () => document.getElementById('ipConfirmDeleteDayModal').classList.add('hidden'));
+    }
+
+    // 일정 템플릿 불러오기 모달 닫기(X, 닫기 버튼)
+    const ipCloseLoadTemplateModal = document.getElementById('ipCloseLoadTemplateModal');
+    if (ipCloseLoadTemplateModal) {
+        ipCloseLoadTemplateModal.addEventListener('click', () => {
+            document.getElementById('ipLoadTemplateModal').classList.add('hidden');
+        });
+    }
+    const ipCancelLoadTemplateModal = document.getElementById('ipCancelLoadTemplateModal');
+    if (ipCancelLoadTemplateModal) {
+        ipCancelLoadTemplateModal.addEventListener('click', () => {
+            document.getElementById('ipLoadTemplateModal').classList.add('hidden');
+        });
     }
 }
 function setupKeydownListeners() {
