@@ -1494,7 +1494,7 @@ function setupColumnEventListeners(calcContainer, colIndex, headerCell, countCel
     const removeBtn = headerCell.querySelector('.remove-col-btn');
     if (removeBtn) {
         removeBtn.addEventListener('click', () => {
-            if (!confirm('해당 항목을 삭제하시겠습니까?')) return;
+            if (!confirm(`'${headerCell.textContent.trim()}' 항목을 삭제하시겠습니까?`)) return;
             calcContainer.querySelectorAll('.quote-table tr').forEach(row => { if (row.cells.length > colIndex) row.deleteCell(colIndex); });
             updateSummaryRow(calcContainer);
             calcAllForGroup();
@@ -1753,6 +1753,12 @@ function setupGlobalEventListeners() {
     document.getElementById('newWindowBtn').addEventListener('click', () => window.open(window.location.href, '_blank'));
     document.getElementById('saveBtn').addEventListener('click', (event) => saveFile(false, event.currentTarget));
     document.getElementById('saveAsBtn').addEventListener('click', (event) => saveFile(true, event.currentTarget));
+    const loadFileLabel = document.querySelector('label[for="loadFile"]');
+    if (loadFileLabel) { loadFileLabel.addEventListener('click', (event) => { event.preventDefault(); loadFile(); }); }
+    document.getElementById('copyMemoBtn')?.addEventListener('click', () => {
+        const memoTextarea = document.getElementById('memoText');
+        if (memoTextarea) { copyToClipboard(memoTextarea.value, '메모'); }
+    });
     document.getElementById('closeLoadInclusionsModalBtn')?.addEventListener('click', () => document.getElementById('loadInclusionsModal').classList.add('hidden'));
     document.getElementById('cancelLoadInclusionsModalBtn')?.addEventListener('click', () => document.getElementById('loadInclusionsModal').classList.add('hidden'));
     document.getElementById('loadMemoFromDbBtn')?.addEventListener('click', openLoadMemoModal);
@@ -1774,20 +1780,6 @@ function setupGlobalEventListeners() {
     const ipCancelDeleteBtn = document.getElementById('ipCancelDeleteDayButton');
     if (ipCancelDeleteBtn) {
         ipCancelDeleteBtn.addEventListener('click', () => document.getElementById('ipConfirmDeleteDayModal').classList.add('hidden'));
-    }
-
-    // 일정 템플릿 불러오기 모달 닫기(X, 닫기 버튼)
-    const ipCloseLoadTemplateModalBtn = document.getElementById('ipCloseLoadTemplateModal');
-    if (ipCloseLoadTemplateModalBtn) {
-        ipCloseLoadTemplateModalBtn.addEventListener('click', () => {
-            document.getElementById('ipLoadTemplateModal').classList.add('hidden');
-        });
-    }
-    const ipCancelLoadTemplateModalBtn = document.getElementById('ipCancelLoadTemplateModal');
-    if (ipCancelLoadTemplateModalBtn) {
-        ipCancelLoadTemplateModalBtn.addEventListener('click', () => {
-            document.getElementById('ipLoadTemplateModal').classList.add('hidden');
-        });
     }
 }
 function setupKeydownListeners() {
