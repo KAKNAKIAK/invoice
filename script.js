@@ -1371,7 +1371,35 @@ function buildCalculatorDOM(calcContainer) {
     content.innerHTML = `<div class="split-container"><div class="pnr-pane"><label class="label-text font-semibold mb-2">PNR 정보</label><textarea class="w-full flex-grow px-3 py-2 border rounded-md shadow-sm" placeholder="PNR 정보를 여기에 붙여넣으세요."></textarea></div><div class="resizer-handle"></div><div class="quote-pane"><div class="table-container"><table class="quote-table"><thead><tr class="header-row"><th><button type="button" class="btn btn-sm btn-primary add-person-type-btn"><i class="fas fa-plus"></i></button></th></tr><tr class="count-row"><th></th></tr></thead><tbody></tbody><tfoot></tfoot></table></div></div></div>`;
     const calculatorElement = content.firstElementChild;
     calcContainer.appendChild(calculatorElement);
-    calculatorElement.querySelector('.add-person-type-btn').addEventListener('click', () => addPersonTypeColumn(calculatorElement, '아동', 1));
+
+    // [수정] 이벤트 위임을 사용하여 버튼 클릭 처리
+    const table = calculatorElement.querySelector('.quote-table');
+    table.addEventListener('click', (e) => {
+        const button = e.target.closest('button');
+        if (!button) return;
+
+        if (button.classList.contains('add-person-type-btn')) {
+            addPersonTypeColumn(calculatorElement, '아동', 1);
+        } else if (button.classList.contains('add-dynamic-row-btn')) {
+            addDynamicCostRow(calculatorElement);
+        } else if (button.classList.contains('remove-col-btn')) {
+            const headerCell = button.closest('th');
+            if (headerCell) {
+                const colIndex = Array.from(headerCell.parentNode.children).indexOf(headerCell);
+                if (confirm('해당 항목을 삭제하시겠습니까?')) {
+                    calculatorElement.querySelectorAll('.quote-table tr').forEach(row => row.cells[colIndex]?.remove());
+                    updateSummaryRow(calculatorElement);
+                    calculateAll(calculatorElement);
+                }
+            }
+        } else if (button.classList.contains('dynamic-row-delete-btn')) {
+            if (confirm('해당 항목을 삭제하시겠습니까?')) {
+                button.closest('tr').remove();
+                calculateAll(calculatorElement);
+            }
+        }
+    });
+
     const tbody = calculatorElement.querySelector('tbody');
     ROW_DEFINITIONS.forEach(def => {
         const row = tbody.insertRow();
@@ -1379,8 +1407,9 @@ function buildCalculatorDOM(calcContainer) {
         const labelCell = row.insertCell(0);
         if (def.type === 'button') {
             labelCell.innerHTML = `<button type="button" class="btn btn-sm btn-outline add-dynamic-row-btn">${def.label}</button>`;
-            labelCell.querySelector('.add-dynamic-row-btn').addEventListener('click', () => addDynamicCostRow(calculatorElement));
-        } else { labelCell.innerHTML = `<span>${def.label}</span>`; }
+        } else { 
+            labelCell.innerHTML = `<span>${def.label}</span>`; 
+        }
     });
 }
 function createCalculatorInstance(wrapper, groupId, calcData) {
@@ -1499,48 +1528,35 @@ function setupExcelLikeInput(input, onBlurCallback) {
 function rebindCalculatorEventListeners(calcContainer) {
     const calcAll = () => calculateAll(calcContainer);
 
-    calcContainer.querySelectorAll('.cost-item, .sales-price').forEach(input => {
+    // [수정] 중복 바인딩을 피하기 위해 새로 추가된 요소에만 이벤트 리스너를 추가합니다.
+    // data-event-bound 속성을 사용하여 이미 처리된 요소는 건너뜁니다.
+    calcContainer.querySelectorAll('.cost-item:not([data-event-bound]), .sales-price:not([data-event-bound])').forEach(input => {
         setupExcelLikeInput(input, calcAll);
+        input.dataset.eventBound = 'true';
     });
 
-    calcContainer.querySelectorAll('.person-type-name-span').forEach(span => { makeEditable(span, 'text', calcAll); });
-    calcContainer.querySelectorAll('.person-count-span').forEach(span => { makeEditable(span, 'number', calcAll); });
-    calcContainer.querySelectorAll('.dynamic-row-label-span').forEach(span => { makeEditable(span, 'text', () => {}); });
-    
-    calcContainer.querySelectorAll('th .remove-col-btn').forEach((btn) => {
-        btn.addEventListener('click', () => {
-            const headerCell = btn.closest('th');
-            if (!headerCell) return;
-            const colIndex = Array.from(headerCell.parentNode.children).indexOf(headerCell);
-            if (confirm('해당 항목을 삭제하시겠습니까?')) {
-                calcContainer.querySelectorAll('.quote-table tr').forEach(row => row.cells[colIndex]?.remove());
-                updateSummaryRow(calcContainer);
-                calcAll();
-            }
-        });
+    calcContainer.querySelectorAll('.person-type-name-span:not([data-event-bound])').forEach(span => {
+        makeEditable(span, 'text', calcAll);
+        span.dataset.eventBound = 'true';
     });
-
-    calcContainer.querySelectorAll('.dynamic-row-delete-btn').forEach(btn => {
-        btn.addEventListener('click', () => { 
-            if (confirm('해당 항목을 삭제하시겠습니까?')) {
-                btn.closest('tr').remove();
-                calcAll();
-            } 
-        });
+    calcContainer.querySelectorAll('.person-count-span:not([data-event-bound])').forEach(span => {
+        makeEditable(span, 'number', calcAll);
+        span.dataset.eventBound = 'true';
+    });
+    calcContainer.querySelectorAll('.dynamic-row-label-span:not([data-event-bound])').forEach(span => {
+        makeEditable(span, 'text', () => {});
+        span.dataset.eventBound = 'true';
     });
     
-    const addPersonBtn = calcContainer.querySelector('.add-person-type-btn');
-    if (addPersonBtn) { addPersonBtn.addEventListener('click', () => addPersonTypeColumn(calcContainer, '아동', 1)); }
+    // [수정] 버튼에 대한 이벤트 리스너는 이벤트 위임으로 처리하므로 이 함수에서 제거합니다.
     
-    const addRowBtn = calcContainer.querySelector('.add-dynamic-row-btn');
-    if (addRowBtn) { addRowBtn.addEventListener('click', () => addDynamicCostRow(calcContainer)); }
-    
-    calcContainer.querySelectorAll('.sales-price').forEach(input => {
+    calcContainer.querySelectorAll('.sales-price:not([data-dblclick-bound])').forEach(input => {
         input.addEventListener('dblclick', (event) => {
             const expression = event.target.dataset.formula || event.target.value;
             const calculatedValue = evaluateMath(expression).toString();
             copyToClipboard(calculatedValue, '상품가');
         });
+        input.dataset.dblclickBound = 'true';
     });
 
     updateSummaryRow(calcContainer);
