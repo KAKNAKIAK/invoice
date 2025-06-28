@@ -771,7 +771,7 @@ async function ip_loadTripFromFirestore(tripId, groupId) {
 }
 
 // =======================================================================
-// 6. 핵심 기능 함수 (기존 메인 앱 함수들)
+// 6. 핵심 기능 함수 (메인 앱 함수들)
 // =======================================================================
 function createCustomerCard(initialData = { name: '', phone: '', email: '' }) {
     const container = document.getElementById('customerInfoContainer');
@@ -860,33 +860,40 @@ function showToastMessage(message, isError = false) {
     }, 3000);
 }
 
+// [수정] UI 데이터를 데이터 객체로 동기화하는 함수
 function syncGroupUIToData(groupId) {
     if (!groupId || !quoteGroupsData[groupId]) return;
     const groupEl = document.getElementById(`group-content-${groupId}`);
     if (!groupEl) return;
+
+    // 각 계산기 인스턴스의 현재 상태를 데이터 객체에 저장
     groupEl.querySelectorAll('.calculator-instance').forEach(instance => {
         const calcId = instance.dataset.calculatorId;
         const calculatorData = quoteGroupsData[groupId].calculators.find(c => c.id === calcId);
         if (!calculatorData) return;
-        calculatorData.pnr = instance.querySelector('.pnr-pane textarea').value;
+
+        // PNR 정보 저장
+        const pnrTextarea = instance.querySelector('.pnr-pane textarea');
+        if (pnrTextarea) {
+            calculatorData.pnr = pnrTextarea.value;
+        }
+
         const table = instance.querySelector('.quote-table');
         if (table) {
+            // 테이블 내의 모든 텍스트 입력 필드의 현재 값을 'value' 속성에 명시적으로 설정
+            // 이렇게 해야 .innerHTML 호출 시 최신 값이 포함됨
             table.querySelectorAll('input[type="text"]').forEach(input => {
                 input.setAttribute('value', input.value);
-                if (input.dataset.formula) {
-                    input.setAttribute('data-formula', input.dataset.formula);
-                } else {
-                    input.removeAttribute('data-formula');
-                }
             });
+            
+            // 이제 테이블의 전체 HTML을 저장
             calculatorData.tableHTML = table.innerHTML;
         }
     });
     hm_syncCurrentHotelData(groupId);
-    if (typeof ip_syncUIToData === 'function') {
-        ip_syncUIToData(groupId);
-    }
+    // ip_syncUIToData(groupId) 와 같은 다른 모듈 동기화 함수가 있다면 여기에 추가
 }
+
 async function getSaveDataBlob() {
     if (activeGroupId) {
         syncGroupUIToData(activeGroupId);
@@ -1258,6 +1265,23 @@ function createGroupUI(groupId) {
     tabEl.addEventListener('click', e => { if (e.target.tagName !== 'BUTTON') switchTab(groupId); });
     tabEl.querySelector('.close-tab-btn').addEventListener('click', () => deleteGroup(groupId));
 }
+
+// [신규] 계산기 UI 렌더링 함수
+function renderCalculators(groupId) {
+    const groupData = quoteGroupsData[groupId];
+    const groupEl = document.getElementById(`group-content-${groupId}`);
+    if (!groupData || !groupEl) return;
+    
+    const calculatorsWrapper = groupEl.querySelector(`#calculators-wrapper-${groupId}`);
+    calculatorsWrapper.innerHTML = ''; // 렌더링 전 컨테이너 비우기
+
+    if (groupData.calculators && groupData.calculators.length > 0) {
+        groupData.calculators.forEach(calcData => {
+            createCalculatorInstance(calculatorsWrapper, groupId, calcData);
+        });
+    }
+}
+
 function initializeGroup(groupEl, groupId) {
     groupEl.innerHTML = `<div class="flex flex-col xl:flex-row gap-6"> 
         <div class="xl:w-1/2 flex flex-col"> 
@@ -1306,10 +1330,36 @@ function initializeGroup(groupEl, groupId) {
 
     const groupData = quoteGroupsData[groupId];
     if (!groupData) return;
+
+    // 계산기 UI 렌더링
+    renderCalculators(groupId);
+
     const calculatorsWrapper = groupEl.querySelector(`#calculators-wrapper-${groupId}`);
-    if (groupData.calculators && groupData.calculators.length > 0) {
-        groupData.calculators.forEach(calcData => createCalculatorInstance(calculatorsWrapper, groupId, calcData));
+    // SortableJS 초기화
+    if (calculatorsWrapper) {
+        new Sortable(calculatorsWrapper, {
+            handle: '.calculator-handle', // 드래그 핸들 지정
+            animation: 150,
+            ghostClass: 'sortable-ghost',
+            onEnd: function (evt) {
+                const { oldIndex, newIndex } = evt;
+                if (oldIndex === newIndex) return;
+
+                // [중요] UI 변경 전, 현재 상태를 데이터에 저장
+                syncGroupUIToData(groupId);
+                
+                // 데이터 배열 순서 변경
+                const calculators = groupData.calculators;
+                const [movedItem] = calculators.splice(oldIndex, 1);
+                calculators.splice(newIndex, 0, movedItem);
+                
+                // 변경된 데이터 순서로 UI 다시 렌더링
+                renderCalculators(groupId);
+            }
+        });
     }
+
+    // 이하 기존 로직 유지...
     const flightContainer = groupEl.querySelector('.flight-schedule-container');
     if (groupData.flightSchedule) { groupData.flightSchedule.forEach(subgroup => createFlightSubgroup(flightContainer, subgroup, groupId)); }
     const priceContainer = groupEl.querySelector('.price-info-container');
@@ -1319,11 +1369,12 @@ function initializeGroup(groupEl, groupId) {
     if (inclusionTextEl) inclusionTextEl.value = groupData.inclusionText || '';
     if (exclusionTextEl) exclusionTextEl.value = groupData.exclusionText || '';
     groupEl.querySelector('.inclusion-exclusion-doc-name-display').textContent = `(${groupData.inclusionExclusionDocName || '새 내역'})`;
+    
     groupEl.querySelector('.add-calculator-btn').addEventListener('click', () => {
         syncGroupUIToData(groupId);
         const newCalcData = { id: `calc_${Date.now()}`, pnr: '', tableHTML: null };
         groupData.calculators.push(newCalcData);
-        createCalculatorInstance(calculatorsWrapper, groupId, newCalcData);
+        renderCalculators(groupId); // 추가 후 다시 렌더링
     });
     groupEl.querySelector('.copy-last-calculator-btn').addEventListener('click', () => {
         if (!groupData || groupData.calculators.length === 0) { showToastMessage('복사할 견적 계산이 없습니다.', true); return; }
@@ -1332,8 +1383,9 @@ function initializeGroup(groupEl, groupId) {
         const newCalcData = JSON.parse(JSON.stringify(lastCalculatorData));
         newCalcData.id = `calc_${Date.now()}_${Math.random()}`;
         groupData.calculators.push(newCalcData);
-        createCalculatorInstance(calculatorsWrapper, groupId, newCalcData);
+        renderCalculators(groupId); // 복사 후 다시 렌더링
     });
+
     inclusionTextEl.addEventListener('input', e => { groupData.inclusionText = e.target.value; });
     exclusionTextEl.addEventListener('input', e => { groupData.exclusionText = e.target.value; });
     groupEl.querySelector('.copy-inclusion-btn').addEventListener('click', () => { copyToClipboard(inclusionTextEl.value, '포함 내역'); });
@@ -1366,13 +1418,13 @@ function initializeGroup(groupEl, groupId) {
         initializeItineraryPlannerForGroup(itineraryContainer, groupId);
     }
 }
+
 function buildCalculatorDOM(calcContainer) {
     const content = document.createElement('div');
     content.innerHTML = `<div class="split-container"><div class="pnr-pane"><label class="label-text font-semibold mb-2">PNR 정보</label><textarea class="w-full flex-grow px-3 py-2 border rounded-md shadow-sm" placeholder="PNR 정보를 여기에 붙여넣으세요."></textarea></div><div class="resizer-handle"></div><div class="quote-pane"><div class="table-container"><table class="quote-table"><thead><tr class="header-row"><th><button type="button" class="btn btn-sm btn-primary add-person-type-btn"><i class="fas fa-plus"></i></button></th></tr><tr class="count-row"><th></th></tr></thead><tbody></tbody><tfoot></tfoot></table></div></div></div>`;
     const calculatorElement = content.firstElementChild;
     calcContainer.appendChild(calculatorElement);
 
-    // [수정] 이벤트 위임을 사용하여 버튼 클릭 처리
     const table = calculatorElement.querySelector('.quote-table');
     table.addEventListener('click', (e) => {
         const button = e.target.closest('button');
@@ -1412,34 +1464,48 @@ function buildCalculatorDOM(calcContainer) {
         }
     });
 }
+
 function createCalculatorInstance(wrapper, groupId, calcData) {
     const instanceContainer = document.createElement('div');
-    instanceContainer.className = 'calculator-instance border p-4 rounded-lg relative bg-white shadow';
+    instanceContainer.className = 'calculator-instance border p-4 rounded-lg relative bg-white shadow mb-4';
     instanceContainer.dataset.calculatorId = calcData.id;
-    const deleteBtn = document.createElement('button');
-    deleteBtn.type = 'button';
-    deleteBtn.className = 'absolute top-2 right-2 text-gray-400 hover:text-red-600 z-10';
-    deleteBtn.innerHTML = '<i class="fas fa-times-circle"></i>';
-    deleteBtn.title = '이 계산기 삭제';
-    deleteBtn.addEventListener('click', (e) => {
+
+    const headerDiv = document.createElement('div');
+    headerDiv.className = 'calculator-header flex justify-between items-center pb-2 mb-2 border-b';
+    headerDiv.innerHTML = `
+        <div class="calculator-handle cursor-grab text-gray-500 p-1" title="순서 변경">
+            <i class="fas fa-grip-vertical"></i>
+        </div>
+        <button type="button" class="delete-calculator-btn text-gray-400 hover:text-red-600 z-10 p-1" title="이 계산기 삭제">
+            <i class="fas fa-times-circle"></i>
+        </button>
+    `;
+
+    headerDiv.querySelector('.delete-calculator-btn').addEventListener('click', (e) => {
         e.stopPropagation();
         if (confirm('이 견적 계산기를 삭제하시겠습니까?')) {
             const groupData = quoteGroupsData[groupId];
             if (groupData) {
-                groupData.calculators = groupData.calculators.filter(c => c.id !== calcData.id);
+                const calcIndex = groupData.calculators.findIndex(c => c.id === calcData.id);
+                if (calcIndex > -1) {
+                    groupData.calculators.splice(calcIndex, 1);
+                }
             }
             instanceContainer.remove();
         }
     });
-    instanceContainer.appendChild(deleteBtn);
+    
+    instanceContainer.appendChild(headerDiv);
     wrapper.appendChild(instanceContainer);
     buildCalculatorDOM(instanceContainer);
+
     if (calcData && calcData.tableHTML) {
         restoreCalculatorState(instanceContainer, calcData);
     } else {
         addPersonTypeColumn(instanceContainer, '성인', 1);
     }
 }
+
 function restoreCalculatorState(instanceContainer, calcData) {
     if (!instanceContainer || !calcData) return;
     const pnrTextarea = instanceContainer.querySelector('.pnr-pane textarea');
@@ -1458,14 +1524,9 @@ function restoreCalculatorState(instanceContainer, calcData) {
 }
 
 // =======================================================================
-// 7. [수정] 견적 계산기 핵심 로직 (엑셀 방식 + Enter 키 기능 적용)
+// 7. 견적 계산기 핵심 로직
 // =======================================================================
 
-/**
- * Excel과 유사한 입력 필드 동작을 설정합니다. (Enter 키 기능 추가)
- * @param {HTMLInputElement} input - 적용할 입력 필드 요소
- * @param {Function} onBlurCallback - blur 이벤트 발생 시 호출될 콜백 함수
- */
 function setupExcelLikeInput(input, onBlurCallback) {
     input.addEventListener('focus', (e) => {
         const formula = e.target.dataset.formula;
@@ -1489,11 +1550,9 @@ function setupExcelLikeInput(input, onBlurCallback) {
         if (onBlurCallback) onBlurCallback();
     });
 
-    // Enter 키 이벤트 핸들러 추가
     input.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
-            e.preventDefault(); // 기본 동작(폼 제출 등) 방지
-
+            e.preventDefault();
             const currentCell = e.target.closest('td');
             if (!currentCell) return;
             const currentRow = currentCell.closest('tr');
@@ -1502,18 +1561,16 @@ function setupExcelLikeInput(input, onBlurCallback) {
             const currentRowIndex = allRows.indexOf(currentRow);
             const currentCellIndex = Array.from(currentRow.children).indexOf(currentCell);
 
-            // 현재 입력칸의 blur 이벤트를 실행하여 계산 및 값 표시
             e.target.blur();
 
-            // 다음 행에서 동일한 컬럼의 입력 필드를 찾아 포커스
             for (let i = currentRowIndex + 1; i < allRows.length; i++) {
                 const nextCell = allRows[i].cells[currentCellIndex];
                 if (nextCell) {
                     const nextInput = nextCell.querySelector('input[type="text"]');
                     if (nextInput) {
                         nextInput.focus();
-                        nextInput.select(); // 내용을 전체 선택하여 바로 수정 가능하도록
-                        return; // 다음 입력 필드를 찾았으므로 반복 종료
+                        nextInput.select();
+                        return;
                     }
                 }
             }
@@ -1521,15 +1578,9 @@ function setupExcelLikeInput(input, onBlurCallback) {
     });
 }
 
-/**
- * 계산기 내 모든 이벤트 리스너를 다시 바인딩합니다.
- * @param {HTMLElement} calcContainer - 계산기 인스턴스 컨테이너
- */
 function rebindCalculatorEventListeners(calcContainer) {
     const calcAll = () => calculateAll(calcContainer);
 
-    // [수정] 중복 바인딩을 피하기 위해 새로 추가된 요소에만 이벤트 리스너를 추가합니다.
-    // data-event-bound 속성을 사용하여 이미 처리된 요소는 건너뜁니다.
     calcContainer.querySelectorAll('.cost-item:not([data-event-bound]), .sales-price:not([data-event-bound])').forEach(input => {
         setupExcelLikeInput(input, calcAll);
         input.dataset.eventBound = 'true';
@@ -1547,8 +1598,6 @@ function rebindCalculatorEventListeners(calcContainer) {
         makeEditable(span, 'text', () => {});
         span.dataset.eventBound = 'true';
     });
-    
-    // [수정] 버튼에 대한 이벤트 리스너는 이벤트 위임으로 처리하므로 이 함수에서 제거합니다.
     
     calcContainer.querySelectorAll('.sales-price:not([data-dblclick-bound])').forEach(input => {
         input.addEventListener('dblclick', (event) => {
@@ -1586,11 +1635,7 @@ function makeEditable(element, inputType, onBlurCallback) {
         input.addEventListener('keydown', e => {
             if (e.key === 'Enter') {
                 e.preventDefault();
-                const formElements = Array.from(document.getElementById('quoteForm').querySelectorAll('input, textarea, button, select'));
-                const currentIndex = formElements.indexOf(e.target);
-                const nextElement = formElements[currentIndex + 1];
-                if (nextElement) { nextElement.focus(); }
-                else { e.target.blur(); }
+                e.target.blur();
             } else if (e.key === 'Escape') { e.target.blur(); }
         });
     };
@@ -1599,7 +1644,7 @@ function makeEditable(element, inputType, onBlurCallback) {
 
 function getCellContent(rowId, colIndex, type) {
     const name = `group[${colIndex}][${rowId}]`;
-    let initialValue = ''; // 기본값을 '0'으로 설정
+    let initialValue = '';
     if (type === 'costInput') {
         if (rowId === 'insurance') {
             initialValue = '5,000';
@@ -1727,7 +1772,7 @@ function calculateAll(calcContainer) {
     summarySection.querySelector('.totalProfitMargin').textContent = formatPercentage(grandTotalProfitMargin);
 }
 // =======================================================================
-// 8. 기타 유틸리티 함수 (기존 코드 유지)
+// 8. 기타 유틸리티 함수
 // =======================================================================
 function createFlightSubgroup(container, subgroupData, groupId) {
     const subGroupDiv = document.createElement('div');
@@ -1914,7 +1959,6 @@ function setupGlobalEventListeners() {
         ipCancelDeleteBtn.addEventListener('click', () => document.getElementById('ipConfirmDeleteDayModal').classList.add('hidden'));
     }
 
-    // 일정 템플릿 불러오기 모달 닫기(X, 닫기 버튼)
     const ipCloseLoadTemplateModal = document.getElementById('ipCloseLoadTemplateModal');
     if (ipCloseLoadTemplateModal) {
         ipCloseLoadTemplateModal.addEventListener('click', () => {
