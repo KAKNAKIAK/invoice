@@ -860,19 +860,17 @@ function showToastMessage(message, isError = false) {
     }, 3000);
 }
 
-// [수정] UI 데이터를 데이터 객체로 동기화하는 함수
+// *** 최종 수정된 함수 ***
 function syncGroupUIToData(groupId) {
     if (!groupId || !quoteGroupsData[groupId]) return;
     const groupEl = document.getElementById(`group-content-${groupId}`);
     if (!groupEl) return;
 
-    // 각 계산기 인스턴스의 현재 상태를 데이터 객체에 저장
     groupEl.querySelectorAll('.calculator-instance').forEach(instance => {
         const calcId = instance.dataset.calculatorId;
         const calculatorData = quoteGroupsData[groupId].calculators.find(c => c.id === calcId);
         if (!calculatorData) return;
 
-        // PNR 정보 저장
         const pnrTextarea = instance.querySelector('.pnr-pane textarea');
         if (pnrTextarea) {
             calculatorData.pnr = pnrTextarea.value;
@@ -880,18 +878,29 @@ function syncGroupUIToData(groupId) {
 
         const table = instance.querySelector('.quote-table');
         if (table) {
-            // 테이블 내의 모든 텍스트 입력 필드의 현재 값을 'value' 속성에 명시적으로 설정
-            // 이렇게 해야 .innerHTML 호출 시 최신 값이 포함됨
-            table.querySelectorAll('input[type="text"]').forEach(input => {
-                input.setAttribute('value', input.value);
+            // 1. 원본 테이블을 복제하여 리스너가 없는 깨끗한 DOM 생성
+            const tableClone = table.cloneNode(true);
+
+            // 2. 복제된 DOM에서 'data-event-bound' 속성 모두 제거
+            tableClone.querySelectorAll('[data-event-bound]').forEach(el => {
+                el.removeAttribute('data-event-bound');
             });
             
-            // 이제 테이블의 전체 HTML을 저장
-            calculatorData.tableHTML = table.innerHTML;
+            // 3. 원본 테이블의 현재 input '값'을 복제된 테이블의 'value' 속성에 반영
+            const originalInputs = table.querySelectorAll('input[type="text"]');
+            const clonedInputs = tableClone.querySelectorAll('input[type="text"]');
+            originalInputs.forEach((originalInput, index) => {
+                if (clonedInputs[index]) {
+                    clonedInputs[index].setAttribute('value', originalInput.value);
+                }
+            });
+
+            // 4. 깨끗하게 정리된 복제본의 HTML을 저장
+            calculatorData.tableHTML = tableClone.innerHTML;
         }
     });
+
     hm_syncCurrentHotelData(groupId);
-    // ip_syncUIToData(groupId) 와 같은 다른 모듈 동기화 함수가 있다면 여기에 추가
 }
 
 async function getSaveDataBlob() {
@@ -1266,14 +1275,13 @@ function createGroupUI(groupId) {
     tabEl.querySelector('.close-tab-btn').addEventListener('click', () => deleteGroup(groupId));
 }
 
-// [신규] 계산기 UI 렌더링 함수
 function renderCalculators(groupId) {
     const groupData = quoteGroupsData[groupId];
     const groupEl = document.getElementById(`group-content-${groupId}`);
     if (!groupData || !groupEl) return;
     
     const calculatorsWrapper = groupEl.querySelector(`#calculators-wrapper-${groupId}`);
-    calculatorsWrapper.innerHTML = ''; // 렌더링 전 컨테이너 비우기
+    calculatorsWrapper.innerHTML = ''; 
 
     if (groupData.calculators && groupData.calculators.length > 0) {
         groupData.calculators.forEach(calcData => {
@@ -1331,35 +1339,26 @@ function initializeGroup(groupEl, groupId) {
     const groupData = quoteGroupsData[groupId];
     if (!groupData) return;
 
-    // 계산기 UI 렌더링
     renderCalculators(groupId);
 
     const calculatorsWrapper = groupEl.querySelector(`#calculators-wrapper-${groupId}`);
-    // SortableJS 초기화
     if (calculatorsWrapper) {
         new Sortable(calculatorsWrapper, {
-            handle: '.calculator-handle', // 드래그 핸들 지정
+            handle: '.calculator-handle',
             animation: 150,
             ghostClass: 'sortable-ghost',
             onEnd: function (evt) {
                 const { oldIndex, newIndex } = evt;
                 if (oldIndex === newIndex) return;
-
-                // [중요] UI 변경 전, 현재 상태를 데이터에 저장
                 syncGroupUIToData(groupId);
-                
-                // 데이터 배열 순서 변경
                 const calculators = groupData.calculators;
                 const [movedItem] = calculators.splice(oldIndex, 1);
                 calculators.splice(newIndex, 0, movedItem);
-                
-                // 변경된 데이터 순서로 UI 다시 렌더링
                 renderCalculators(groupId);
             }
         });
     }
 
-    // 이하 기존 로직 유지...
     const flightContainer = groupEl.querySelector('.flight-schedule-container');
     if (groupData.flightSchedule) { groupData.flightSchedule.forEach(subgroup => createFlightSubgroup(flightContainer, subgroup, groupId)); }
     const priceContainer = groupEl.querySelector('.price-info-container');
@@ -1374,7 +1373,7 @@ function initializeGroup(groupEl, groupId) {
         syncGroupUIToData(groupId);
         const newCalcData = { id: `calc_${Date.now()}`, pnr: '', tableHTML: null };
         groupData.calculators.push(newCalcData);
-        renderCalculators(groupId); // 추가 후 다시 렌더링
+        renderCalculators(groupId);
     });
     groupEl.querySelector('.copy-last-calculator-btn').addEventListener('click', () => {
         if (!groupData || groupData.calculators.length === 0) { showToastMessage('복사할 견적 계산이 없습니다.', true); return; }
@@ -1383,7 +1382,7 @@ function initializeGroup(groupEl, groupId) {
         const newCalcData = JSON.parse(JSON.stringify(lastCalculatorData));
         newCalcData.id = `calc_${Date.now()}_${Math.random()}`;
         groupData.calculators.push(newCalcData);
-        renderCalculators(groupId); // 복사 후 다시 렌더링
+        renderCalculators(groupId);
     });
 
     inclusionTextEl.addEventListener('input', e => { groupData.inclusionText = e.target.value; });
@@ -1504,6 +1503,9 @@ function createCalculatorInstance(wrapper, groupId, calcData) {
     } else {
         addPersonTypeColumn(instanceContainer, '성인', 1);
     }
+    
+    rebindCalculatorEventListeners(instanceContainer);
+    calculateAll(instanceContainer);
 }
 
 function restoreCalculatorState(instanceContainer, calcData) {
@@ -1517,10 +1519,8 @@ function restoreCalculatorState(instanceContainer, calcData) {
             const formula = input.getAttribute('data-formula');
             input.dataset.formula = formula;
         });
-        rebindCalculatorEventListeners(instanceContainer); 
     }
     else { addPersonTypeColumn(instanceContainer, '성인', 1); }
-    calculateAll(instanceContainer);
 }
 
 // =======================================================================
