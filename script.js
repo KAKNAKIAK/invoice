@@ -1553,6 +1553,7 @@ function setupExcelLikeInput(input, onBlurCallback) {
     input.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
             e.preventDefault();
+            e.stopPropagation();
             const currentCell = e.target.closest('td');
             if (!currentCell) return;
             const currentRow = currentCell.closest('tr');
