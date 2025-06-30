@@ -126,9 +126,8 @@ function addFlightsFromParser(parsedFlights) {
 }
 
 // =======================================================================
-// ▼▼▼ 4. 호텔카드 메이커 (Hotel Maker) 통합 코드 (사용자 제공 버전 기반) ▼▼▼
+// ▼▼▼ 4. 호텔카드 메이커 (Hotel Maker) 통합 코드 ▼▼▼
 // =======================================================================
-
 const hmFirebaseConfig = {
     apiKey: "AIzaSyDsV5PGKMFdCDKgFfl077-DuaYv6N5kVNs",
     authDomain: "hotelinformation-app.firebaseapp.com",
@@ -860,7 +859,6 @@ function showToastMessage(message, isError = false) {
     }, 3000);
 }
 
-// *** 최종 수정된 함수 ***
 function syncGroupUIToData(groupId) {
     if (!groupId || !quoteGroupsData[groupId]) return;
     const groupEl = document.getElementById(`group-content-${groupId}`);
@@ -878,15 +876,15 @@ function syncGroupUIToData(groupId) {
 
         const table = instance.querySelector('.quote-table');
         if (table) {
-            // 1. 원본 테이블을 복제하여 리스너가 없는 깨끗한 DOM 생성
             const tableClone = table.cloneNode(true);
 
-            // 2. 복제된 DOM에서 'data-event-bound' 속성 모두 제거
             tableClone.querySelectorAll('[data-event-bound]').forEach(el => {
                 el.removeAttribute('data-event-bound');
             });
+             tableClone.querySelectorAll('[data-dblclick-bound]').forEach(el => {
+                el.removeAttribute('data-dblclick-bound');
+            });
             
-            // 3. 원본 테이블의 현재 input '값'을 복제된 테이블의 'value' 속성에 반영
             const originalInputs = table.querySelectorAll('input[type="text"]');
             const clonedInputs = tableClone.querySelectorAll('input[type="text"]');
             originalInputs.forEach((originalInput, index) => {
@@ -895,7 +893,6 @@ function syncGroupUIToData(groupId) {
                 }
             });
 
-            // 4. 깨끗하게 정리된 복제본의 HTML을 저장
             calculatorData.tableHTML = tableClone.innerHTML;
         }
     });
@@ -1514,13 +1511,11 @@ function restoreCalculatorState(instanceContainer, calcData) {
     if (pnrTextarea) pnrTextarea.value = calcData.pnr || '';
     const table = instanceContainer.querySelector('.quote-table');
     if (table && calcData.tableHTML) { 
-        table.innerHTML = calcData.tableHTML; 
-        table.querySelectorAll('input[data-formula]').forEach(input => {
-            const formula = input.getAttribute('data-formula');
-            input.dataset.formula = formula;
-        });
+        table.innerHTML = calcData.tableHTML;
     }
-    else { addPersonTypeColumn(instanceContainer, '성인', 1); }
+    else { 
+        addPersonTypeColumn(instanceContainer, '성인', 1);
+    }
 }
 
 // =======================================================================
@@ -1528,6 +1523,9 @@ function restoreCalculatorState(instanceContainer, calcData) {
 // =======================================================================
 
 function setupExcelLikeInput(input, onBlurCallback) {
+    if (input.dataset.eventBound) return;
+    input.dataset.eventBound = 'true';
+
     input.addEventListener('focus', (e) => {
         const formula = e.target.dataset.formula;
         if (formula) {
@@ -1582,31 +1580,31 @@ function setupExcelLikeInput(input, onBlurCallback) {
 function rebindCalculatorEventListeners(calcContainer) {
     const calcAll = () => calculateAll(calcContainer);
 
-    calcContainer.querySelectorAll('.cost-item:not([data-event-bound]), .sales-price:not([data-event-bound])').forEach(input => {
+    calcContainer.querySelectorAll('[data-event-bound]').forEach(el => el.removeAttribute('data-event-bound'));
+    calcContainer.querySelectorAll('[data-dblclick-bound]').forEach(el => el.removeAttribute('data-dblclick-bound'));
+
+    calcContainer.querySelectorAll('.cost-item, .sales-price').forEach(input => {
         setupExcelLikeInput(input, calcAll);
-        input.dataset.eventBound = 'true';
     });
 
-    calcContainer.querySelectorAll('.person-type-name-span:not([data-event-bound])').forEach(span => {
+    calcContainer.querySelectorAll('.person-type-name-span').forEach(span => {
         makeEditable(span, 'text', calcAll);
-        span.dataset.eventBound = 'true';
     });
-    calcContainer.querySelectorAll('.person-count-span:not([data-event-bound])').forEach(span => {
+    calcContainer.querySelectorAll('.person-count-span').forEach(span => {
         makeEditable(span, 'number', calcAll);
-        span.dataset.eventBound = 'true';
     });
-    calcContainer.querySelectorAll('.dynamic-row-label-span:not([data-event-bound])').forEach(span => {
+    calcContainer.querySelectorAll('.dynamic-row-label-span').forEach(span => {
         makeEditable(span, 'text', () => {});
-        span.dataset.eventBound = 'true';
     });
     
-    calcContainer.querySelectorAll('.sales-price:not([data-dblclick-bound])').forEach(input => {
+    calcContainer.querySelectorAll('.sales-price').forEach(input => {
+        if (input.dataset.dblclickBound) return;
+        input.dataset.dblclickBound = 'true';
         input.addEventListener('dblclick', (event) => {
             const expression = event.target.dataset.formula || event.target.value;
             const calculatedValue = evaluateMath(expression).toString();
             copyToClipboard(calculatedValue, '상품가');
         });
-        input.dataset.dblclickBound = 'true';
     });
 
     updateSummaryRow(calcContainer);
@@ -1614,30 +1612,37 @@ function rebindCalculatorEventListeners(calcContainer) {
 
 
 function makeEditable(element, inputType, onBlurCallback) {
-    if (!element || element.querySelector('input')) return;
+    if (element.dataset.eventBound) return;
+    element.dataset.eventBound = 'true';
+    
     const clickHandler = () => {
         if (element.style.display === 'none') return;
         const currentText = element.textContent;
         const input = document.createElement('input');
         input.type = inputType;
         input.value = inputType === 'number' ? parseInt(currentText.replace(/,/g, ''), 10) || 0 : currentText;
-        input.className = 'person-type-input';
+        input.className = 'person-type-input w-full bg-yellow-100 text-center';
         element.style.display = 'none';
         element.parentNode.insertBefore(input, element.nextSibling);
         input.focus();
         input.select();
+
         const finishEditing = () => {
             element.textContent = input.value;
             element.style.display = '';
-            if (input.parentNode) input.parentNode.removeChild(input);
+            if (input.parentNode) {
+                input.parentNode.removeChild(input);
+            }
             if (onBlurCallback) onBlurCallback();
+            element.removeAttribute('data-event-bound');
         };
-        input.addEventListener('blur', finishEditing);
+
+        input.addEventListener('blur', finishEditing, { once: true });
         input.addEventListener('keydown', e => {
-            if (e.key === 'Enter') {
+            if (e.key === 'Enter' || e.key === 'Escape') {
                 e.preventDefault();
                 e.target.blur();
-            } else if (e.key === 'Escape') { e.target.blur(); }
+            }
         });
     };
     element.addEventListener('click', clickHandler);
@@ -1662,12 +1667,7 @@ function getCellContent(rowId, colIndex, type) {
         default: return '';
     }
 }
-function setupColumnEventListeners(calcContainer, colIndex, headerCell, countCell) {
-    if (!headerCell || !countCell) return;
-    const calcAllForGroup = () => calculateAll(calcContainer);
-    makeEditable(headerCell.querySelector('.person-type-name-span'), 'text', calcAllForGroup);
-    makeEditable(countCell.querySelector('.person-count-span'), 'number', calcAllForGroup);
-}
+
 function addPersonTypeColumn(calcContainer, typeName = '성인', count = 1) {
     const table = calcContainer.querySelector('.quote-table');
     if (!table) return;
@@ -1690,6 +1690,7 @@ function addPersonTypeColumn(calcContainer, typeName = '성인', count = 1) {
     updateSummaryRow(calcContainer);
     calculateAll(calcContainer);
 }
+
 function addDynamicCostRow(calcContainer, label = '신규 항목') {
     const table = calcContainer.querySelector('.quote-table');
     if (!table) return;
