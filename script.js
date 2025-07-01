@@ -1521,60 +1521,119 @@ function restoreCalculatorState(instanceContainer, calcData) {
 // =======================================================================
 // 7. 견적 계산기 핵심 로직
 // =======================================================================
+/**
+ * 입력 필드를 엑셀처럼 수식 입력과 결과 표시 모드로 전환하고,
+ * 엔터 키를 누르면 아래 셀로 이동하는 기능을 설정합니다.
+ * 이 함수는 특정 input 요소에 대해 한 번만 실행되도록 보장합니다.
+ *
+ * @param {HTMLInputElement} inputElement - 기능을 적용할 대상 입력 필드 요소입니다.
+ * @param {Function} onCalculationEnd - 계산이 완료된 후(포커스가 해제될 때) 실행될 콜백 함수입니다.
+ */
+function setupExcelLikeInput(inputElement, onCalculationEnd) {
+    // --------------------------------------------------------------------------
+    // 1. 초기화 및 중복 바인딩 방지
+    // --------------------------------------------------------------------------
+    // 이미 이벤트 리스너가 할당된 요소인지 확인하여 중복 실행을 막습니다.
+    // 이는 동적으로 요소를 추가하고 이벤트를 다시 바인딩할 때 매우 중요합니다.
+    if (inputElement.dataset.excelLikeBound) {
+        return;
+    }
+    inputElement.dataset.excelLikeBound = 'true';
 
-function setupExcelLikeInput(input, onBlurCallback) {
-    if (input.dataset.eventBound) return;
-    input.dataset.eventBound = 'true';
+    // --------------------------------------------------------------------------
+    // 2. 이벤트 리스너 할당
+    // --------------------------------------------------------------------------
 
-    input.addEventListener('focus', (e) => {
-        const formula = e.target.dataset.formula;
+    // --- 포커스 이벤트: 사용자가 셀을 클릭(선택)했을 때 ---
+    const handleFocus = (event) => {
+        const input = event.target;
+        // 'data-formula' 속성에 저장된 원본 수식이 있다면, 그 수식을 다시 보여줍니다.
+        // 이를 통해 사용자는 이전에 입력했던 수식을 확인하고 수정할 수 있습니다.
+        const formula = input.dataset.formula;
         if (formula) {
-            e.target.value = formula;
+            input.value = formula;
+            input.select(); // 수식 전체를 선택하여 쉽게 수정할 수 있도록 합니다.
         }
-    });
+    };
 
-    input.addEventListener('blur', (e) => {
-        const rawValue = e.target.value.trim();
+    // --- 블러 이벤트: 사용자가 셀에서 포커스를 잃었을 때 (Enter, Tab, 다른 곳 클릭) ---
+    const handleBlur = (event) => {
+        const input = event.target;
+        const rawValue = input.value.trim();
+
+        // 입력값이 '='로 시작하면 수식으로 판단합니다.
         if (rawValue.startsWith('=')) {
-            e.target.dataset.formula = rawValue;
+            // 원본 수식을 'data-formula' 속성에 저장하여 나중에 다시 볼 수 있게 합니다.
+            input.dataset.formula = rawValue;
+
+            // '='를 제외한 실제 계산식을 추출합니다.
             const expression = rawValue.substring(1);
+
+            // 외부 `evaluateMath` 함수를 호출하여 수식을 계산합니다.
             const result = evaluateMath(expression);
-            e.target.value = isNaN(result) ? 'Error' : Math.round(result).toLocaleString();
+
+            // 계산 결과를 쉼표가 포함된 숫자 형식(로케일 형식)으로 변환하여 보여줍니다.
+            // isNaN으로 유효한 숫자인지 확인하고, 아닐 경우 'Error'를 표시합니다.
+            input.value = isNaN(result) ? 'Error' : Math.round(result).toLocaleString('ko-KR');
         } else {
-            delete e.target.dataset.formula;
+            // '='로 시작하지 않으면 일반 숫자로 처리합니다.
+            // 혹시 남아있을 수 있는 수식 정보를 삭제합니다.
+            delete input.dataset.formula;
+            // 쉼표 등을 제거하고 숫자로 변환한 뒤, 다시 로케일 형식으로 변환합니다.
             const numericValue = parseFloat(rawValue.replace(/,/g, '')) || 0;
-            e.target.value = numericValue.toLocaleString();
+            input.value = numericValue.toLocaleString('ko-KR');
         }
-        if (onBlurCallback) onBlurCallback();
-    });
 
-    input.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            e.stopPropagation();
-            const currentCell = e.target.closest('td');
-            if (!currentCell) return;
-            const currentRow = currentCell.closest('tr');
-            const tableBody = currentRow.closest('tbody');
-            const allRows = Array.from(tableBody.querySelectorAll('tr'));
-            const currentRowIndex = allRows.indexOf(currentRow);
-            const currentCellIndex = Array.from(currentRow.children).indexOf(currentCell);
+        // 계산이 완료된 후, 부모 컴포넌트에 알리기 위한 콜백 함수를 호출합니다.
+        // (예: 전체 합계 재계산)
+        if (typeof onCalculationEnd === 'function') {
+            onCalculationEnd();
+        }
+    };
 
-            e.target.blur();
+    // --- 키다운 이벤트: 엑셀처럼 Enter 키로 아래로 이동하는 기능 ---
+    const handleKeyDown = (event) => {
+        if (event.key !== 'Enter') {
+            return;
+        }
 
-            for (let i = currentRowIndex + 1; i < allRows.length; i++) {
-                const nextCell = allRows[i].cells[currentCellIndex];
-                if (nextCell) {
-                    const nextInput = nextCell.querySelector('input[type="text"]');
-                    if (nextInput) {
-                        nextInput.focus();
-                        nextInput.select();
-                        return;
-                    }
+        event.preventDefault(); // Enter 키의 기본 동작(예: 폼 제출)을 막습니다.
+        event.stopPropagation(); // 이벤트가 부모 요소로 전파되는 것을 막습니다.
+
+        // 현재 셀의 위치(행, 열 인덱스)를 파악합니다.
+        const currentCell = event.target.closest('td');
+        if (!currentCell) return;
+
+        const currentRow = currentCell.closest('tr');
+        const tableBody = currentRow.closest('tbody');
+        const allRows = Array.from(tableBody.querySelectorAll('tr'));
+        const currentRowIndex = allRows.indexOf(currentRow);
+        const currentCellIndex = Array.from(currentRow.children).indexOf(currentCell);
+
+        // 현재 입력창의 포커스를 강제로 해제하여 `blur` 이벤트를 실행시킵니다.
+        // 이 과정에서 수식 계산 및 결과 표시가 이루어집니다.
+        event.target.blur();
+
+        // 바로 아래 행의 같은 열에 있는 다음 입력 필드를 찾습니다.
+        for (let i = currentRowIndex + 1; i < allRows.length; i++) {
+            const nextCell = allRows[i].cells[currentCellIndex];
+            if (nextCell) {
+                const nextInput = nextCell.querySelector('input[type="text"]');
+                // 다음 입력 필드가 존재하면, 그곳으로 포커스를 이동시키고 종료합니다.
+                if (nextInput) {
+                    nextInput.focus();
+                    return; // 다음 입력 필드를 찾았으므로 반복 종료
                 }
             }
         }
-    });
+    };
+
+    // --------------------------------------------------------------------------
+    // 3. 실제 이벤트 연결
+    // --------------------------------------------------------------------------
+    inputElement.addEventListener('focus', handleFocus);
+    inputElement.addEventListener('blur', handleBlur);
+    inputElement.addEventListener('keydown', handleKeyDown);
 }
 
 function rebindCalculatorEventListeners(calcContainer) {
