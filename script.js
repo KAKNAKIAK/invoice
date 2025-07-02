@@ -1645,12 +1645,13 @@ function createPriceSubgroup(container, subgroupData, groupId) {
     // 이벤트 리스너는 중앙 관리 함수(setupEventListeners)에서 처리합니다.
     container.appendChild(subGroupDiv);
 }
+
 function addPriceRow(tbody, rowData, subgroupData, subGroupDiv, groupId) {
     const tr = document.createElement('tr');
     const fields = [{ key: 'item', align: 'center' }, { key: 'price', align: 'center' }, { key: 'count', align: 'center' }, { key: 'total', align: 'center', readonly: true }, { key: 'remarks', align: 'center' }];
     tr.innerHTML = fields.map(f => `<td><input type="text" class="text-${f.align}" data-field="${f.key}" value="${rowData[f.key] !== undefined ? (f.key === 'price' || f.key === 'total' ? (parseFloat(String(rowData[f.key]).replace(/,/g, '')) || 0).toLocaleString() : rowData[f.key]) : ''}" ${f.readonly ? 'readonly' : ''}></td>`).join('') + `<td><button type="button" class="delete-row-btn"><i class="fas fa-trash"></i></button></td>`;
     tbody.appendChild(tr);
-    
+
     // 각 행의 입력 필드에 이벤트 리스너를 바로 설정
     tr.querySelectorAll('input:not([readonly])').forEach(input => {
         const field = input.dataset.field;
@@ -1672,7 +1673,7 @@ function addPriceRow(tbody, rowData, subgroupData, subGroupDiv, groupId) {
         const price = parseFloat(String(rowData.price).replace(/,/g, '')) || 0;
         const count = parseInt(String(rowData.count).replace(/,/g, '')) || 0;
         const total = price * count;
-        rowData.total = total.toLocaleString(); // 데이터 객체에도 포맷된 값 저장
+        rowData.total = total; // 데이터 객체에는 숫자 값 저장
         
         const totalInput = tr.querySelector('[data-field="total"]');
         if (totalInput) totalInput.value = total.toLocaleString();
@@ -2012,7 +2013,10 @@ function setupEventListeners() {
             if (section.classList.contains('price-subgroup')) {
                 updateGrandTotal(section, groupId);
             }
-        } else if(button.id.startsWith('ip-')) { // 상세일정표 버튼 처리
+        } else if (button.classList.contains('day-toggle-button')) {
+             ip_handleToggleDayCollapse(event, button.closest('.ip-day-section').dataset.dayId.split('-')[1], groupId);
+        }
+        else if(button.id.startsWith('ip-')) { // 상세일정표 버튼 처리
             if (button.id.includes('loadFromDBBtn')) ip_openLoadTripModal(groupId);
             else if (button.id.includes('copyInlineHtmlButton')) ip_handleCopyInlineHtml(groupId);
             else if (button.id.includes('inlinePreviewButton')) ip_handleInlinePreview(groupId);
@@ -2021,7 +2025,6 @@ function setupEventListeners() {
             else if (button.classList.contains('save-date-button')) ip_handleSaveDate(button.closest('.ip-day-section').dataset.dayId.split('-')[1], groupId, button.previousElementSibling.value);
             else if (button.classList.contains('cancel-date-edit-button')) ip_handleCancelDateEdit(button.closest('.ip-day-section').dataset.dayId.split('-')[1], groupId);
             else if (button.classList.contains('delete-day-button')) ip_showConfirmDeleteDayModal(button.closest('.ip-day-section').dataset.dayId.split('-')[1], groupId);
-            else if (button.classList.contains('day-toggle-button')) ip_handleToggleDayCollapse(event, button.closest('.ip-day-section').dataset.dayId.split('-')[1], groupId);
             else if (button.classList.contains('add-activity-button')) ip_openActivityModal(groupId, button.closest('.day-content-wrapper').querySelector('.activities-list').dataset.dayIndex);
             else if (button.classList.contains('edit-activity-button')) {
                 const card = button.closest('.ip-activity-card');
