@@ -939,7 +939,8 @@ async function loadDataIntoWindow(fileHandle, openInNewWindow) {
                 const newWindow = window.open(relativeUrl, '_blank');
                 if (!newWindow) {
                     showToastMessage('팝업이 차단되어 새 창을 열 수 없습니다. 팝업 차단을 해제해주세요.', true);
-                    sessionStorage.removeItem(uniqueKey);
+                                      
+                                       sessionStorage.removeItem(uniqueKey);
                 }
             } else {
                 try {
@@ -1240,7 +1241,7 @@ function initializeGroup(groupEl, groupId) {
                 <div class="flex justify-between items-center mb-4">
                     <h2 class="text-xl font-semibold">항공 스케줄</h2>
                     <div class="flex items-center space-x-2">
-                        <button type="button" class="btn btn-sm btn-outline copy-flight-schedule-btn" title="HTML 복사"><i class="fas fa-clipboard"></i> 코드 복사</button>
+                        <button type="button" class="btn btn-sm btn-primary copy-flight-schedule-btn" title="HTML 복사"><i class="fas fa-clipboard"></i> 코드 복사</button>
                         <button type="button" class="btn btn-sm btn-primary parse-gds-btn">GDS 파싱</button>
                         <button type="button" class="btn btn-sm btn-primary add-flight-subgroup-btn"><i class="fas fa-plus"></i> 추가</button>
                     </div>
@@ -1251,7 +1252,7 @@ function initializeGroup(groupEl, groupId) {
                 <div class="flex justify-between items-center mb-4">
                     <h2 class="text-xl font-semibold">요금 안내</h2>
                     <div class="flex items-center space-x-2">
-                        <button type="button" class="btn btn-sm btn-outline copy-price-info-btn" title="HTML 복사"><i class="fas fa-clipboard"></i> 코드 복사</button>
+                        <button type="button" class="btn btn-sm btn-primary copy-price-info-btn" title="HTML 복사"><i class="fas fa-clipboard"></i> 코드 복사</button>
                         <button type="button" class="btn btn-sm btn-primary add-price-subgroup-btn"><i class="fas fa-plus"></i> 추가</button>
                     </div>
                 </div>
@@ -1319,7 +1320,7 @@ function initializeGroup(groupEl, groupId) {
 
 function buildCalculatorDOM(calcContainer) {
     const content = document.createElement('div');
-    content.innerHTML = `<div class="split-container"><div class="pnr-pane"><label class="label-text font-semibold mb-2">PNR 정보</label><textarea class="w-full flex-grow px-3 py-2 border rounded-md shadow-sm" placeholder="PNR 정보를 여기에 붙여넣으세요."></textarea></div><div class="resizer-handle"></div><div class="quote-pane"><div class="table-container"><table class="quote-table"><thead><tr class="header-row"><th><button type="button" class="btn btn-sm btn-primary add-person-type-btn"><i class="fas fa-plus"></i></button></th></tr><tr class="count-row"><th></th></tr></thead><tbody></tbody><tfoot></tfoot></table></div></div></div>`;
+    content.innerHTML = `<div class="split-container"><div class="pnr-pane"><label class="label-text font-semibold mb-2">PNR 정보</label><textarea class="w-full flex-grow px-3 py-2 border rounded-md shadow-sm" placeholder="PNR 정보를 여기에 붙여넣으세요."></textarea></div><div class="resizer-handle"></div><div class="quote-pane"><div class="table-container"><table class="quote-table"><thead><tr class="header-row"><th><button type="button" class="btn btn-sm btn-primary add-person-type-btn"><i class="fas fa-plus"></i></button></th></tr><tr class="count-row"><th></th></tr></thead><tbody></tbody><tfoot><tr><td colspan="3" class="text-right font-bold pr-2">총 합계</td><td class="grand-total">0</td><td colspan="2"><button type="button" class="add-row-btn"><i class="fas fa-plus mr-1"></i></button></td></tr></tfoot></table></div></div></div>`;
     const calculatorElement = content.firstElementChild;
     calcContainer.appendChild(calculatorElement);
 
@@ -1674,27 +1675,67 @@ function setupEventListeners() {
     const appContainer = document.querySelector('.max-w-full');
 
     // --- 상단 헤더 및 글로벌 버튼 ---
-    appContainer.addEventListener('click', (event) => {
-        const button = event.target.closest('button');
-        if (!button) return;
+    if (appContainer) {
+        appContainer.addEventListener('click', (event) => {
+            const button = event.target.closest('button');
+            if (!button) return;
 
-        const id = button.id;
-        if (id === 'addCustomerBtn') createCustomerCard();
-        else if (id === 'newGroupBtn') addNewGroup();
-        else if (id === 'copyGroupBtn') copyActiveGroup();
-        else if (id === 'deleteGroupBtn') deleteActiveGroup();
-        else if (id === 'newWindowBtn') window.open(window.location.href, '_blank');
-        else if (id === 'saveBtn') saveFile(false, button);
-        else if (id === 'saveAsBtn') saveFile(true, button);
-        else if (id === 'recentFilesBtn') openRecentFilesModal();
-        else if (id === 'copyMemoBtn') copyToClipboard(document.getElementById('memoText').value, '메모');
-        else if (id === 'loadMemoFromDbBtn') openLoadMemoModal();
-    });
-    
-    document.querySelector('label[for="loadFile"]')?.addEventListener('click', (event) => {
-        event.preventDefault();
-        loadFile();
-    });
+            const id = button.id;
+            if (id === 'addCustomerBtn') createCustomerCard();
+            else if (id === 'newGroupBtn') addNewGroup();
+            else if (id === 'copyGroupBtn') copyActiveGroup();
+            else if (id === 'deleteGroupBtn') deleteActiveGroup();
+            else if (id === 'newWindowBtn') window.open(window.location.href, '_blank');
+            else if (id === 'saveBtn') saveFile(false, button);
+            else if (id === 'saveAsBtn') saveFile(true, button);
+            else if (id === 'recentFilesBtn') openRecentFilesModal();
+            else if (id === 'copyMemoBtn') copyToClipboard(document.getElementById('memoText').value, '메모');
+            else if (id === 'loadMemoFromDbBtn') openLoadMemoModal();
+        });
+    }
+
+    // --- 파일 불러오기 라벨 클릭 이벤트 리스너 (추가) ---
+    const loadFileLabel = document.querySelector('label[for="loadFile"]');
+    if (loadFileLabel) {
+        loadFileLabel.addEventListener('click', (event) => {
+            event.preventDefault(); // 기본 동작 방지
+            loadFile();
+        });
+    }
+
+    // --- 고객 정보 컨테이너 이벤트 위임 ---
+    const customerInfoContainer = document.getElementById('customerInfoContainer');
+    if (customerInfoContainer) {
+        customerInfoContainer.addEventListener('click', (event) => {
+            const button = event.target.closest('button');
+            if (!button) return;
+
+            // 고객 카드 삭제 버튼
+            if (button.classList.contains('remove-customer-btn')) {
+                if (confirm('이 고객 정보를 삭제하시겠습니까?')) {
+                    button.closest('.p-4').remove();
+                }
+            }
+            // 정보 복사 버튼
+            else if (button.classList.contains('copy-customer-info-btn')) {
+                const inputElement = button.previousElementSibling;
+                if (inputElement && inputElement.value) {
+                    copyToClipboard(inputElement.value, '고객정보');
+                } else {
+                    showToastMessage('복사할 내용이 없습니다.', true);
+                }
+            }
+        });
+
+        customerInfoContainer.addEventListener('dblclick', (event) => {
+            const inputElement = event.target;
+            if (inputElement.matches('input[type="text"], input[type="tel"], input[type="email"]')) {
+                if (inputElement.value) {
+                    copyToClipboard(inputElement.value, '고객정보');
+                }
+            }
+        });
+    }
 
     // --- 모달 닫기 버튼 ---
     document.body.addEventListener('click', event => {
