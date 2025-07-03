@@ -165,7 +165,6 @@ function initializeHotelMakerForGroup(container, groupId) {
         </div>
     `;
 
-    // 이벤트 리스너는 중앙 관리 함수(setupEventListeners)에서 처리합니다.
     hm_render(groupId);
 }
 
@@ -205,13 +204,12 @@ function hm_renderTabs(groupId) {
     hotelData.allHotelData.forEach((hotel, index) => {
         const tabButton = document.createElement('button');
         tabButton.className = 'hotel-tab-button';
-        tabButton.dataset.index = index; // 데이터 속성 추가
+        tabButton.dataset.index = index;
         if (index === hotelData.currentHotelIndex) {
             tabButton.classList.add('active');
         }
         tabButton.innerHTML = `<span class="tab-title">${hotel.nameKo || `새 호텔 ${index + 1}`}</span><i class="fas fa-times tab-delete-icon" title="이 호텔 정보 삭제"></i>`;
         
-        // 이벤트 리스너는 중앙 관리 함수에서 처리
         tabsContainer.insertBefore(tabButton, addBtn);
     });
 }
@@ -481,7 +479,6 @@ function initializeItineraryPlannerForGroup(container, groupId) {
             </div>
         </main>
     `;
-    // 이벤트 리스너는 중앙 관리 함수(setupEventListeners)에서 처리합니다.
     ip_render(groupId);
 }
 
@@ -865,7 +862,7 @@ function syncGroupUIToData(groupId) {
         });
     }
 
-    // [수정] 요금 안내 데이터 동기화
+    // 요금 안내 데이터 동기화
     const priceInfoContainer = groupEl.querySelector('.price-info-container');
     if (priceInfoContainer) {
         groupData.priceInfo = [];
@@ -1361,8 +1358,6 @@ function initializeGroup(groupEl, groupId) {
     if (inclusionTextEl) inclusionTextEl.value = groupData.inclusionText || '';
     if (exclusionTextEl) exclusionTextEl.value = groupData.exclusionText || '';
     groupEl.querySelector('.inclusion-exclusion-doc-name-display').textContent = `(${groupData.inclusionExclusionDocName || '새 내역'})`;
-    
-    // 이벤트 리스너는 중앙 관리 함수(setupEventListeners)에서 처리합니다.
 
     const hotelMakerContainer = groupEl.querySelector(`#hotel-maker-container-${groupId}`);
     if (hotelMakerContainer) {
@@ -1604,7 +1599,6 @@ function createFlightSubgroup(container, subgroupData, groupId) {
     const tbody = subGroupDiv.querySelector('tbody');
     subgroupData.rows.forEach(rowData => addFlightRow(tbody, rowData, subgroupData));
     
-    // 이벤트 리스너는 중앙 관리 함수(setupEventListeners)에서 처리합니다.
     container.appendChild(subGroupDiv);
 }
 function addFlightRow(tbody, rowData, subgroupData) {
@@ -1612,7 +1606,6 @@ function addFlightRow(tbody, rowData, subgroupData) {
     const fields = [{ key: 'flightNum', placeholder: 'ZE561' }, { key: 'depDate', placeholder: '07/09' }, { key: 'originCity', placeholder: 'ICN' }, { key: 'depTime', placeholder: '20:55' }, { key: 'arrDate', placeholder: '07/09' }, { key: 'destCity', placeholder: 'CXR' }, { key: 'arrTime', placeholder: '23:55' }];
     tr.innerHTML = fields.map(f => `<td><input type="text" class="flight-schedule-input" data-field="${f.key}" value="${rowData[f.key] || ''}" placeholder="${f.placeholder}"></td>`).join('') + `<td class="text-center"><button type="button" class="delete-row-btn" title="삭제"><i class="fas fa-trash"></i></button></td>`;
     tbody.appendChild(tr);
-    // 이벤트 리스너는 중앙 관리 함수(setupEventListeners)에서 처리합니다.
 }
 function generateInclusionExclusionInlineHtml(inclusionText, exclusionText) { 
     const i = inclusionText ? inclusionText.replace(/\n/g, '<br>') : ''; 
@@ -1631,7 +1624,6 @@ function generateFlightScheduleInlineHtml(flightData) {
     return html; 
 }
 
-// [수정 시작] '요금 안내' 섹션 관련 함수들을 원래 버전의 코드로 교체합니다.
 function createPriceSubgroup(container, subgroupData, groupId) {
     const subGroupDiv = document.createElement('div');
     subGroupDiv.className = 'dynamic-section price-subgroup';
@@ -1641,8 +1633,7 @@ function createPriceSubgroup(container, subgroupData, groupId) {
     if (subgroupData.rows && subgroupData.rows.length > 0) {
         subgroupData.rows.forEach(rowData => addPriceRow(tbody, rowData, subgroupData, subGroupDiv, groupId));
     }
-    updateGrandTotal(subGroupDiv, groupId);
-    // 이벤트 리스너는 중앙 관리 함수(setupEventListeners)에서 처리합니다.
+    updateGrandTotal(subGroupDiv); // 수정된 함수 호출
     container.appendChild(subGroupDiv);
 }
 
@@ -1652,7 +1643,6 @@ function addPriceRow(tbody, rowData, subgroupData, subGroupDiv, groupId) {
     tr.innerHTML = fields.map(f => `<td><input type="text" class="text-${f.align}" data-field="${f.key}" value="${rowData[f.key] !== undefined ? (f.key === 'price' || f.key === 'total' ? (parseFloat(String(rowData[f.key]).replace(/,/g, '')) || 0).toLocaleString() : rowData[f.key]) : ''}" ${f.readonly ? 'readonly' : ''}></td>`).join('') + `<td><button type="button" class="delete-row-btn"><i class="fas fa-trash"></i></button></td>`;
     tbody.appendChild(tr);
 
-    // 각 행의 입력 필드에 이벤트 리스너를 바로 설정
     tr.querySelectorAll('input:not([readonly])').forEach(input => {
         const field = input.dataset.field;
         
@@ -1673,52 +1663,70 @@ function addPriceRow(tbody, rowData, subgroupData, subGroupDiv, groupId) {
         const price = parseFloat(String(rowData.price).replace(/,/g, '')) || 0;
         const count = parseInt(String(rowData.count).replace(/,/g, '')) || 0;
         const total = price * count;
-        rowData.total = total; // 데이터 객체에는 숫자 값 저장
+        rowData.total = total;
         
         const totalInput = tr.querySelector('[data-field="total"]');
         if (totalInput) totalInput.value = total.toLocaleString();
         
-        updateGrandTotal(subGroupDiv, groupId);
+        updateGrandTotal(subGroupDiv); // 수정된 함수 호출
     }
-    updateRow(); // 초기 렌더링 시 계산 실행
+    updateRow();
 }
 
-function updateGrandTotal(subGroupDiv, groupId) {
-    const subgroupData = quoteGroupsData[groupId]?.priceInfo.find(g => g.id === subGroupDiv.id);
-    if (!subgroupData) return;
 
-    const grandTotal = subgroupData.rows.reduce((sum, row) => {
-        const price = parseFloat(String(row.price).replace(/,/g, '')) || 0;
-        const count = parseInt(String(row.count).replace(/,/g, '')) || 0;
-        return sum + (price * count);
-    }, 0);
+/**
+ * [✨ 최종 수정된 함수] 요금 안내 테이블의 총합계를 계산하고 화면에 업데이트합니다.
+ * 데이터 객체 대신 화면(DOM)의 각 행에서 직접 값을 읽어와 계산하여 데이터 동기화 문제를 해결합니다.
+ * @param {HTMLElement} subGroupDiv - 총합계를 계산할 요금 안내 그룹의 DOM 요소
+ */
+function updateGrandTotal(subGroupDiv) {
+    if (!subGroupDiv) return;
     
-    subGroupDiv.querySelector('.grand-total').textContent = grandTotal.toLocaleString();
+    let grandTotal = 0;
+    const rows = subGroupDiv.querySelectorAll('tbody tr');
+
+    rows.forEach(row => {
+        const priceInput = row.querySelector('input[data-field="price"]');
+        const countInput = row.querySelector('input[data-field="count"]');
+
+        if (priceInput && countInput) {
+            const price = parseFloat(priceInput.value.replace(/,/g, '')) || 0;
+            const count = parseInt(countInput.value.replace(/,/g, '')) || 0;
+            grandTotal += price * count;
+        }
+    });
+    
+    const grandTotalCell = subGroupDiv.querySelector('.grand-total');
+    if (grandTotalCell) {
+        grandTotalCell.textContent = grandTotal.toLocaleString();
+    }
 }
+
 
 function generatePriceInfoInlineHtml(priceData) {
     let html = '';
     if (priceData) {
         priceData.forEach(subgroup => {
-            // [수정사항 1] 견적 설명(subgroup.title)이 HTML에 포함되도록 수정
             if (subgroup.title) { 
                 html += `<h4 style="font-size:14px;font-weight:600;margin-bottom:8px; padding-left: 8px;">${subgroup.title}</h4>`; 
             }
             html += `<table style="width:100%;border-collapse:collapse;font-family:sans-serif;font-size:12px;margin-bottom:16px"><thead><tr style="background-color:#f9fafb"><th style="border:1px solid #ddd;padding:8px;text-align:center">내역</th><th style="border:1px solid #ddd;padding:8px;text-align:center">1인당 금액</th><th style="border:1px solid #ddd;padding:8px;text-align:center">인원</th><th style="border:1px solid #ddd;padding:8px;text-align:center">총 금액</th><th style="border:1px solid #ddd;padding:8px;text-align:center">비고</th></tr></thead><tbody>`;
+            
             let grandTotal = 0;
             subgroup.rows.forEach(row => { 
                 const p = parseFloat(String(row.price).replace(/,/g, '')) || 0; 
                 const c = parseInt(String(row.count).replace(/,/g, '')) || 0; 
                 const t = p * c; 
-                grandTotal += t; 
+                grandTotal += t;
+                
                 html += `<tr><td style="border:1px solid #ddd;padding:8px">${row.item || ''}</td><td style="border:1px solid #ddd;padding:8px;text-align:right">${p.toLocaleString()}</td><td style="border:1px solid #ddd;padding:8px;text-align:center">${c}</td><td style="border:1px solid #ddd;padding:8px;text-align:right">${t.toLocaleString()}</td><td style="border:1px solid #ddd;padding:8px">${row.remarks || ''}</td></tr>`; 
             });
+            
             html += `</tbody><tfoot><tr style="font-weight:bold"><td colspan="3" style="border:1px solid #ddd;padding:8px;text-align:right">총 합계</td><td style="border:1px solid #ddd;padding:8px;text-align:right">${grandTotal.toLocaleString()}</td><td style="border:1px solid #ddd;padding:8px"></td></tr></tfoot></table>`;
         });
     }
     return html;
 }
-// [수정 끝]
 
 function restoreState(data) {
     document.getElementById('customerInfoContainer').innerHTML = '';
@@ -1796,7 +1804,7 @@ function setupEventListeners() {
     const loadFileLabel = document.querySelector('label[for="loadFile"]');
     if (loadFileLabel) {
         loadFileLabel.addEventListener('click', (event) => {
-            event.preventDefault(); // 기본 동작 방지
+            event.preventDefault();
             loadFile();
         });
     }
@@ -1808,13 +1816,11 @@ function setupEventListeners() {
             const button = event.target.closest('button');
             if (!button) return;
 
-            // 고객 카드 삭제 버튼
             if (button.classList.contains('remove-customer-btn')) {
                 if (confirm('이 고객 정보를 삭제하시겠습니까?')) {
                     button.closest('.p-4').remove();
                 }
             }
-            // 정보 복사 버튼
             else if (button.classList.contains('copy-customer-info-btn')) {
                 const inputElement = button.previousElementSibling;
                 if (inputElement && inputElement.value) {
@@ -1861,14 +1867,11 @@ function setupEventListeners() {
     const contentsContainer = document.getElementById('quoteGroupContentsContainer');
     if (!contentsContainer) return;
 
-    // 클릭 이벤트 위임
     contentsContainer.addEventListener('click', (event) => {
         const target = event.target;
         const button = target.closest('button');
 
-        // 버튼이 아닌 다른 곳 클릭 시 무시
         if (!button) {
-            // 편집 가능한 span 클릭 처리
             if(target.matches('.person-type-name-span, .person-count-span, .dynamic-row-label-span')) {
                 const calcContainer = target.closest('.calculator-instance');
                 const callback = () => calculateAll(calcContainer);
@@ -1880,7 +1883,6 @@ function setupEventListeners() {
         
         const groupId = button.closest('.calculation-group-content')?.id.split('-').pop();
 
-        // 버튼 클래스 또는 ID로 분기
         if (button.classList.contains('add-calculator-btn')) {
             syncGroupUIToData(groupId);
             const groupData = quoteGroupsData[groupId];
@@ -1943,7 +1945,6 @@ function setupEventListeners() {
         } else if (button.classList.contains('copy-flight-schedule-btn')) {
             copyHtmlToClipboard(generateFlightScheduleInlineHtml(quoteGroupsData[groupId].flightSchedule));
         } else if (button.classList.contains('copy-price-info-btn')) {
-            // [수정] 복사 전 데이터 동기화
             syncGroupUIToData(groupId);
             copyHtmlToClipboard(generatePriceInfoInlineHtml(quoteGroupsData[groupId].priceInfo));
         } else if (button.classList.contains('add-flight-subgroup-btn')) {
@@ -1953,7 +1954,6 @@ function setupEventListeners() {
             quoteGroupsData[groupId].flightSchedule.push(sg);
             createFlightSubgroup(flightContainer, sg, groupId);
         } else if (button.classList.contains('add-price-subgroup-btn')) {
-            // [수정] 기본 항목 추가 로직
             const priceContainer = button.closest('section').querySelector('.price-info-container');
             const defaultRows = [
                 { item: "성인요금", price: "0", count: "1", remarks: "" },
@@ -2016,7 +2016,7 @@ function setupEventListeners() {
         } else if (button.classList.contains('day-toggle-button')) {
              ip_handleToggleDayCollapse(event, button.closest('.ip-day-section').dataset.dayId.split('-')[1], groupId);
         }
-        else if(button.id.startsWith('ip-')) { // 상세일정표 버튼 처리
+        else if(button.id.startsWith('ip-')) {
             if (button.id.includes('loadFromDBBtn')) ip_openLoadTripModal(groupId);
             else if (button.id.includes('copyInlineHtmlButton')) ip_handleCopyInlineHtml(groupId);
             else if (button.id.includes('inlinePreviewButton')) ip_handleInlinePreview(groupId);
@@ -2039,7 +2039,6 @@ function setupEventListeners() {
         }
     });
 
-    // 입력 필드 이벤트 위임 (focusin, focusout, keydown, dblclick)
     contentsContainer.addEventListener('focusin', (event) => {
         const target = event.target;
         if (target.matches('.cost-item, .sales-price')) {
@@ -2067,7 +2066,6 @@ function setupEventListeners() {
             const calcContainer = target.closest('.calculator-instance');
             if (calcContainer) calculateAll(calcContainer);
         } else if(target.matches('.flight-schedule-input, .price-table input, .inclusion-text, .exclusion-text, .price-subgroup-title')) {
-             // 데이터 동기화
             const groupId = target.closest('.calculation-group-content').id.split('-').pop();
             syncGroupUIToData(groupId);
         }
@@ -2084,7 +2082,7 @@ function setupEventListeners() {
             const allRows = Array.from(tableBody.querySelectorAll('tr'));
             const currentRowIndex = allRows.indexOf(currentRow);
             const currentCellIndex = Array.from(currentRow.children).indexOf(currentCell);
-            event.target.blur(); // 계산 실행
+            event.target.blur();
             for (let i = currentRowIndex + 1; i < allRows.length; i++) {
                 const nextCell = allRows[i].cells[currentCellIndex];
                 if (nextCell) {
@@ -2111,7 +2109,6 @@ function setupEventListeners() {
     
     document.getElementById('ipActivityForm').addEventListener('submit', ip_handleActivityFormSubmit);
     
-    // 리사이저 핸들
     document.addEventListener('mousedown', (e) => {
         if (e.target.matches('.resizer-handle')) {
             let isResizing = true;
@@ -2140,9 +2137,8 @@ function setupEventListeners() {
         }
     });
 
-    // 단축키
     document.addEventListener('keydown', (event) => {
-        if (event.target.matches('input, textarea')) return; // 입력 필드 포커스 시에는 단축키 비활성화
+        if (event.target.matches('input, textarea')) return;
         if (!event.shiftKey && !event.ctrlKey && !event.altKey) {
             switch (event.code) {
                 case 'F2': event.preventDefault(); document.getElementById('saveBtn').click(); break;
