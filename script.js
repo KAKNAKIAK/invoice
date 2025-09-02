@@ -1,7 +1,7 @@
 // =======================================================================
 // 1. 전역 변수 및 설정
 // =======================================================================
-let quoteGroupsData = {}; // 모든 견적 그룹의 데이터를 저장하는 핵심 객체
+let quoteGroupsData = {}; // 모든 견적 그룹의 데이터를 저장하는 핵심 객체 (현재 활성 세션과 동기화됨)
 let groupCounter = 0;
 let activeGroupId = null;
 let currentFileHandle = null;
@@ -9,7 +9,7 @@ let currentFileHandle = null;
 const ROW_DEFINITIONS = [
     { id: 'airfare', label: '항공', type: 'costInput' }, { id: 'hotel', label: '호텔', type: 'costInput' },
     { id: 'ground', label: '지상', type: 'costInput' }, { id: 'insurance', label: '보험', type: 'costInput' },
-    { id: 'commission', label: '커미션', type: 'costInput' }, { id: 'addDynamicRow', label: '+ 항목 추가', type: 'button' },
+    { id: 'commission', label: '커미션', type: 'costInput' }, { id: 'addDynamicRow', label: '+', type: 'button' },
     { id: 'netCost', label: '넷가', type: 'calculated' }, { id: 'salesPrice', label: '상품가', type: 'salesInput' },
     { id: 'profitPerPerson', label: '1인수익', type: 'calculated' }, { id: 'profitMargin', label: '1인수익률', type: 'calculatedPercentage' }
 ];
@@ -28,7 +28,885 @@ const fbApp = firebase.initializeApp(firebaseConfig, 'memoApp');
 const db = firebase.firestore(fbApp);
 
 // =======================================================================
-// 2. IndexedDB 헬퍼 함수 (파일 핸들 저장을 위해)
+// 2. 파일 탭 시스템 - FileSession 클래스와 파일 관리
+// =======================================================================
+class FileSession {
+    constructor(fileId, displayName = '새 파일', fileHandle = null) {
+        this.fileId = fileId;
+        this.displayName = displayName;
+        this.fileHandle = fileHandle;
+        this.quoteGroupsData = {}; // 기존 구조 그대로 유지
+        this.groupCounter = 0;
+        this.activeGroupId = null;
+        this.memoText = '';
+        this.customerInfo = [];
+        this.uiState = {
+            scrollTop: 0,
+            activeTab: null,
+            modalStates: {}
+        };
+        this.domCache = null; // DocumentFragment for detached DOM
+        this.dirty = false;
+        this.createdAt = new Date();
+    }
+
+    // 세션의 더티 상태 관리
+    markDirty() {
+        this.dirty = true;
+        updateFileTabUI(this.fileId);
+    }
+
+    markClean() {
+        this.dirty = false;
+        updateFileTabUI(this.fileId);
+    }
+
+    // UI 상태 저장
+    saveUIState() {
+        const workspace = document.getElementById('workspace');
+        if (workspace) {
+            this.uiState.scrollTop = workspace.scrollTop;
+        }
+        
+        // 현재 활성 견적 그룹 저장
+        this.uiState.activeGroupId = activeGroupId;
+        
+        // 메모 텍스트 저장
+        const memoTextarea = document.getElementById('memoText');
+        if (memoTextarea) {
+            this.memoText = memoTextarea.value;
+        }
+        
+        // 고객 정보 저장
+        this.customerInfo = getCustomerData();
+        
+        // 현재 견적 그룹 데이터 동기화
+        if (activeGroupId) {
+            syncGroupUIToData(activeGroupId);
+        }
+    }
+
+    // UI 상태 복원
+    restoreUIState() {
+        // 전역 변수들을 이 세션의 값으로 복원
+        quoteGroupsData = this.quoteGroupsData;
+        groupCounter = this.groupCounter;
+        activeGroupId = this.activeGroupId;
+        
+        const workspace = document.getElementById('workspace');
+        if (workspace && this.uiState.scrollTop) {
+            workspace.scrollTop = this.uiState.scrollTop;
+        }
+        
+        // 메모 텍스트 복원
+        const memoTextarea = document.getElementById('memoText');
+        if (memoTextarea) {
+            memoTextarea.value = this.memoText || '';
+        }
+        
+        // 고객 정보 복원
+        const customerContainer = document.getElementById('customerInfoContainer');
+        if (customerContainer) {
+            customerContainer.innerHTML = '';
+            if (this.customerInfo && this.customerInfo.length > 0) {
+                this.customerInfo.forEach(customer => createCustomerCard(customer));
+            } else {
+                createCustomerCard();
+            }
+        }
+    }
+}
+
+// 파일 관리자
+const filesManager = new Map();
+let currentFileId = null;
+let fileIdCounter = 0;
+
+// 호환성 레이어 - 기존 코드가 계속 작동하도록 하는 헬퍼 함수들
+function getCurrentSession() {
+    return filesManager.get(currentFileId);
+}
+
+function getCurrentQuoteGroups() {
+    const session = getCurrentSession();
+    if (session) {
+        // 전역 변수와 세션 데이터 동기화
+        if (quoteGroupsData !== session.quoteGroupsData) {
+            quoteGroupsData = session.quoteGroupsData;
+        }
+        return session.quoteGroupsData;
+    }
+    return {};
+}
+
+function updateCurrentSession() {
+    const session = getCurrentSession();
+    if (session) {
+        session.quoteGroupsData = quoteGroupsData;
+        session.groupCounter = groupCounter;
+        session.activeGroupId = activeGroupId;
+        session.markDirty();
+    }
+}
+
+// 파일 탭 UI 관리
+function createFileTab(fileId, displayName, isActive = false) {
+    const tabsContainer = document.getElementById('fileTabsContainer');
+    const tab = document.createElement('div');
+    tab.className = `file-tab flex items-center gap-2 px-3 py-2 rounded-md transition-all cursor-pointer ${
+        isActive ? 'bg-indigo-100 text-indigo-700 border border-indigo-200' : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+    }`;
+    tab.dataset.fileId = fileId;
+    
+    // 파일명 표시 (더티 상태 표시 포함)
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'text-sm font-medium truncate max-w-32';
+    nameSpan.textContent = displayName;
+    
+    const dirtyIndicator = document.createElement('span');
+    dirtyIndicator.className = 'dirty-indicator text-orange-500 ml-1';
+    dirtyIndicator.textContent = '●';
+    dirtyIndicator.style.display = 'none';
+    
+    // 닫기 버튼
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'close-file-btn text-gray-400 hover:text-red-500 ml-1 p-1';
+    closeBtn.innerHTML = '<i class="fas fa-times text-xs"></i>';
+    closeBtn.title = '파일 닫기';
+    
+    tab.appendChild(nameSpan);
+    tab.appendChild(dirtyIndicator);
+    tab.appendChild(closeBtn);
+    tabsContainer.appendChild(tab);
+    
+    return tab;
+}
+
+function updateFileTabUI(fileId) {
+    const session = filesManager.get(fileId);
+    if (!session) return;
+    
+    const tab = document.querySelector(`[data-file-id="${fileId}"]`);
+    if (!tab) return;
+    
+    const dirtyIndicator = tab.querySelector('.dirty-indicator');
+    if (dirtyIndicator) {
+        dirtyIndicator.style.display = session.dirty ? 'inline' : 'none';
+    }
+}
+
+function switchFileTab(newFileId) {
+    if (currentFileId === newFileId) return;
+    
+    // 현재 세션 상태 저장
+    if (currentFileId) {
+        const currentSession = getCurrentSession();
+        if (currentSession) {
+            currentSession.saveUIState();
+            
+            // DOM 캐시에 현재 워크스페이스 저장
+            const workspace = document.getElementById('workspace');
+            if (workspace) {
+                currentSession.domCache = document.createDocumentFragment();
+                while (workspace.firstChild) {
+                    currentSession.domCache.appendChild(workspace.firstChild);
+                }
+            }
+        }
+    }
+    
+    // 새 세션으로 전환
+    currentFileId = newFileId;
+    const newSession = getCurrentSession();
+    if (!newSession) return;
+    
+    // DOM 복원
+    const workspace = document.getElementById('workspace');
+    if (workspace) {
+        workspace.innerHTML = '';
+        if (newSession.domCache) {
+            workspace.appendChild(newSession.domCache);
+            newSession.domCache = null; // 캐시 정리
+        } else {
+            // 첫 번째 로드시 기본 구조 생성
+            initializeWorkspaceForSession(newSession);
+        }
+    }
+    
+    // UI 상태 복원
+    newSession.restoreUIState();
+    
+    // 탭 UI 업데이트
+    document.querySelectorAll('.file-tab').forEach(tab => {
+        const isActive = tab.dataset.fileId === newFileId;
+        tab.className = `file-tab flex items-center gap-2 px-3 py-2 rounded-md transition-all cursor-pointer ${
+            isActive ? 'bg-indigo-100 text-indigo-700 border border-indigo-200' : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+        }`;
+    });
+    
+    // 견적 그룹 탭 영역 초기화 및 재구성
+    const tabsContainer = document.getElementById('quoteGroupTabs');
+    if (tabsContainer) {
+        tabsContainer.innerHTML = ''; // 기존 탭들 모두 제거
+        
+        // 견적 그룹 UI 다시 렌더링
+        if (Object.keys(newSession.quoteGroupsData).length > 0) {
+            Object.keys(newSession.quoteGroupsData).forEach(id => createGroupUI(id));
+            if (newSession.activeGroupId && newSession.quoteGroupsData[newSession.activeGroupId]) {
+                switchTab(newSession.activeGroupId);
+            } else {
+                const firstGroupId = Object.keys(newSession.quoteGroupsData)[0];
+                if (firstGroupId) switchTab(firstGroupId);
+            }
+        } else {
+            addNewGroup();
+        }
+    }
+    
+    // 파일 탭 전환 후 필요한 이벤트 리스너 재바인딩
+    rebindWorkspaceEventListeners();
+}
+
+function makeTabNameEditable(spanElement, groupId) {
+    if (spanElement.dataset.editing) return;
+    spanElement.dataset.editing = 'true';
+    
+    const currentText = spanElement.textContent;
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = currentText;
+    input.className = 'tab-name-input';
+    
+    spanElement.style.display = 'none';
+    spanElement.parentNode.insertBefore(input, spanElement);
+    input.focus();
+    input.select();
+
+    const finishEditing = () => {
+        const newName = input.value.trim();
+        if (newName) {
+            spanElement.textContent = newName;
+            quoteGroupsData[groupId].name = newName;
+            updateCurrentSession();
+        }
+        spanElement.style.display = '';
+        if (input.parentNode) {
+            input.parentNode.removeChild(input);
+        }
+        delete spanElement.dataset.editing;
+    };
+
+    input.addEventListener('blur', finishEditing, { once: true });
+    input.addEventListener('keydown', e => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            input.blur();
+        } else if (e.key === 'Escape') {
+            input.value = currentText; // Revert changes
+            e.preventDefault();
+            input.blur();
+        }
+    });
+}
+
+// 워크스페이스 내 이벤트 리스너를 다시 바인딩하는 함수
+function rebindWorkspaceEventListeners() {
+    // 파일 불러오기 label 이벤트 재바인딩
+    const loadFileLabel = document.querySelector('label[for="loadFile"]');
+    if (loadFileLabel) {
+        // 기존 이벤트 제거 후 새로 바인딩
+        loadFileLabel.replaceWith(loadFileLabel.cloneNode(true));
+        const newLoadFileLabel = document.querySelector('label[for="loadFile"]');
+        if (newLoadFileLabel) {
+            newLoadFileLabel.addEventListener('click', (event) => {
+                event.preventDefault();
+                loadFile();
+            });
+        }
+    }
+    
+    // 워크스페이스 헤더 버튼들 이벤트 리스너 재바인딩
+    const saveBtn = document.getElementById('saveBtn');
+    if (saveBtn) {
+        saveBtn.replaceWith(saveBtn.cloneNode(true));
+        const newSaveBtn = document.getElementById('saveBtn');
+        if (newSaveBtn) {
+            newSaveBtn.addEventListener('click', () => saveFile(false, newSaveBtn));
+        }
+    }
+
+    const saveAsBtn = document.getElementById('saveAsBtn');
+    if (saveAsBtn) {
+        saveAsBtn.replaceWith(saveAsBtn.cloneNode(true));
+        const newSaveAsBtn = document.getElementById('saveAsBtn');
+        if (newSaveAsBtn) {
+            newSaveAsBtn.addEventListener('click', () => saveFile(true, newSaveAsBtn));
+        }
+    }
+
+    const newWindowBtn = document.getElementById('newWindowBtn');
+    if (newWindowBtn) {
+        newWindowBtn.replaceWith(newWindowBtn.cloneNode(true));
+        const newNewWindowBtn = document.getElementById('newWindowBtn');
+        if (newNewWindowBtn) {
+            newNewWindowBtn.addEventListener('click', () => {
+                window.open(window.location.href, '_blank');
+            });
+        }
+    }
+
+    const recentFilesBtn = document.getElementById('recentFilesBtn');
+    if (recentFilesBtn) {
+        recentFilesBtn.replaceWith(recentFilesBtn.cloneNode(true));
+        const newRecentFilesBtn = document.getElementById('recentFilesBtn');
+        if (newRecentFilesBtn) {
+            newRecentFilesBtn.addEventListener('click', openRecentFilesModal);
+        }
+    }
+
+    const addCustomerBtn = document.getElementById('addCustomerBtn');
+    if (addCustomerBtn) {
+        addCustomerBtn.replaceWith(addCustomerBtn.cloneNode(true));
+        const newAddCustomerBtn = document.getElementById('addCustomerBtn');
+        if (newAddCustomerBtn) {
+            newAddCustomerBtn.addEventListener('click', () => createCustomerCard());
+        }
+    }
+
+    const loadMemoFromDbBtn = document.getElementById('loadMemoFromDbBtn');
+    if (loadMemoFromDbBtn) {
+        loadMemoFromDbBtn.replaceWith(loadMemoFromDbBtn.cloneNode(true));
+        const newLoadMemoFromDbBtn = document.getElementById('loadMemoFromDbBtn');
+        if (newLoadMemoFromDbBtn) {
+            newLoadMemoFromDbBtn.addEventListener('click', openLoadMemoModal);
+        }
+    }
+
+    // 견적 그룹 버튼들 이벤트 바인딩
+    const newGroupBtn = document.getElementById('newGroupBtn');
+    if (newGroupBtn) {
+        newGroupBtn.replaceWith(newGroupBtn.cloneNode(true));
+        const newNewGroupBtn = document.getElementById('newGroupBtn');
+        if (newNewGroupBtn) {
+            newNewGroupBtn.addEventListener('click', () => {
+                groupCounter++;
+                const newGroupId = `group_${Date.now()}`;
+                quoteGroupsData[newGroupId] = {
+                    name: `견적 ${groupCounter}`,
+                    calculators: [],
+                    flightSchedule: [],
+                    priceInfo: [],
+                    hotelMakerData: { allHotelData: [{ nameKo: '새 호텔 1', nameEn: "", website: "", image: "", description: "" }], currentHotelIndex: 0 },
+                    itineraryData: { title: "새 일정표", days: [], editingTitle: false },
+                    inclusionText: '',
+                    exclusionText: ''
+                };
+                createGroupUI(newGroupId);
+                switchGroup(newGroupId);
+            });
+        }
+    }
+
+    const copyGroupBtn = document.getElementById('copyGroupBtn');
+    if (copyGroupBtn) {
+        copyGroupBtn.replaceWith(copyGroupBtn.cloneNode(true));
+        const newCopyGroupBtn = document.getElementById('copyGroupBtn');
+        if (newCopyGroupBtn) {
+            newCopyGroupBtn.addEventListener('click', () => {
+                if (!activeGroupId) { showToastMessage('복사할 그룹을 먼저 선택하세요.', true); return; }
+                syncGroupUIToData(activeGroupId);
+                const sourceData = quoteGroupsData[activeGroupId];
+                const newGroupId = `group_${Date.now()}`;
+                quoteGroupsData[newGroupId] = JSON.parse(JSON.stringify(sourceData));
+                groupCounter++;
+                createGroupUI(newGroupId);
+                switchGroup(newGroupId);
+                
+                // 견적 복사 후 분할 패널 너비를 최소 너비로 재설정
+                setTimeout(resetSplitPaneWidths, 50);
+                
+                showToastMessage('그룹이 복사되었습니다.');
+            });
+        }
+    }
+
+    const deleteGroupBtn = document.getElementById('deleteGroupBtn');
+    if (deleteGroupBtn) {
+        deleteGroupBtn.replaceWith(deleteGroupBtn.cloneNode(true));
+        const newDeleteGroupBtn = document.getElementById('deleteGroupBtn');
+        if (newDeleteGroupBtn) {
+            newDeleteGroupBtn.addEventListener('click', deleteActiveGroup);
+        }
+    }
+
+    // quoteGroupContentsContainer 이벤트 위임 재바인딩
+    const contentsContainer = document.getElementById('quoteGroupContentsContainer');
+    if (contentsContainer) {
+        // 기존 이벤트 제거 후 새로 바인딩
+        contentsContainer.replaceWith(contentsContainer.cloneNode(true));
+        const newContentsContainer = document.getElementById('quoteGroupContentsContainer');
+        if (newContentsContainer) {
+            // setupEventListeners()의 contentsContainer 이벤트 위임 코드 복사
+            newContentsContainer.addEventListener('click', (event) => {
+                const target = event.target;
+                const button = target.closest('button');
+
+                if (!button) {
+                    if(target.matches('.person-type-name-span, .person-count-span, .dynamic-row-label-span, .cost-row-label-span')) {
+                        const calcContainer = target.closest('.calculator-instance');
+                        const callback = () => calculateAll(calcContainer);
+                        const inputType = target.classList.contains('person-count-span') ? 'number' : 'text';
+                        makeEditable(target, inputType, callback);
+                    }
+                    return;
+                }
+                
+                const groupId = button.closest('.calculation-group-content')?.id.split('-').pop();
+
+                if (button.classList.contains('add-calculator-btn')) {
+                    syncGroupUIToData(groupId);
+                    const groupData = quoteGroupsData[groupId];
+                    const newCalcData = { id: `calc_${Date.now()}`, pnr: '', tableHTML: null, pnrTitle: 'PNR 정보' };
+                    groupData.calculators.push(newCalcData);
+                    renderCalculators(groupId);
+                } else if (button.classList.contains('copy-last-calculator-btn')) {
+                     const groupData = quoteGroupsData[groupId];
+                    if (!groupData || groupData.calculators.length === 0) { showToastMessage('복사할 견적 계산이 없습니다.', true); return; }
+                    syncGroupUIToData(groupId);
+                    const lastCalculatorData = groupData.calculators[groupData.calculators.length - 1];
+                    const newCalcData = JSON.parse(JSON.stringify(lastCalculatorData));
+                    newCalcData.id = `calc_${Date.now()}_${Math.random()}`;
+                    groupData.calculators.push(newCalcData);
+                    renderCalculators(groupId);
+                } else if (button.classList.contains('delete-calculator-btn')) {
+                    if (confirm('이 견적 계산기를 삭제하시겠습니까?')) {
+                        const instance = button.closest('.calculator-instance');
+                        const calcId = instance.dataset.calculatorId;
+                        quoteGroupsData[groupId].calculators = quoteGroupsData[groupId].calculators.filter(c => c.id !== calcId);
+                        instance.remove();
+                    }
+                } else if (button.classList.contains('add-person-type-btn')) {
+                    const calcContainer = button.closest('.calculator-instance');
+                    addPersonTypeColumn(calcContainer, '아동', 1);
+                } else if (button.classList.contains('add-dynamic-row-btn')) {
+                    const calcContainer = button.closest('.calculator-instance');
+                    addDynamicCostRow(calcContainer);
+                } else if (button.classList.contains('remove-col-btn')) {
+                    if (confirm('해당 항목을 삭제하시겠습니까?')) {
+                        const headerCell = button.closest('th');
+                        const colIndex = Array.from(headerCell.parentNode.children).indexOf(headerCell);
+                        const calcContainer = button.closest('.calculator-instance');
+                        calcContainer.querySelectorAll('.quote-table tr').forEach(row => row.cells[colIndex]?.remove());
+                        updateSummaryRow(calcContainer);
+                        calculateAll(calcContainer);
+                    }
+                } else if (button.classList.contains('dynamic-row-delete-btn')) {
+                    if (confirm('해당 항목을 삭제하시겠습니까?')) {
+                         const calcContainer = button.closest('.calculator-instance');
+                         button.closest('tr').remove();
+                         calculateAll(calcContainer);
+                    }
+                } else if (button.id.startsWith('hm-copyHtmlBtn-')) {
+                    hm_copyOptimizedHtml(groupId);
+                } else if (button.id.startsWith('hm-previewHotelBtn-')) {
+                    hm_previewHotelInfo(groupId);
+                } else if (button.id.startsWith('hm-loadHotelHtmlBtn-')) {
+                    hm_openLoadHotelSetModal(groupId);
+                } else if (button.id.startsWith('hm-addHotelTabBtn-')) {
+                    hm_addHotel(groupId);
+                } else if (button.matches('.hotel-tab-button')) {
+                    if(target.closest('.tab-delete-icon')) {
+                         hm_deleteHotel(groupId, parseInt(button.dataset.index));
+                    } else {
+                         hm_switchTab(groupId, parseInt(button.dataset.index));
+                    }
+                } else if (button.classList.contains('parse-gds-btn')) {
+                    window.open('./gds_parser/gds_parser.html', 'GDS_Parser', `width=800,height=500,top=${(screen.height / 2) - 250},left=${(screen.width / 2) - 400}`);
+                } else if (button.classList.contains('copy-flight-schedule-btn')) {
+                    copyHtmlToClipboard(generateFlightScheduleInlineHtml(quoteGroupsData[groupId].flightSchedule));
+                } else if (button.classList.contains('copy-price-info-btn')) {
+                    syncGroupUIToData(groupId);
+                    copyHtmlToClipboard(generatePriceInfoInlineHtml(quoteGroupsData[groupId].priceInfo));
+                } else if (button.classList.contains('add-flight-subgroup-btn')) {
+                    const flightContainer = button.closest('section').querySelector('.flight-schedule-container');
+                    const sg = { id: `flight_sub_${Date.now()}`, title: "", rows: [{}] };
+                    if (!quoteGroupsData[groupId].flightSchedule) quoteGroupsData[groupId].flightSchedule = [];
+                    quoteGroupsData[groupId].flightSchedule.push(sg);
+                    createFlightSubgroup(flightContainer, sg, groupId);
+                } else if (button.classList.contains('add-price-subgroup-btn')) {
+                    const priceContainer = button.closest('section').querySelector('.price-info-container');
+                    const defaultRows = [
+                        { item: "성인요금", price: "0", count: "1", remarks: "" },
+                        { item: "소아요금", price: "0", count: "0", remarks: "만2~12세미만" },
+                        { item: "유아요금", price: "0", count: "0", remarks: "만24개월미만" }
+                    ];
+                    const sg = { id: `price_sub_${Date.now()}`, title: "", rows: defaultRows };
+                    if (!quoteGroupsData[groupId].priceInfo) quoteGroupsData[groupId].priceInfo = [];
+                    quoteGroupsData[groupId].priceInfo.push(sg);
+                    createPriceSubgroup(priceContainer, sg, groupId);
+                } else if (button.classList.contains('load-inclusion-exclusion-db-btn')) {
+                    openLoadInclusionsModal();
+                } else if (button.classList.contains('copy-inclusion-btn')) {
+                    copyToClipboard(button.closest('div').nextElementSibling.value, '포함 내역');
+                } else if (button.classList.contains('copy-exclusion-btn')) {
+                    copyToClipboard(button.closest('div').nextElementSibling.value, '불포함 내역');
+                } else if (button.classList.contains('delete-dynamic-section-btn')) {
+                    const section = button.closest('.dynamic-section');
+                    if (section.classList.contains('flight-schedule-subgroup')) {
+                        quoteGroupsData[groupId].flightSchedule = quoteGroupsData[groupId].flightSchedule.filter(g => g.id !== section.id);
+                    } else if (section.classList.contains('price-subgroup')) {
+                        quoteGroupsData[groupId].priceInfo = quoteGroupsData[groupId].priceInfo.filter(g => g.id !== section.id);
+                    }
+                    section.remove();
+                } else if (button.classList.contains('add-row-btn')) {
+                    const section = button.closest('.dynamic-section');
+                    const tbody = section.querySelector('tbody');
+                    if (section.classList.contains('flight-schedule-subgroup')) {
+                         const subgroupData = quoteGroupsData[groupId].flightSchedule.find(g => g.id === section.id);
+                         const newRowData = {};
+                         subgroupData.rows.push(newRowData);
+                         addFlightRow(tbody, newRowData, subgroupData);
+                    } else if (section.classList.contains('price-subgroup')) {
+                        const subgroupData = quoteGroupsData[groupId].priceInfo.find(g => g.id === section.id);
+                        const newRowData = { item: "", price: "0", count: "1", remarks: "" };
+                        subgroupData.rows.push(newRowData);
+                        addPriceRow(tbody, newRowData, subgroupData, section, groupId);
+                    }
+                } else if (button.classList.contains('delete-row-btn')) {
+                    const section = button.closest('.dynamic-section');
+                    const tr = button.closest('tr');
+                    const tbody = tr.parentNode;
+                    const rowIndex = Array.from(tbody.children).indexOf(tr);
+                    if (section.classList.contains('flight-schedule-subgroup')) {
+                        const subgroupData = quoteGroupsData[groupId].flightSchedule.find(g => g.id === section.id);
+                        subgroupData.rows.splice(rowIndex, 1);
+                    } else if (section.classList.contains('price-subgroup')) {
+                        const subgroupData = quoteGroupsData[groupId].priceInfo.find(g => g.id === section.id);
+                        if (subgroupData.rows.length > 1) {
+                            subgroupData.rows.splice(rowIndex, 1);
+                        } else {
+                             showToastMessage('최소 한 개의 요금 항목은 유지해야 합니다.', true);
+                             return;
+                        }
+                    }
+                    tr.remove();
+                    if (section.classList.contains('price-subgroup')) {
+                        updateGrandTotal(section, groupId);
+                    }
+                } else if (button.classList.contains('day-toggle-button')) {
+                     ip_handleToggleDayCollapse(event, button.closest('.ip-day-section').dataset.dayId.split('-')[1], groupId);
+                }
+                else if(button.id.startsWith('ip-')) {
+                    if (button.id.includes('loadFromDBBtn')) ip_openLoadTripModal(groupId);
+                    else if (button.id.includes('copyInlineHtmlButton')) ip_handleCopyInlineHtml(groupId);
+                    else if (button.id.includes('inlinePreviewButton')) ip_handleInlinePreview(groupId);
+                    else if (button.id.includes('addDayButton')) ip_addDay(groupId);
+                    else if (button.classList.contains('edit-date-button')) ip_handleEditDate(button.closest('.ip-day-section').dataset.dayId.split('-')[1], groupId);
+                    else if (button.classList.contains('save-date-button')) ip_handleSaveDate(button.closest('.ip-day-section').dataset.dayId.split('-')[1], groupId, button.previousElementSibling.value);
+                    else if (button.classList.contains('cancel-date-edit-button')) ip_handleCancelDateEdit(button.closest('.ip-day-section').dataset.dayId.split('-')[1], groupId);
+                    else if (button.classList.contains('delete-day-button')) ip_showConfirmDeleteDayModal(button.closest('.ip-day-section').dataset.dayId.split('-')[1], groupId);
+                    else if (button.classList.contains('add-activity-button')) ip_openActivityModal(groupId, button.closest('.day-content-wrapper').querySelector('.activities-list').dataset.dayIndex);
+                    else if (button.classList.contains('edit-activity-button')) {
+                        const card = button.closest('.ip-activity-card');
+                        ip_openActivityModal(groupId, card.dataset.dayIndex, card.dataset.activityIndex);
+                    } else if (button.classList.contains('duplicate-activity-button')) {
+                        const card = button.closest('.ip-activity-card');
+                        ip_handleDuplicateActivity(groupId, card.dataset.dayIndex, card.dataset.activityIndex);
+                    } else if (button.classList.contains('delete-activity-button')) {
+                        const card = button.closest('.ip-activity-card');
+                        ip_handleDeleteActivity(groupId, card.dataset.dayIndex, card.dataset.activityIndex);
+                    }
+                }
+            });
+            
+            // 추가 이벤트 리스너들도 재바인딩
+            newContentsContainer.addEventListener('focusin', (event) => {
+                const target = event.target;
+                if (target.matches('.cost-item, .sales-price')) {
+                    const formula = target.dataset.formula;
+                    if (formula) {
+                        target.value = formula;
+                        target.select();
+                    }
+                }
+            });
+
+            newContentsContainer.addEventListener('focusout', (event) => {
+                const target = event.target;
+                if (target.matches('.cost-item, .sales-price')) {
+                    const rawValue = target.value.trim();
+                    if (rawValue.startsWith('=')) {
+                        target.dataset.formula = rawValue;
+                        const result = evaluateMath(rawValue.substring(1));
+                        target.value = isNaN(result) ? 'Error' : Math.round(result).toLocaleString('ko-KR');
+                    } else {
+                        delete target.dataset.formula;
+                        const numericValue = parseFloat(rawValue.replace(/,/g, '')) || 0;
+                        target.value = numericValue.toLocaleString('ko-KR');
+                    }
+                    const calcContainer = target.closest('.calculator-instance');
+                    if (calcContainer) calculateAll(calcContainer);
+                } else if(target.matches('.flight-schedule-cell, .price-table-cell, .inclusion-text, .exclusion-text, .price-subgroup-title')) {
+                    const groupId = target.closest('.calculation-group-content').id.split('-').pop();
+                    syncGroupUIToData(groupId);
+                }
+            });
+
+            newContentsContainer.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter' && event.target.matches('.cost-item, .sales-price')) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    const currentCell = event.target.closest('td');
+                    if (!currentCell) return;
+                    const currentRow = currentCell.closest('tr');
+                    const tableBody = currentRow.closest('tbody');
+                    const allRows = Array.from(tableBody.querySelectorAll('tr'));
+                    const currentRowIndex = allRows.indexOf(currentRow);
+                    const currentCellIndex = Array.from(currentRow.children).indexOf(currentCell);
+                    event.target.blur();
+                    for (let i = currentRowIndex + 1; i < allRows.length; i++) {
+                        const nextCell = allRows[i].cells[currentCellIndex];
+                        if (nextCell) {
+                            const nextInput = nextCell.querySelector('input[type="text"]');
+                            if (nextInput) {
+                                nextInput.focus();
+                                return;
+                            }
+                        }
+                    }
+                }
+            });
+            
+            newContentsContainer.addEventListener('dblclick', (event) => {
+                if(event.target.matches('.sales-price')) {
+                    const expression = event.target.dataset.formula || event.target.value;
+                    const calculatedValue = evaluateMath(expression).toString();
+                    copyToClipboard(calculatedValue, '상품가');
+                } else if(event.target.matches('.copy-customer-info-btn')) {
+                     const inputElement = event.target.closest('div').querySelector('input');
+                     copyToClipboard(inputElement.value, '고객정보');
+                } else if (event.target.matches('.cost-row-label-span')) {
+                    const span = event.target;
+                    const groupId = span.closest('.calculation-group-content')?.id.split('-').pop();
+                    if (!groupId) return;
+                    makeEditable(span, 'text', () => {
+                        syncGroupUIToData(groupId);
+                        updateCurrentSession();
+                    });
+                } else if (event.target.matches('.pnr-title-span')) {
+                    const span = event.target;
+                    const instance = span.closest('.calculator-instance');
+                    const groupId = instance.closest('.calculation-group-content').id.split('-').pop();
+                    const calcId = instance.dataset.calculatorId;
+                    
+                    makeEditable(span, 'text', () => {
+                        const calculatorData = quoteGroupsData[groupId].calculators.find(c => c.id === calcId);
+                        if(calculatorData) {
+                            calculatorData.pnrTitle = span.textContent; // Read from the span itself
+                        }
+                        updateCurrentSession();
+                    });
+                } else if (event.target.closest('.ip-day-header-container')) {
+                    const header = event.target.closest('.ip-day-header-container');
+                    const daySection = header.closest('.ip-day-section');
+                    const button = event.target.closest('button');
+                    const input = event.target.closest('input');
+
+                    // Only trigger toggle if not clicking on a button or input
+                    if (!button && !input) {
+                        const dayIndex = daySection.dataset.dayId.split('-')[1];
+                        const groupId = daySection.closest('.calculation-group-content').id.split('-').pop();
+                        ip_handleToggleDayCollapse(event, dayIndex, groupId);
+                    }
+                } else if (event.target.closest('.ip-activity-card')) {
+                    const card = event.target.closest('.ip-activity-card');
+                    // Ensure not to trigger when clicking on links or buttons inside the card
+                    if (event.target.closest('a, button')) {
+                        return;
+                    }
+                    
+                    const dayIndex = card.dataset.dayIndex;
+                    const activityIndex = card.dataset.activityIndex;
+                    const groupId = card.closest('.calculation-group-content').id.split('-').pop();
+
+                    if (dayIndex !== undefined && activityIndex !== undefined && groupId) {
+                        ip_openActivityModal(groupId, dayIndex, activityIndex);
+                    }
+                }
+            });
+        }
+    }
+
+    // 견적 그룹 탭 컨테이너 이벤트 위임 재바인딩
+    const quoteGroupTabs = document.getElementById('quoteGroupTabs');
+    if (quoteGroupTabs) {
+        quoteGroupTabs.replaceWith(quoteGroupTabs.cloneNode(true));
+        const newQuoteGroupTabs = document.getElementById('quoteGroupTabs');
+        if (newQuoteGroupTabs) {
+            newQuoteGroupTabs.addEventListener('click', (event) => {
+                const tabButton = event.target.closest('.quote-tab');
+                if (tabButton) {
+                    const groupId = tabButton.dataset.groupId;
+                    if (event.target.classList.contains('close-tab-btn')) {
+                        deleteGroup(groupId);
+                    } else {
+                        switchTab(groupId);
+                    }
+                }
+            });
+
+            newQuoteGroupTabs.addEventListener('dblclick', (event) => {
+                const span = event.target;
+                if (span.tagName === 'SPAN' && span.closest('.quote-tab')) {
+                    const tab = span.closest('.quote-tab');
+                    const groupId = tab.dataset.groupId;
+                    makeTabNameEditable(span, groupId);
+                }
+            });
+        }
+    }
+    
+    // 고객 정보 컨테이너 이벤트 위임 재바인딩
+    const customerInfoContainer = document.getElementById('customerInfoContainer');
+    if (customerInfoContainer) {
+        customerInfoContainer.addEventListener('click', (event) => {
+            const button = event.target.closest('button');
+            if (!button) return;
+
+            if (button.classList.contains('remove-customer-btn')) {
+                if (confirm('이 고객 정보를 삭제하시겠습니까?')) {
+                    button.closest('.p-4').remove();
+                }
+            }
+            else if (button.classList.contains('copy-customer-info-btn')) {
+                const inputElement = button.previousElementSibling;
+                if (inputElement && inputElement.value) {
+                    copyToClipboard(inputElement.value, '고객정보');
+                } else {
+                    showToastMessage('복사할 내용이 없습니다.', true);
+                }
+            }
+        });
+
+        customerInfoContainer.addEventListener('dblclick', (event) => {
+            const inputElement = event.target;
+            if (inputElement.matches('input[type="text"], input[type="tel"], input[type="email"]')) {
+                if (inputElement.value) {
+                    copyToClipboard(inputElement.value, '고객정보');
+                }
+            }
+        });
+    }
+}
+
+function createNewFileTab(displayName = null) {
+    fileIdCounter++;
+    const fileId = `file_${fileIdCounter}_${Date.now()}`;
+    const fileName = displayName || `새 파일 ${fileIdCounter}`;
+    
+    const session = new FileSession(fileId, fileName);
+    filesManager.set(fileId, session);
+    
+    createFileTab(fileId, fileName, true);
+    switchFileTab(fileId);
+    
+    return fileId;
+}
+
+function closeFileTab(fileId) {
+    const session = filesManager.get(fileId);
+    if (!session) return;
+    
+    // 더티 상태 확인
+    if (session.dirty) {
+        const result = confirm(`'${session.displayName}' 파일에 저장하지 않은 변경사항이 있습니다. 정말 닫으시겠습니까?`);
+        if (!result) return;
+    }
+    
+    // 탭 제거
+    const tab = document.querySelector(`[data-file-id="${fileId}"]`);
+    if (tab) tab.remove();
+    
+    // 세션 제거
+    filesManager.delete(fileId);
+    
+    // 다른 탭으로 전환하거나 새 탭 생성
+    if (currentFileId === fileId) {
+        const remainingFiles = Array.from(filesManager.keys());
+        if (remainingFiles.length > 0) {
+            switchFileTab(remainingFiles[remainingFiles.length - 1]);
+        } else {
+            createNewFileTab();
+        }
+    }
+}
+
+function initializeWorkspaceForSession(session) {
+    // 기본 워크스페이스 HTML 구조 생성
+    const workspace = document.getElementById('workspace');
+    workspace.innerHTML = `
+        <header class="mb-8 flex justify-between items-center">
+            <div class="flex items-baseline gap-4">
+                <h1 class="text-3xl font-bold text-indigo-700">2025 견적</h1>
+                <a href="./manual/index.html" target="_blank" class="text-sm font-medium text-indigo-600 hover:text-indigo-800 hover:underline">사용 매뉴얼</a>
+            </div>
+            <div class="flex items-center space-x-2 flex-wrap">
+                <button type="button" id="newWindowBtn" class="btn btn-sm btn-secondary"><i class="far fa-window-restore"></i> 새창(Shift+N)</button>
+                <button type="button" id="saveBtn" class="btn btn-sm btn-secondary"><i class="fas fa-save"></i> 저장(F2)</button>
+                <button type="button" id="saveAsBtn" class="btn btn-sm btn-secondary"><i class="fas fa-file-export"></i> 다른 이름으로 저장(F3)</button>
+                <label for="loadFile" class="btn btn-sm btn-secondary cursor-pointer"><i class="fas fa-folder-open"></i> 불러오기(F4)</label>
+                <button type="button" id="recentFilesBtn" class="btn btn-sm btn-secondary"><i class="fas fa-history"></i> 최근 파일(Shift+Y)</button>
+            </div>
+        </header>
+        <form id="quoteForm" onsubmit="return false;">
+            <div class="flex flex-col lg:flex-row gap-6 mb-8">
+                <section class="lg:w-1/2 p-4 sm:p-6 border border-gray-200 rounded-lg">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-base font-semibold text-gray-800">고객 정보</h2>
+                        <button type="button" id="addCustomerBtn" class="text-sm text-indigo-600 hover:text-indigo-800 font-medium">
+                            <i class="fas fa-plus-circle mr-1"></i>연락처 추가
+                        </button>
+                    </div>
+                    <div id="customerInfoContainer" class="flex flex-wrap gap-4"></div>
+                </section>
+                <div class="lg:w-1/2 flex flex-col sm:flex-row gap-6">
+                    <section class="w-full sm:w-1/2 p-4 sm:p-6 border border-gray-200 rounded-lg flex flex-col">
+                        <div class="flex justify-between items-center mb-4">
+                            <h2 class="text-base font-semibold text-gray-800">메모</h2>
+                            <button type="button" id="loadMemoFromDbBtn" class="btn btn-sm btn-outline"><i class="fas fa-database mr-1"></i> DB</button>
+                        </div>
+                        <textarea id="memoText" class="w-full flex-grow px-3 py-2 border rounded-md shadow-sm" placeholder="메모 입력..."></textarea>
+                        <button type="button" id="copyMemoBtn" class="mt-2 btn btn-sm btn-outline"><i class="far fa-copy"></i> 메모 복사</button>
+                    </section>
+                    <section class="w-full sm:w-1/2 p-4 sm:p-6 border border-gray-200 rounded-lg">
+                        <h2 class="text-base font-semibold text-gray-800 mb-4">업무 보조 툴</h2>
+                        <div class="grid grid-cols-1 gap-2 mt-4">
+                            <a href="https://kaknakiak.github.io/ERPTOGDS/" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline text-center">GDS 엔트리 생성기</a>
+                            <a href="https://kaknakiak.github.io/PNRTOERP/" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline text-center">PNR 네임필드추출</a>
+                            <a href="https://incomparable-meringue-d33b6b.netlify.app/" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline text-center">간편 URL 단축기</a>
+                            <a href="https://kaknakiak.github.io/hotelbooking/" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline text-center">호텔 수배서 작성기</a>
+                            <a href="https://kaknakiak.github.io/hotelinformation/" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline text-center">호텔카드 메이커</a>
+                            <a href="https://kaknakiak.github.io/tripplantest2/" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline text-center">상세일정표</a>
+                        </div>
+                    </section>
+                </div>
+            </div>
+            <hr class="my-10 border-gray-300">
+            <div class="quote-group-controls">
+                <div id="quoteGroupTabs" class="quote-group-tabs-container"></div>
+                <div class="quote-group-buttons">
+                    <button type="button" id="newGroupBtn" class="btn btn-sm btn-blue"><i class="fas fa-plus"></i> 새 그룹</button>
+                    <button type="button" id="copyGroupBtn" class="btn btn-sm btn-yellow"><i class="fas fa-copy"></i> 그룹 복사</button>
+                    <button type="button" id="deleteGroupBtn" class="btn btn-sm btn-red"><i class="fas fa-trash-alt"></i> 그룹 삭제</button>
+                </div>
+            </div>
+            <div id="quoteGroupContentsContainer" class="border border-t-0 border-gray-300 rounded-lg rounded-tl-none p-4"></div>
+        </form>
+    `;
+}
+
+// =======================================================================
+// 3. IndexedDB 헬퍼 함수 (파일 핸들 저장을 위해)
 // =======================================================================
 const IDB_NAME = 'FileHandlesDB';
 const IDB_STORE_NAME = 'fileHandles';
@@ -145,7 +1023,7 @@ function initializeHotelMakerForGroup(container, groupId) {
         <div class="hm-controls flex flex-wrap gap-2 justify-end mb-4">
             <button id="hm-copyHtmlBtn-${groupId}" class="btn btn-sm btn-outline"><i class="fas fa-copy"></i> 코드 복사</button>
             <button id="hm-previewHotelBtn-${groupId}" class="btn btn-sm btn-outline"><i class="fas fa-eye"></i> 미리보기</button>
-            <button id="hm-loadHotelHtmlBtn-${groupId}" class="btn btn-sm btn-outline"><i class="fas fa-database"></i> DB 불러오기</button>
+            <button id="hm-loadHotelHtmlBtn-${groupId}" class="btn btn-sm btn-green"><i class="fas fa-database"></i> DB 불러오기</button>
         </div>
         <div id="hm-hotelTabsContainer-${groupId}" class="hm-tabs-container flex flex-wrap items-center border-b-2 border-gray-200 mb-4">
             <button id="hm-addHotelTabBtn-${groupId}" class="hotel-tab-button"><i class="fas fa-plus mr-2"></i>새 호텔 추가</button>
@@ -466,9 +1344,9 @@ function initializeItineraryPlannerForGroup(container, groupId) {
             <div class="flex justify-between items-center h-[50px]">
                 <div id="ip-headerTitleSection-${groupId}" class="ip-header-title-container"></div>
                 <div class="flex items-center space-x-2">
-                    <button id="ip-loadFromDBBtn-${groupId}" class="btn btn-sm btn-primary" title="DB에서 일정 불러오기"><i class="fas fa-database"></i><span class="inline ml-2">DB 불러오기</span></button>
                     <button id="ip-copyInlineHtmlButton-${groupId}" class="btn btn-sm btn-outline" title="일정표 코드 복사"><i class="fas fa-copy"></i> 코드 복사</button>
-                    <button id="ip-inlinePreviewButton-${groupId}" class="btn btn-sm btn-primary" title="인라인 형식 미리보기"><i class="fas fa-eye"></i> 미리보기</button>
+                    <button id="ip-inlinePreviewButton-${groupId}" class="btn btn-sm btn-outline" title="인라인 형식 미리보기"><i class="fas fa-eye"></i> 미리보기</button>
+                    <button id="ip-loadFromDBBtn-${groupId}" class="btn btn-sm btn-green" title="DB에서 일정 불러오기"><i class="fas fa-database"></i><span class="inline ml-2">DB 불러오기</span></button>
                 </div>
             </div>
         </header>
@@ -802,6 +1680,7 @@ function showToastMessage(message, isError = false) {
 }
 
 function syncGroupUIToData(groupId) {
+    const quoteGroupsData = getCurrentQuoteGroups();
     if (!groupId || !quoteGroupsData[groupId]) return;
     const groupEl = document.getElementById(`group-content-${groupId}`);
     if (!groupEl) return;
@@ -853,8 +1732,8 @@ function syncGroupUIToData(groupId) {
             };
             subgroupEl.querySelectorAll('tbody tr').forEach(rowEl => {
                 const rowData = {};
-                rowEl.querySelectorAll('input').forEach(input => {
-                    rowData[input.dataset.field] = input.value;
+                rowEl.querySelectorAll('.flight-schedule-cell').forEach(cell => {
+                    rowData[cell.dataset.field] = cell.textContent.trim();
                 });
                 newSubgroupData.rows.push(rowData);
             });
@@ -874,8 +1753,8 @@ function syncGroupUIToData(groupId) {
             };
             subgroupEl.querySelectorAll('tbody tr').forEach(rowEl => {
                 const rowData = {};
-                rowEl.querySelectorAll('input').forEach(input => {
-                    rowData[input.dataset.field] = input.value;
+                rowEl.querySelectorAll('.price-table-cell').forEach(cell => {
+                    rowData[cell.dataset.field] = cell.textContent.trim();
                 });
                 newSubgroupData.rows.push(rowData);
             });
@@ -935,24 +1814,50 @@ async function saveFile(isSaveAs = false, clickedButton = null) {
     try {
         const blob = await getSaveDataBlob();
         if (!blob) throw new Error("Blob 생성 실패");
-        if (isSaveAs || !currentFileHandle) {
+        
+        // 현재 세션의 파일 핸들 사용
+        const currentSession = getCurrentSession();
+        const sessionFileHandle = currentSession ? currentSession.fileHandle : currentFileHandle;
+        
+        if (isSaveAs || !sessionFileHandle) {
+            // 현재 파일명 가져오기
+            let suggestedFileName;
+            if (sessionFileHandle && sessionFileHandle.name) {
+                // 기존 파일이 있으면 그 이름 사용
+                suggestedFileName = sessionFileHandle.name;
+            } else if (currentSession && currentSession.displayName && currentSession.displayName !== '새 견적서') {
+                // 세션에 표시명이 있으면 사용
+                suggestedFileName = currentSession.displayName.endsWith('.html') ? 
+                    currentSession.displayName : `${currentSession.displayName}.html`;
+            } else {
+                // 기본값
+                suggestedFileName = `견적서_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}.html`;
+            }
+            
             const newHandle = await window.showSaveFilePicker({
-                suggestedName: `견적서_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}.html`,
+                suggestedName: suggestedFileName,
                 types: [{ description: 'HTML 파일', accept: { 'text/html': ['.html'] } }]
             });
             const writableStream = await newHandle.createWritable();
             await writableStream.write(blob);
             await writableStream.close();
+            
+            // 세션과 전역 핸들 모두 업데이트
+            if (currentSession) {
+                currentSession.fileHandle = newHandle;
+                currentSession.displayName = newHandle.name;
+                updateFileTabUI(currentSession.fileId);
+            }
             currentFileHandle = newHandle;
             document.title = newHandle.name;
             showToastMessage('파일이 성공적으로 저장되었습니다.');
             await saveFileHandle(newHandle.name, newHandle);
         } else {
-            const writableStream = await currentFileHandle.createWritable();
+            const writableStream = await sessionFileHandle.createWritable();
             await writableStream.write(blob);
             await writableStream.close();
             showToastMessage('변경사항이 성공적으로 저장되었습니다.');
-            await saveFileHandle(currentFileHandle.name, currentFileHandle);
+            await saveFileHandle(sessionFileHandle.name, sessionFileHandle);
         }
     } catch (err) {
         if (err.name !== 'AbortError') { console.error('파일 저장 실패:', err); showToastMessage('파일 저장에 실패했습니다.', true); }
@@ -965,12 +1870,136 @@ async function saveFile(isSaveAs = false, clickedButton = null) {
 async function loadFile() {
     try {
         const [fileHandle] = await window.showOpenFilePicker({ types: [{ description: 'HTML 파일', accept: { 'text/html': ['.html'] } }] });
-        const openInNew = confirm("파일을 새 창에서 여시겠습니까?\n'확인' = 새 창, '취소' = 현재 창");
-        await loadDataIntoWindow(fileHandle, openInNew);
+        
+        // 무조건 새 탭에서 열기
+        await loadFileInNewTab(fileHandle);
     } catch (err) {
         if (err.name !== 'AbortError') { console.error('파일 열기 실패:', err); showToastMessage('파일을 열지 못했습니다.', true); }
     }
 }
+
+async function loadFileInCurrentTab(fileHandle) {
+    try {
+        // 파일 읽기
+        const file = await fileHandle.getFile();
+        const contents = await file.text();
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(contents, 'text/html');
+        const restoredDataScript = doc.getElementById('restored-data');
+        
+        if (restoredDataScript && restoredDataScript.textContent) {
+            // 현재 세션 업데이트
+            const currentSession = getCurrentSession();
+            if (currentSession) {
+                // 파일명에서 확장자 제거하여 탭 이름 업데이트
+                const fileName = fileHandle.name.replace(/\.[^/.]+$/, "");
+                currentSession.displayName = fileName;
+                currentSession.fileHandle = fileHandle;
+                
+                // 파일 탭 UI 업데이트
+                const currentTab = document.querySelector(`[data-file-id="${currentFileId}"]`);
+                if (currentTab) {
+                    const nameSpan = currentTab.querySelector('span');
+                    if (nameSpan) {
+                        nameSpan.textContent = fileName;
+                    }
+                }
+                
+                // 파일 데이터 복원
+                try {
+                    const restoredData = JSON.parse(restoredDataScript.textContent);
+                    
+                    // 현재 세션 데이터 업데이트
+                    currentSession.quoteGroupsData = restoredData.quoteGroupsData || {};
+                    currentSession.groupCounter = restoredData.groupCounter || 0;
+                    currentSession.activeGroupId = restoredData.activeGroupId;
+                    currentSession.memoText = restoredData.memoText || '';
+                    currentSession.customerInfo = restoredData.customerInfo || [];
+                    
+                    // 전역 변수도 업데이트 (호환성을 위해)
+                    quoteGroupsData = currentSession.quoteGroupsData;
+                    groupCounter = currentSession.groupCounter;
+                    activeGroupId = currentSession.activeGroupId;
+                    
+                    // UI 상태 복원
+                    currentSession.restoreUIState();
+                    
+                    showToastMessage(`'${fileName}' 파일을 현재 탭에 로드했습니다.`);
+                    
+                    // 파일 핸들 저장
+                    await saveFileHandle(fileHandle.name, fileHandle);
+                } catch (e) {
+                    console.error("데이터 파싱 실패:", e);
+                    showToastMessage("파일 데이터를 처리하는 중 오류가 발생했습니다.", true);
+                }
+            }
+        } else {
+            showToastMessage('유효한 데이터가 포함된 견적서 파일이 아닙니다.', true);
+        }
+    } catch (err) {
+        console.error('파일 로딩 실패:', err);
+        showToastMessage('파일을 열지 못했습니다.', true);
+    }
+}
+
+async function loadFileInNewTab(fileHandle) {
+    try {
+        // 파일 읽기
+        const file = await fileHandle.getFile();
+        const contents = await file.text();
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(contents, 'text/html');
+        const restoredDataScript = doc.getElementById('restored-data');
+        
+        if (restoredDataScript && restoredDataScript.textContent) {
+            // 파일명에서 확장자 제거
+            const fileName = fileHandle.name.replace(/\.[^/.]+$/, "");
+            
+            // 새 파일탭 생성
+            const newFileId = createNewFileTab(fileName);
+            
+            // 파일 핸들 연결
+            const session = filesManager.get(newFileId);
+            if (session) {
+                session.fileHandle = fileHandle;
+            }
+            
+            // 파일 데이터 복원
+            try {
+                const restoredData = JSON.parse(restoredDataScript.textContent);
+                
+                // 현재 세션 데이터 업데이트
+                session.quoteGroupsData = restoredData.quoteGroupsData || {};
+                session.groupCounter = restoredData.groupCounter || 0;
+                session.activeGroupId = restoredData.activeGroupId;
+                session.memoText = restoredData.memoText || '';
+                session.customerInfo = restoredData.customerInfo || [];
+                
+                // 전역 변수도 업데이트 (호환성을 위해)
+                quoteGroupsData = session.quoteGroupsData;
+                groupCounter = session.groupCounter;
+                activeGroupId = session.activeGroupId;
+                
+                // 전체 UI 상태 복원 (견적 그룹과 오른쪽 패널 포함)
+                restoreState(restoredData);
+                
+                showToastMessage(`'${fileName}' 파일을 새 탭에 로드했습니다.`);
+                
+                // 파일 핸들 저장
+                await saveFileHandle(fileHandle.name, fileHandle);
+            } catch (e) {
+                console.error("데이터 파싱 실패:", e);
+                showToastMessage("파일 데이터를 처리하는 중 오류가 발생했습니다.", true);
+            }
+        } else {
+            showToastMessage('유효한 데이터가 포함된 견적서 파일이 아닙니다.', true);
+        }
+    } catch (err) {
+        console.error('파일 로딩 실패:', err);
+        showToastMessage('파일을 열지 못했습니다.', true);
+    }
+}
+
 async function loadDataIntoWindow(fileHandle, openInNewWindow) {
     try {
         if ((await fileHandle.queryPermission({ mode: 'read' })) !== 'granted') {
@@ -1055,8 +2084,8 @@ function renderRecentFileList(fullList, searchTerm) {
                 try {
                     const handle = await getFileHandle(item.name);
                     if (handle) {
-                        const openInNew = confirm("파일을 새 창에서 여시겠습니까?\n'확인' = 새 창, '취소' = 현재 창");
-                        await loadDataIntoWindow(handle, openInNew);
+                        // 무조건 새 탭에서 열기
+                        await loadFileInNewTab(handle);
                         recentFilesModal.classList.add('hidden');
                     } else { showToastMessage(`'${item.name}' 파일 핸들을 찾을 수 없습니다. 다시 선택해주세요.`, true); }
                 } catch (e) { showToastMessage(`파일 로드 중 오류 발생: ${e.message}`, true); }
@@ -1186,8 +2215,10 @@ async function openLoadMemoModal() {
 function addNewGroup() {
     groupCounter++;
     const groupId = groupCounter;
-    quoteGroupsData[groupId] = {
+    const groupName = `견적 ${groupId}`;
+    getCurrentQuoteGroups()[groupId] = {
         id: groupId,
+        name: groupName,
         calculators: [{ id: `calc_${Date.now()}`, pnr: '', tableHTML: null }],
         flightSchedule: [], 
         priceInfo: [],
@@ -1209,7 +2240,11 @@ function addNewGroup() {
     };
     createGroupUI(groupId);
     switchTab(groupId);
-    showToastMessage(`새 견적 그룹 ${groupId}이(가) 추가되었습니다.`);
+    
+    // 새 견적 추가 후 분할 패널 너비를 최소 너비로 재설정
+    setTimeout(resetSplitPaneWidths, 50);
+    
+    showToastMessage(`새 견적 그룹 ${groupName}이(가) 추가되었습니다.`);
 }
 function deleteGroup(groupId) {
     if (Object.keys(quoteGroupsData).length <= 1) { showToastMessage('마지막 견적 그룹은 삭제할 수 없습니다.', true); return; }
@@ -1231,6 +2266,7 @@ function copyActiveGroup() {
     const newGroupData = JSON.parse(JSON.stringify(quoteGroupsData[activeGroupId]));
     groupCounter++;
     newGroupData.id = groupCounter;
+    newGroupData.name = `${newGroupData.name} (복사본)`;
     newGroupData.calculators.forEach(calc => { calc.id = `calc_${Date.now()}_${Math.random()}`; });
     quoteGroupsData[groupCounter] = newGroupData;
     createGroupUI(groupCounter);
@@ -1252,14 +2288,25 @@ function switchTab(newGroupId) {
     groupEl.id = `group-content-${newGroupId}`;
     contentsContainer.appendChild(groupEl);
     initializeGroup(groupEl, newGroupId);
+    
+    // 탭 전환 후 분할 패널 너비를 최소 너비로 재설정
+    setTimeout(resetSplitPaneWidths, 50);
 }
 
 function createGroupUI(groupId) {
     const tabsContainer = document.getElementById('quoteGroupTabs');
+    
+    // 기존 탭이 있는지 확인
+    const existingTab = tabsContainer.querySelector(`[data-group-id="${groupId}"]`);
+    if (existingTab) {
+        return; // 이미 존재하면 생성하지 않음
+    }
+    
     const tabEl = document.createElement('div');
     tabEl.className = 'quote-tab';
     tabEl.dataset.groupId = groupId;
-    tabEl.innerHTML = `<span>견적 ${groupId}</span><button type="button" class="close-tab-btn" title="탭 닫기">×</button>`;
+    const groupName = quoteGroupsData[groupId]?.name || `견적 ${groupId}`;
+    tabEl.innerHTML = `<span title="더블클릭하여 수정 가능">${groupName}</span><button type="button" class="close-tab-btn" title="탭 닫기">×</button>`;
     tabsContainer.appendChild(tabEl);
     tabEl.addEventListener('click', e => { if (e.target.tagName !== 'BUTTON') switchTab(groupId); });
     tabEl.querySelector('.close-tab-btn').addEventListener('click', () => deleteGroup(groupId));
@@ -1292,36 +2339,36 @@ function initializeGroup(groupEl, groupId) {
         <div class="xl:w-1/2 space-y-6 right-panel-container"> 
             <section class="p-4 sm:p-6 border rounded-lg bg-gray-50/50">
                 <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-xl font-semibold">항공 스케줄</h2>
+                    <h2 class="text-base font-semibold">항공 스케줄</h2>
                     <div class="flex items-center space-x-2">
                         <button type="button" class="btn btn-sm btn-outline copy-flight-schedule-btn" title="HTML 복사"><i class="fas fa-clipboard"></i> 코드 복사</button>
-                        <button type="button" class="btn btn-sm btn-primary parse-gds-btn">GDS 파싱</button>
-                        <button type="button" class="btn btn-sm btn-primary add-flight-subgroup-btn"><i class="fas fa-plus"></i> 추가</button>
+                        <button type="button" class="btn btn-sm btn-green parse-gds-btn">GDS 파싱</button>
+                        <button type="button" class="btn btn-sm btn-outline add-flight-subgroup-btn"><i class="fas fa-plus"></i> 추가</button>
                     </div>
                 </div>
                 <div class="space-y-4 flight-schedule-container"></div>
             </section> 
             <section class="p-4 sm:p-6 border rounded-lg bg-gray-50/50">
                 <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-xl font-semibold">요금 안내</h2>
+                    <h2 class="text-base font-semibold">요금 안내</h2>
                     <div class="flex items-center space-x-2">
                         <button type="button" class="btn btn-sm btn-outline copy-price-info-btn" title="HTML 복사"><i class="fas fa-clipboard"></i> 코드 복사</button>
-                        <button type="button" class="btn btn-sm btn-primary add-price-subgroup-btn"><i class="fas fa-plus"></i> 추가</button>
+                        <button type="button" class="btn btn-sm btn-green add-price-subgroup-btn"><i class="fas fa-plus"></i> 추가</button>
                     </div>
                 </div>
                 <div class="space-y-4 price-info-container"></div>
             </section> 
             <section class="p-4 sm:p-6 border rounded-lg bg-gray-50/50">
                 <div class="flex justify-between items-center mb-4">
-                    <div class="flex items-center"><h2 class="text-xl font-semibold">포함/불포함</h2><span class="text-sm text-gray-500 ml-2 inclusion-exclusion-doc-name-display"></span></div>
-                    <button type="button" class="btn btn-sm btn-primary load-inclusion-exclusion-db-btn"><i class="fas fa-database mr-1"></i> DB 불러오기</button>
+                    <div class="flex items-center"><h2 class="text-base font-semibold">포함/불포함</h2><span class="text-sm text-gray-500 ml-2 inclusion-exclusion-doc-name-display"></span></div>
+                    <button type="button" class="btn btn-sm btn-green load-inclusion-exclusion-db-btn"><i class="fas fa-database mr-1"></i> DB 불러오기</button>
                 </div>
                 <div class="flex flex-col sm:flex-row gap-4">
-                    <div class="w-full sm:w-1/2"><div class="flex items-center mb-1"><h3 class="font-medium">포함</h3><button type="button" class="ml-2 copy-inclusion-btn inline-copy-btn" title="포함 내역 복사"><i class="far fa-copy"></i></button></div><textarea class="w-full flex-grow px-3 py-2 border rounded-md shadow-sm inclusion-text" rows="5"></textarea></div>
-                    <div class="w-full sm:w-1/2"><div class="flex items-center mb-1"><h3 class="font-medium">불포함</h3><button type="button" class="ml-2 copy-exclusion-btn inline-copy-btn" title="불포함 내역 복사"><i class="far fa-copy"></i></button></div><textarea class="w-full flex-grow px-3 py-2 border rounded-md shadow-sm exclusion-text" rows="5"></textarea></div>
+                    <div class="w-full sm:w-1/2"><div class="flex items-center mb-1"><h3 class="font-medium">포함</h3><button type="button" class="ml-2 copy-inclusion-btn inline-copy-btn" title="포함 내역 복사"><i class="far fa-copy"></i></button></div><textarea class="w-full flex-grow px-3 py-2 border rounded-md shadow-sm inclusion-text" rows="5" title="클릭하여 수정 가능"></textarea></div>
+                    <div class="w-full sm:w-1/2"><div class="flex items-center mb-1"><h3 class="font-medium">불포함</h3><button type="button" class="ml-2 copy-exclusion-btn inline-copy-btn" title="불포함 내역 복사"><i class="far fa-copy"></i></button></div><textarea class="w-full flex-grow px-3 py-2 border rounded-md shadow-sm exclusion-text" rows="5" title="클릭하여 수정 가능"></textarea></div>
                 </div>
             </section> 
-            <section class="p-4 sm:p-6 border rounded-lg bg-gray-50/50"><h2 class="text-xl font-semibold mb-4">호텔카드 메이커</h2><div id="hotel-maker-container-${groupId}"></div></section> 
+            <section class="p-4 sm:p-6 border rounded-lg bg-gray-50/50"><h2 class="text-base font-semibold mb-4">호텔카드 메이커</h2><div id="hotel-maker-container-${groupId}"></div></section> 
             <section class="p-4 sm:p-6 border rounded-lg bg-gray-50/50"><div id="itinerary-planner-container-${groupId}"></div></section> 
         </div> 
     </div>`;
@@ -1371,9 +2418,29 @@ function initializeGroup(groupEl, groupId) {
 
 function buildCalculatorDOM(calcContainer) {
     const content = document.createElement('div');
-    content.innerHTML = `<div class="split-container"><div class="pnr-pane"><label class="label-text font-semibold mb-2">PNR 정보</label><textarea class="w-full flex-grow px-3 py-2 border rounded-md shadow-sm" placeholder="PNR 정보를 여기에 붙여넣으세요."></textarea></div><div class="resizer-handle"></div><div class="quote-pane"><div class="table-container"><table class="quote-table"><thead><tr class="header-row"><th><button type="button" class="btn btn-sm btn-primary add-person-type-btn"><i class="fas fa-plus"></i></button></th></tr><tr class="count-row"><th></th></tr></thead><tbody></tbody><tfoot></tfoot></table></div></div></div>`;
+    content.innerHTML = `<div class="split-container"><div class="pnr-pane"><label class="label-text font-semibold mb-2"><span class="pnr-title-span" title="더블클릭하여 수정 가능">PNR 정보</span></label><textarea class="w-full flex-grow px-3 py-2 border rounded-md shadow-sm" placeholder="PNR 정보를 여기에 붙여넣으세요."></textarea></div><div class="resizer-handle"></div><div class="quote-pane"><div class="table-container"><table class="quote-table"><thead><tr class="header-row"><th><button type="button" class="btn btn-sm btn-primary add-person-type-btn"><i class="fas fa-plus"></i></button></th></tr><tr class="count-row"><th></th></tr></thead><tbody></tbody><tfoot></tfoot></table></div></div></div>`;
     const calculatorElement = content.firstElementChild;
     calcContainer.appendChild(calculatorElement);
+
+    // 초기 너비 설정 - PNR 영역을 더 넓게
+    const pnrPane = calculatorElement.querySelector('.pnr-pane');
+    const quotePane = calculatorElement.querySelector('.quote-pane');
+    
+    // 컨테이너가 DOM에 추가된 후 초기 크기 설정
+    setTimeout(() => {
+        const container = calculatorElement.querySelector('.split-container');
+        if (container) {
+            const containerWidth = container.offsetWidth;
+            const resizerWidth = 5; // resizer-handle width
+            const idealQuoteWidth = 300; // 견적 테이블 이상적인 크기
+            const idealPnrWidth = containerWidth - idealQuoteWidth - resizerWidth;
+            
+            if (idealPnrWidth > 150) { // 최소 PNR 너비 확인
+                pnrPane.style.width = idealPnrWidth + 'px';
+                quotePane.style.width = idealQuoteWidth + 'px';
+            }
+        }
+    }, 0);
 
     const tbody = calculatorElement.querySelector('tbody');
     ROW_DEFINITIONS.forEach(def => {
@@ -1381,9 +2448,9 @@ function buildCalculatorDOM(calcContainer) {
         row.dataset.rowId = def.id;
         const labelCell = row.insertCell(0);
         if (def.type === 'button') {
-            labelCell.innerHTML = `<button type="button" class="btn btn-sm btn-outline add-dynamic-row-btn">${def.label}</button>`;
+            labelCell.innerHTML = `<button type="button" class="btn btn-sm btn-secondary add-dynamic-row-btn">${def.label}</button>`;
         } else { 
-            labelCell.innerHTML = `<span>${def.label}</span>`; 
+            labelCell.innerHTML = `<span class="cost-row-label-span" title="더블클릭하여 수정 가능">${def.label}</span>`; 
         }
     });
 }
@@ -1421,6 +2488,10 @@ function restoreCalculatorState(instanceContainer, calcData) {
     if (!instanceContainer || !calcData) return;
     const pnrTextarea = instanceContainer.querySelector('.pnr-pane textarea');
     if (pnrTextarea) pnrTextarea.value = calcData.pnr || '';
+    
+    const pnrTitleSpan = instanceContainer.querySelector('.pnr-title-span');
+    if (pnrTitleSpan) pnrTitleSpan.textContent = calcData.pnrTitle || 'PNR 정보';
+
     const table = instanceContainer.querySelector('.quote-table');
     if (table && calcData.tableHTML) { 
         table.innerHTML = calcData.tableHTML;
@@ -1492,10 +2563,10 @@ function addPersonTypeColumn(calcContainer, typeName = '성인', count = 1) {
     const headerRow = table.querySelector('thead .header-row');
     const colIndex = headerRow.cells.length;
     const headerCell = document.createElement('th');
-    headerCell.innerHTML = `<div class="relative"><span class="person-type-name-span">${typeName}</span><button type="button" class="remove-col-btn" title="이 항목 삭제"><i class="fas fa-times"></i></button></div>`;
+    headerCell.innerHTML = `<div class="relative"><span class="person-type-name-span" title="더블클릭하여 수정 가능">${typeName}</span><button type="button" class="remove-col-btn" title="이 항목 삭제"><i class="fas fa-times"></i></button></div>`;
     headerRow.appendChild(headerCell);
     const countCell = document.createElement('th');
-    countCell.innerHTML = `<span class="person-count-span">${count}</span>`;
+    countCell.innerHTML = `<span class="person-count-span" title="더블클릭하여 수정 가능">${count}</span>`;
     table.querySelector('thead .count-row').appendChild(countCell);
     table.querySelectorAll('tbody tr').forEach(tr => {
         const rowId = tr.dataset.rowId;
@@ -1518,7 +2589,7 @@ function addDynamicCostRow(calcContainer, label = '신규 항목') {
     const insertionIndex = Array.from(tbody.rows).indexOf(buttonRow);
     const newRow = tbody.insertRow(insertionIndex);
     newRow.dataset.rowId = rowId;
-    newRow.insertCell(0).innerHTML = `<div class="flex items-center"><button type="button" class="dynamic-row-delete-btn"><i class="fas fa-trash-alt"></i></button><span class="dynamic-row-label-span ml-2">${label}</span></div>`;
+    newRow.insertCell(0).innerHTML = `<div class="flex items-center"><button type="button" class="dynamic-row-delete-btn"><i class="fas fa-trash-alt"></i></button><span class="dynamic-row-label-span ml-2" title="더블클릭하여 수정 가능">${label}</span></div>`;
     for (let i = 1; i < numCols; i++) { newRow.insertCell(i).innerHTML = getCellContent(rowId, i, 'costInput'); }
     
     calculateAll(calcContainer);
@@ -1595,7 +2666,7 @@ function createFlightSubgroup(container, subgroupData, groupId) {
     const subGroupDiv = document.createElement('div');
     subGroupDiv.className = 'dynamic-section flight-schedule-subgroup';
     subGroupDiv.id = subgroupData.id;
-    subGroupDiv.innerHTML = `<button type="button" class="delete-dynamic-section-btn" title="삭제"><i class="fas fa-trash-alt"></i></button><div class="mb-2"><input type="text" class="w-full flex-grow px-3 py-2 border rounded-md shadow-sm" placeholder="항공사" value="${subgroupData.title || ''}"></div><div class="overflow-x-auto"><table class="flight-schedule-table"><thead><tr><th>편명</th><th>출발일</th><th>출발지</th><th>출발시간</th><th>도착일</th><th>도착지</th><th>도착시간</th><th style="width: 50px;"></th></tr></thead><tbody></tbody></table></div><div class="add-row-btn-container pt-2"><button type="button" class="add-row-btn"><i class="fas fa-plus mr-1"></i></button></div>`;
+    subGroupDiv.innerHTML = `<button type="button" class="delete-dynamic-section-btn" title="삭제"><i class="fas fa-trash-alt"></i></button><div class="mb-2"><input type="text" class="w-full flex-grow px-3 py-2 border rounded-md shadow-sm" placeholder="항공사" title="클릭하여 수정 가능" value="${subgroupData.title || ''}"></div><div class="overflow-x-auto"><table class="flight-schedule-table"><thead><tr><th>편명</th><th>출발일</th><th>출발지</th><th>출발시간</th><th>도착일</th><th>도착지</th><th>도착시간</th><th style="width: 50px;"></th></tr></thead><tbody></tbody></table></div><div class="add-row-btn-container pt-2"><button type="button" class="add-row-btn"><i class="fas fa-plus mr-1"></i></button></div>`;
     const tbody = subGroupDiv.querySelector('tbody');
     subgroupData.rows.forEach(rowData => addFlightRow(tbody, rowData, subgroupData));
     
@@ -1604,7 +2675,7 @@ function createFlightSubgroup(container, subgroupData, groupId) {
 function addFlightRow(tbody, rowData, subgroupData) {
     const tr = document.createElement('tr');
     const fields = [{ key: 'flightNum', placeholder: 'ZE561' }, { key: 'depDate', placeholder: '07/09' }, { key: 'originCity', placeholder: 'ICN' }, { key: 'depTime', placeholder: '20:55' }, { key: 'arrDate', placeholder: '07/09' }, { key: 'destCity', placeholder: 'CXR' }, { key: 'arrTime', placeholder: '23:55' }];
-    tr.innerHTML = fields.map(f => `<td><input type="text" class="flight-schedule-input" data-field="${f.key}" value="${rowData[f.key] || ''}" placeholder="${f.placeholder}"></td>`).join('') + `<td class="text-center"><button type="button" class="delete-row-btn" title="삭제"><i class="fas fa-trash"></i></button></td>`;
+    tr.innerHTML = fields.map(f => `<td><span class="flight-schedule-cell" data-field="${f.key}" data-placeholder="${f.placeholder}" contenteditable="true" title="클릭하여 수정 가능">${rowData[f.key] || ''}</span></td>`).join('') + `<td class="text-center"><button type="button" class="delete-row-btn" title="삭제"><i class="fas fa-trash"></i></button></td>`;
     tbody.appendChild(tr);
 }
 function generateInclusionExclusionInlineHtml(inclusionText, exclusionText) { 
@@ -1628,7 +2699,7 @@ function createPriceSubgroup(container, subgroupData, groupId) {
     const subGroupDiv = document.createElement('div');
     subGroupDiv.className = 'dynamic-section price-subgroup';
     subGroupDiv.id = subgroupData.id;
-    subGroupDiv.innerHTML = `<button type="button" class="delete-dynamic-section-btn" title="삭제"><i class="fas fa-trash-alt"></i></button><input type="text" class="w-full flex-grow px-3 py-2 border rounded-md shadow-sm mb-2 price-subgroup-title" placeholder="견적설명" value="${subgroupData.title || ''}"><table class="price-table"><thead><tr><th style="width:25%">내역</th><th>1인당금액</th><th>인원</th><th>총금액</th><th style="width:30%">비고</th><th style="width:50px"></th></tr></thead><tbody></tbody><tfoot><tr><td colspan="3" class="text-right font-bold pr-2">총 합계</td><td class="grand-total">0</td><td colspan="2"><button type="button" class="add-row-btn"><i class="fas fa-plus mr-1"></i></button></td></tr></tfoot></table>`;
+    subGroupDiv.innerHTML = `<button type="button" class="delete-dynamic-section-btn" title="삭제"><i class="fas fa-trash-alt"></i></button><input type="text" class="w-full flex-grow px-3 py-2 border rounded-md shadow-sm mb-2 price-subgroup-title" placeholder="견적설명" title="클릭하여 수정 가능" value="${subgroupData.title || ''}"><table class="price-table"><thead><tr><th style="width:25%">내역</th><th>1인당금액</th><th>인원</th><th>총금액</th><th style="width:30%">비고</th><th style="width:50px"></th></tr></thead><tbody></tbody><tfoot><tr><td colspan="3" class="text-right font-bold pr-2">총 합계</td><td class="grand-total">0</td><td colspan="2"><button type="button" class="add-row-btn"><i class="fas fa-plus mr-1"></i></button></td></tr></tfoot></table>`;
     const tbody = subGroupDiv.querySelector('tbody');
     if (subgroupData.rows && subgroupData.rows.length > 0) {
         subgroupData.rows.forEach(rowData => addPriceRow(tbody, rowData, subgroupData, subGroupDiv, groupId));
@@ -1639,22 +2710,37 @@ function createPriceSubgroup(container, subgroupData, groupId) {
 
 function addPriceRow(tbody, rowData, subgroupData, subGroupDiv, groupId) {
     const tr = document.createElement('tr');
-    const fields = [{ key: 'item', align: 'center' }, { key: 'price', align: 'center' }, { key: 'count', align: 'center' }, { key: 'total', align: 'center', readonly: true }, { key: 'remarks', align: 'center' }];
-    tr.innerHTML = fields.map(f => `<td><input type="text" class="text-${f.align}" data-field="${f.key}" value="${rowData[f.key] !== undefined ? (f.key === 'price' || f.key === 'total' ? (parseFloat(String(rowData[f.key]).replace(/,/g, '')) || 0).toLocaleString() : rowData[f.key]) : ''}" ${f.readonly ? 'readonly' : ''}></td>`).join('') + `<td><button type="button" class="delete-row-btn"><i class="fas fa-trash"></i></button></td>`;
+    const fields = [
+        { key: 'item', align: 'center', placeholder: '항목' }, 
+        { key: 'price', align: 'center', placeholder: '가격' }, 
+        { key: 'count', align: 'center', placeholder: '수량' }, 
+        { key: 'total', align: 'center', readonly: true, placeholder: '합계' }, 
+        { key: 'remarks', align: 'center', placeholder: '비고' }
+    ];
+    
+    tr.innerHTML = fields.map(f => {
+        const value = rowData[f.key] !== undefined ? 
+            (f.key === 'price' || f.key === 'total' ? 
+                (parseFloat(String(rowData[f.key]).replace(/,/g, '')) || 0).toLocaleString() : 
+                rowData[f.key]) : '';
+        
+        return `<td><span class="price-table-cell text-${f.align}" data-field="${f.key}" data-placeholder="${f.placeholder}" ${f.readonly ? 'readonly' : 'contenteditable="true"'} title="${f.readonly ? '자동 계산됨' : '클릭하여 수정 가능'}">${value}</span></td>`;
+    }).join('') + `<td><button type="button" class="delete-row-btn"><i class="fas fa-trash"></i></button></td>`;
+    
     tbody.appendChild(tr);
 
-    tr.querySelectorAll('input:not([readonly])').forEach(input => {
-        const field = input.dataset.field;
+    tr.querySelectorAll('.price-table-cell:not([readonly])').forEach(cell => {
+        const field = cell.dataset.field;
         
-        input.addEventListener('input', () => {
-            rowData[field] = input.value;
+        cell.addEventListener('input', () => {
+            rowData[field] = cell.textContent.trim();
             updateRow();
         });
 
         if (field === 'price' || field === 'count') {
-            input.addEventListener('blur', (e) => {
-                const numValue = parseFloat(e.target.value.replace(/,/g, '')) || 0;
-                e.target.value = numValue.toLocaleString();
+            cell.addEventListener('blur', (e) => {
+                const numValue = parseFloat(e.target.textContent.replace(/,/g, '')) || 0;
+                e.target.textContent = numValue.toLocaleString();
             });
         }
     });
@@ -1665,8 +2751,8 @@ function addPriceRow(tbody, rowData, subgroupData, subGroupDiv, groupId) {
         const total = price * count;
         rowData.total = total;
         
-        const totalInput = tr.querySelector('[data-field="total"]');
-        if (totalInput) totalInput.value = total.toLocaleString();
+        const totalCell = tr.querySelector('[data-field="total"]');
+        if (totalCell) totalCell.textContent = total.toLocaleString();
         
         updateGrandTotal(subGroupDiv); // 수정된 함수 호출
     }
@@ -1686,12 +2772,12 @@ function updateGrandTotal(subGroupDiv) {
     const rows = subGroupDiv.querySelectorAll('tbody tr');
 
     rows.forEach(row => {
-        const priceInput = row.querySelector('input[data-field="price"]');
-        const countInput = row.querySelector('input[data-field="count"]');
+        const priceCell = row.querySelector('[data-field="price"]');
+        const countCell = row.querySelector('[data-field="count"]');
 
-        if (priceInput && countInput) {
-            const price = parseFloat(priceInput.value.replace(/,/g, '')) || 0;
-            const count = parseInt(countInput.value.replace(/,/g, '')) || 0;
+        if (priceCell && countCell) {
+            const price = parseFloat(priceCell.textContent.replace(/,/g, '')) || 0;
+            const count = parseInt(countCell.textContent.replace(/,/g, '')) || 0;
             grandTotal += price * count;
         }
     });
@@ -1728,6 +2814,46 @@ function generatePriceInfoInlineHtml(priceData) {
     return html;
 }
 
+
+/**
+ * 견적 계산 모듈의 분할 패널(split pane) 너비를 최소 상태로 재설정합니다.
+ * quote-pane을 CSS에 정의된 min-width로 설정하고 pnr-pane이 나머지 공간을 차지하도록 합니다.
+ */
+function resetSplitPaneWidths() {
+    const splitContainers = document.querySelectorAll('.split-container');
+    splitContainers.forEach(container => {
+        const pnrPane = container.querySelector('.pnr-pane');
+        const quotePane = container.querySelector('.quote-pane');
+        const resizer = container.querySelector('.resizer-handle');
+
+        if (pnrPane && quotePane && resizer) {
+            // flexbox 동작을 잠시 비활성화하여 명시적인 너비 설정을 허용합니다.
+            pnrPane.style.flex = 'none';
+            quotePane.style.flex = 'none';
+
+            const containerWidth = container.offsetWidth;
+            const resizerWidth = resizer.offsetWidth;
+            
+            // CSS에서 min-width 값을 직접 가져옵니다.
+            const quotePaneMinWidth = parseInt(window.getComputedStyle(quotePane).minWidth, 10);
+
+            // quote-pane 너비를 min-width로 설정합니다.
+            const newQuoteWidth = quotePaneMinWidth;
+            quotePane.style.width = `${newQuoteWidth}px`;
+            
+            // pnr-pane이 나머지 너비를 차지하도록 설정합니다.
+            const newPnrWidth = containerWidth - newQuoteWidth - resizerWidth;
+            pnrPane.style.width = `${newPnrWidth > 0 ? newPnrWidth : 0}px`;
+
+            // 잠시 후 flexbox 동작을 복원합니다.
+            setTimeout(() => {
+                pnrPane.style.removeProperty('flex');
+                quotePane.style.removeProperty('flex');
+            }, 100);
+        }
+    });
+}
+
 function restoreState(data) {
     document.getElementById('customerInfoContainer').innerHTML = '';
     document.getElementById('quoteGroupTabs').innerHTML = '';
@@ -1736,6 +2862,9 @@ function restoreState(data) {
     quoteGroupsData = data.quoteGroupsData || {};
 
     Object.values(quoteGroupsData).forEach(group => {
+        if (!group.name) {
+            group.name = `견적 ${group.id}`;
+        }
         if (!group.hotelMakerData) {
             group.hotelMakerData = {
                 allHotelData: [{ nameKo: `새 호텔 1`, nameEn: "", website: "", image: "", description: "" }],
@@ -1767,79 +2896,64 @@ function restoreState(data) {
     else { 
         addNewGroup(); 
     }
+
+    // 파일 로드 시 분할 패널 너비를 최소 너비로 재설정합니다.
+    // DOM이 완전히 렌더링된 후 실행되도록 setTimeout을 사용합니다.
+    setTimeout(resetSplitPaneWidths, 100);
 }
+
 function initializeNewSession() {
-    createCustomerCard();
-    addNewGroup();
+    // 파일 탭 시스템 초기화
+    if (filesManager.size === 0) {
+        createNewFileTab('새 견적서');
+    }
+    
+    // 기존 초기화 로직
     document.getElementById('memoText').value = '지원어려울시 업셀링 요청';
+    
+    // 현재 세션 업데이트
+    updateCurrentSession();
+
+    // 앱 첫 로드 시 분할 패널 너비를 최소 너비로 재설정합니다.
+    setTimeout(resetSplitPaneWidths, 100);
 }
 
 // =======================================================================
 // 9. 이벤트 리스너 중앙 관리 (Event Delegation)
 // =======================================================================
 function setupEventListeners() {
-    const appContainer = document.querySelector('.max-w-full');
-
-    // --- 상단 헤더 및 글로벌 버튼 ---
-    if (appContainer) {
-        appContainer.addEventListener('click', (event) => {
+    // --- 파일 탭 바 이벤트 리스너 ---
+    const fileTabBar = document.getElementById('fileTabBar');
+    if (fileTabBar) {
+        fileTabBar.addEventListener('click', (event) => {
             const button = event.target.closest('button');
-            if (!button) return;
-
-            const id = button.id;
-            if (id === 'addCustomerBtn') createCustomerCard();
-            else if (id === 'newGroupBtn') addNewGroup();
-            else if (id === 'copyGroupBtn') copyActiveGroup();
-            else if (id === 'deleteGroupBtn') deleteActiveGroup();
-            else if (id === 'newWindowBtn') window.open(window.location.href, '_blank');
-            else if (id === 'saveBtn') saveFile(false, button);
-            else if (id === 'saveAsBtn') saveFile(true, button);
-            else if (id === 'recentFilesBtn') openRecentFilesModal();
-            else if (id === 'copyMemoBtn') copyToClipboard(document.getElementById('memoText').value, '메모');
-            else if (id === 'loadMemoFromDbBtn') openLoadMemoModal();
-        });
-    }
-
-    // --- 파일 불러오기 라벨 클릭 이벤트 리스너 (추가) ---
-    const loadFileLabel = document.querySelector('label[for="loadFile"]');
-    if (loadFileLabel) {
-        loadFileLabel.addEventListener('click', (event) => {
-            event.preventDefault();
-            loadFile();
-        });
-    }
-
-    // --- 고객 정보 컨테이너 이벤트 위임 ---
-    const customerInfoContainer = document.getElementById('customerInfoContainer');
-    if (customerInfoContainer) {
-        customerInfoContainer.addEventListener('click', (event) => {
-            const button = event.target.closest('button');
-            if (!button) return;
-
-            if (button.classList.contains('remove-customer-btn')) {
-                if (confirm('이 고객 정보를 삭제하시겠습니까?')) {
-                    button.closest('.p-4').remove();
-                }
+            const fileTab = event.target.closest('.file-tab');
+            
+            if (button && button.id === 'newFileTabBtn') {
+                createNewFileTab();
+                return;
             }
-            else if (button.classList.contains('copy-customer-info-btn')) {
-                const inputElement = button.previousElementSibling;
-                if (inputElement && inputElement.value) {
-                    copyToClipboard(inputElement.value, '고객정보');
-                } else {
-                    showToastMessage('복사할 내용이 없습니다.', true);
-                }
+            
+            if (button && button.classList.contains('close-file-btn')) {
+                event.stopPropagation();
+                const fileId = button.closest('.file-tab').dataset.fileId;
+                closeFileTab(fileId);
+                return;
             }
-        });
-
-        customerInfoContainer.addEventListener('dblclick', (event) => {
-            const inputElement = event.target;
-            if (inputElement.matches('input[type="text"], input[type="tel"], input[type="email"]')) {
-                if (inputElement.value) {
-                    copyToClipboard(inputElement.value, '고객정보');
-                }
+            
+            if (fileTab && !button) {
+                const fileId = fileTab.dataset.fileId;
+                switchFileTab(fileId);
             }
         });
     }
+
+    // --- 상단 헤더 및 글로벌 버튼 이벤트는 rebindWorkspaceEventListeners에서 처리 ---
+
+    // --- 파일 불러오기 라벨 클릭 이벤트 리스너는 rebindWorkspaceEventListeners에서 처리 ---
+    // loadFile 이벤트는 파일 탭 전환 시마다 rebindWorkspaceEventListeners()에서 재바인딩됨
+
+    // --- 고객 정보 컨테이너 이벤트 위임은 rebindWorkspaceEventListeners에서 처리 ---
 
     // --- 모달 닫기 버튼 ---
     document.body.addEventListener('click', event => {
@@ -1872,7 +2986,7 @@ function setupEventListeners() {
         const button = target.closest('button');
 
         if (!button) {
-            if(target.matches('.person-type-name-span, .person-count-span, .dynamic-row-label-span')) {
+            if(target.matches('.person-type-name-span, .person-count-span, .dynamic-row-label-span, .cost-row-label-span')) {
                 const calcContainer = target.closest('.calculator-instance');
                 const callback = () => calculateAll(calcContainer);
                 const inputType = target.classList.contains('person-count-span') ? 'number' : 'text';
@@ -1886,7 +3000,7 @@ function setupEventListeners() {
         if (button.classList.contains('add-calculator-btn')) {
             syncGroupUIToData(groupId);
             const groupData = quoteGroupsData[groupId];
-            const newCalcData = { id: `calc_${Date.now()}`, pnr: '', tableHTML: null };
+            const newCalcData = { id: `calc_${Date.now()}`, pnr: '', tableHTML: null, pnrTitle: 'PNR 정보' };
             groupData.calculators.push(newCalcData);
             renderCalculators(groupId);
         } else if (button.classList.contains('copy-last-calculator-btn')) {
@@ -2065,7 +3179,7 @@ function setupEventListeners() {
             }
             const calcContainer = target.closest('.calculator-instance');
             if (calcContainer) calculateAll(calcContainer);
-        } else if(target.matches('.flight-schedule-input, .price-table input, .inclusion-text, .exclusion-text, .price-subgroup-title')) {
+        } else if(target.matches('.flight-schedule-cell, .price-table-cell, .inclusion-text, .exclusion-text, .price-subgroup-title')) {
             const groupId = target.closest('.calculation-group-content').id.split('-').pop();
             syncGroupUIToData(groupId);
         }
@@ -2111,23 +3225,62 @@ function setupEventListeners() {
     
     document.addEventListener('mousedown', (e) => {
         if (e.target.matches('.resizer-handle')) {
-            let isResizing = true;
-            let splitContainerToResize = e.target.closest('.split-container');
-            let pnrPaneToResize = splitContainerToResize.querySelector('.pnr-pane');
+            e.preventDefault(); // Prevent text selection
+            const splitContainer = e.target.closest('.split-container');
+            const pnrPane = splitContainer.querySelector('.pnr-pane');
+            const quotePane = splitContainer.querySelector('.quote-pane');
+            const resizer = e.target;
+
             document.body.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none';
+            
+            // 현재 너비값이 없으면 초기화 (두 번째 리사이즈를 위해)
+            if (!pnrPane.style.width || pnrPane.style.width === 'auto') {
+                const currentPnrWidth = pnrPane.offsetWidth;
+                const currentQuoteWidth = quotePane.offsetWidth;
+                pnrPane.style.width = currentPnrWidth + 'px';
+                quotePane.style.width = currentQuoteWidth + 'px';
+            }
+
+            // Temporarily disable flex-grow/shrink to set widths explicitly
+            pnrPane.style.flex = 'none';
+            quotePane.style.flex = 'none';
 
             const onMouseMove = (moveEvent) => {
-                if (!isResizing) return;
-                const rect = splitContainerToResize.getBoundingClientRect();
-                let newWidth = moveEvent.clientX - rect.left;
-                if (newWidth < 150) newWidth = 150;
-                if (newWidth > rect.width - 350) newWidth = rect.width - 350;
-                pnrPaneToResize.style.width = newWidth + 'px';
+                const rect = splitContainer.getBoundingClientRect();
+                let pnrWidth = moveEvent.clientX - rect.left;
+
+                const minPnrWidth = 150;
+                const minQuoteWidth = 280;  // 250 → 280: 현재 스크린샷 기준 최적 크기
+                const resizerWidth = resizer.offsetWidth;
+
+                // Clamp the pnrWidth to its min and max based on the container and quote pane min-width
+                if (pnrWidth < minPnrWidth) {
+                    pnrWidth = minPnrWidth;
+                }
+                if (pnrWidth > rect.width - minQuoteWidth - resizerWidth) {
+                    pnrWidth = rect.width - minQuoteWidth - resizerWidth;
+                }
+
+                const quoteWidth = rect.width - pnrWidth - resizerWidth;
+
+                // Set explicit widths on both panes
+                pnrPane.style.setProperty('width', pnrWidth + 'px', 'important');
+                quotePane.style.setProperty('width', quoteWidth + 'px', 'important');
             };
             
             const onMouseUp = () => {
-                isResizing = false;
                 document.body.style.cursor = 'default';
+                document.body.style.userSelect = 'auto';
+
+                // flex 속성 복원 (width는 유지)
+                pnrPane.style.flex = '0 0 auto';  // width 기반으로 고정 크기 유지
+                quotePane.style.flex = '0 0 auto'; // width 기반으로 고정 크기 유지
+                
+                // width는 제거하지 않고 유지 (다음 리사이즈를 위해 필요)
+                // pnrPane.style.removeProperty('width');  // 주석 처리
+                // quotePane.style.removeProperty('width'); // 주석 처리
+
                 document.removeEventListener('mousemove', onMouseMove);
                 document.removeEventListener('mouseup', onMouseUp);
             };
@@ -2153,6 +3306,9 @@ function setupEventListeners() {
             }
         }
     });
+    
+    // 초기 로드 시 워크스페이스 이벤트 리스너 바인딩
+    rebindWorkspaceEventListeners();
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -2179,7 +3335,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 const restoredData = JSON.parse(restoredDataJSON);
                 restoreState(restoredData);
             } catch(e) { console.error("세션 데이터 파싱 실패:", e); initializeNewSession(); }
-        } else { initializeNewSession(); }
+        } else { 
+            // 파일 탭 시스템 초기화
+            initializeNewSession();
+        }
     } else {
         const restoredDataScript = document.getElementById('restored-data');
         let restoredData = null;
@@ -2191,4 +3350,42 @@ document.addEventListener('DOMContentLoaded', () => {
         else { initializeNewSession(); }
     }
     setupEventListeners();
+    
+    // 기존 요소들에 툴팁 추가
+    setTimeout(() => {
+        addTooltipsToExistingElements();
+    }, 100);
 });
+
+// 기존 요소들에 툴팁 추가하는 함수
+function addTooltipsToExistingElements() {
+    // 비용 행 라벨들
+    document.querySelectorAll('.cost-row-label-span:not([title])').forEach(el => {
+        el.setAttribute('title', '더블클릭하여 수정 가능');
+    });
+    
+    // 인원 타입 이름들
+    document.querySelectorAll('.person-type-name-span:not([title])').forEach(el => {
+        el.setAttribute('title', '더블클릭하여 수정 가능');
+    });
+    
+    // 인원 수들
+    document.querySelectorAll('.person-count-span:not([title])').forEach(el => {
+        el.setAttribute('title', '더블클릭하여 수정 가능');
+    });
+    
+    // 동적 행 라벨들
+    document.querySelectorAll('.dynamic-row-label-span:not([title])').forEach(el => {
+        el.setAttribute('title', '더블클릭하여 수정 가능');
+    });
+    
+    // PNR 제목
+    document.querySelectorAll('.pnr-title-span:not([title])').forEach(el => {
+        el.setAttribute('title', '더블클릭하여 수정 가능');
+    });
+    
+    // 견적 그룹 탭들
+    document.querySelectorAll('.quote-tab span:not([title])').forEach(el => {
+        el.setAttribute('title', '더블클릭하여 수정 가능');
+    });
+}
