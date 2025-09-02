@@ -1,1208 +1,593 @@
-/* [개선] 가독성 높은 Noto Sans KR 폰트 명시적 추가 및 기본 폰트 크기 조정 */
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap');
+/* PNR Title Span Styling */
+.pnr-title-span {
+    /* Interactivity visual cues removed as per user request */
+}
 
+
+
+/* Global Styles */
 body {
-    font-family: 'Noto Sans KR', 'Inter', sans-serif;
-    font-size: 13px; /* 기본 폰트 크기를 약간 키워 가독성 확보 */
-    background-color: #f3f4f6; /* [개선] 전체 배경색을 연한 회색으로 변경 */
+    font-family: 'Malgun Gothic', '맑은 고딕', sans-serif;
 }
 
-/* [개선] 입력 필드 커서 색상 명확화 및 포커스 효과 개선 */
-input,
-textarea {
-    caret-color: #2563EB; /* 대표 색상으로 커서 색상 지정 */
-    transition: all 0.2s;
+/* Buttons */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.5rem 1rem;
+    border-radius: 0.375rem;
+    font-weight: 500;
+    transition: background-color 0.2s, color 0.2s, border-color 0.2s;
+    border: 1px solid transparent;
+    cursor: pointer;
 }
 
-.input-field {
-    @apply w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent sm:text-sm;
+.btn-sm {
+    padding: 0.25rem 0.75rem;
+    font-size: 0.875rem;
 }
-.input-field-sm {
-    @apply px-2 py-1 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm w-full text-left;
+
+.btn-secondary {
+    background-color: #e5e7eb; /* gray-200 */
+    color: #374151; /* gray-700 */
 }
-.label-text { @apply block text-sm font-medium text-gray-700 mb-1; }
+.btn-secondary:hover {
+    background-color: #d1d5db; /* gray-300 */
+}
 
-/* [개선] 버튼 스타일 통일 및 호버 효과 개선 */
-.btn { @apply px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium flex items-center justify-center transition-all duration-200; }
-.btn i.fas, .btn i.far { @apply mr-2; }
-.btn-primary { @apply bg-blue-600 text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500; }
-.btn-secondary { @apply bg-gray-700 text-white hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500; }
-.btn-sm { @apply px-3 py-1.5 text-xs rounded-md; }
-.btn-outline { @apply bg-white border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-gray-400; }
+.btn-primary {
+    background-color: #4f46e5; /* indigo-600 */
+    color: #ffffff;
+}
+.btn-primary:hover {
+    background-color: #4338ca; /* indigo-700 */
+}
 
-.btn-blue { @apply bg-blue-500 text-white hover:bg-blue-600; }
-.btn-yellow { @apply bg-yellow-500 text-white hover:bg-yellow-600; }
-.btn-red { @apply bg-red-500 text-white hover:bg-red-600; }
+.btn-outline {
+    border-color: #d1d5db; /* gray-300 */
+    color: #4b5563; /* gray-600 */
+}
+.btn-outline:hover {
+    background-color: #f9fafb; /* gray-50 */
+}
 
-/* [개선] 견적 그룹 탭 디자인 개선 (활성/비활성 구분 명확화) */
+.btn-blue {
+    background-color: #3b82f6; color: white; }
+.btn-blue:hover { background-color: #2563eb; }
+
+.btn-yellow {
+    background-color: #f59e0b; color: white; }
+.btn-yellow:hover { background-color: #d97706; }
+
+.btn-red {
+    background-color: #ef4444; color: white; }
+.btn-red:hover { background-color: #dc2626; }
+
+.btn-indigo {
+    background-color: #6366f1; color: white; }
+.btn-indigo:hover { background-color: #4f46e5; }
+
+.inline-copy-btn {
+    background: none;
+    border: none;
+    color: #9ca3af; /* gray-400 */
+    cursor: pointer;
+}
+.inline-copy-btn:hover {
+    color: #4f46e5; /* indigo-600 */
+}
+
+/* Tabs */
 .quote-group-controls {
     display: flex;
     justify-content: space-between;
-    align-items: flex-end;
-    border-bottom: 2px solid #e5e7eb; /* 구분선 명확화 */
-    margin-bottom: -2px; /* 활성 탭과 콘텐츠 연결을 위함 */
+    align-items: center;
+    margin-bottom: -1px; /* To overlap border */
 }
+
 .quote-group-tabs-container {
     display: flex;
     flex-wrap: wrap;
-    gap: 4px; /* 탭 간 간격 추가 */
 }
+
 .quote-tab {
-    padding: 10px 16px; /* 여백 증가 */
-    border: 2px solid transparent; /* 기본 테두리 숨김 */
+    padding: 0.5rem 1rem;
+    border: 1px solid #d1d5db; /* gray-300 */
     border-bottom: none;
-    background-color: transparent; /* 기본 배경 투명 */
-    color: #4b5563; /* 기본 텍스트 색상 */
+    border-radius: 0.375rem 0.375rem 0 0;
+    margin-right: 0.25rem;
     cursor: pointer;
-    border-radius: 6px 6px 0 0;
-    display: flex;
-    align-items: center;
-    font-size: 14px; /* 폰트 크기 증가 */
-    font-weight: 500;
-    transition: all 0.2s ease-in-out;
-}
-.quote-tab:hover {
-    background-color: #f9fafb;
-    color: #1f2937;
-}
-.quote-tab.active {
-    background-color: white;
-    border-color: #e5e7eb #e5e7eb white; /* 활성 탭 테두리 색상 */
-    color: #1d4ed8; /* 활성 탭 텍스트 대표 색상으로 변경 */
-    font-weight: 700;
+    background-color: #f3f4f6; /* gray-100 */
     position: relative;
-    z-index: 1;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
 }
-.quote-tab .close-tab-btn {
-    margin-left: 8px; background: none; border: none; cursor: pointer;
-    font-size: 16px; padding: 0 4px; color: #9ca3af; border-radius: 99px;
-    transition: all 0.2s ease-in-out;
-}
-.quote-tab:hover .close-tab-btn { background-color: #e5e7eb; }
-.quote-tab .close-tab-btn:hover { color: #ef4444; background-color: #fee2e2; }
-.quote-group-buttons { padding-bottom: 8px; }
 
-
-.calculation-group-content { display: none; min-height: 500px; }
-.calculation-group-content.active { display: block; }
-
-/* [개선] 분할 화면 리사이저 핸들 시각적 개선 */
-.split-container { display: flex; flex-direction: row; width: 100%; height: 100%; }
-.pnr-pane {
-    width: 30%; min-width: 150px; flex-shrink: 0; display: flex;
-    flex-direction: column; padding-right: 12px;
-}
-.pnr-pane textarea { @apply input-field; flex-grow: 1; resize: none; }
-.resizer-handle {
-    width: 12px; flex-shrink: 0; background-color: transparent; cursor: col-resize;
-    transition: background-color 0.2s ease; position: relative;
-    border-left: 1px solid #e5e7eb;
-    border-right: 1px solid #e5e7eb;
-}
-.resizer-handle:hover { background-color: #e5e7eb; }
-.resizer-handle::before {
-    content: '||'; position: absolute; top: 50%; left: 50%;
-    font-size: 10px; line-height: 1; color: #9ca3af; letter-spacing: -2px;
-    transform: translate(-50%, -50%);
-}
-.quote-pane {
-    flex-grow: 1; min-width: 300px; overflow-x: auto; display: flex;
-    flex-direction: column; padding-left: 12px;
-}
-.table-container { @apply mb-4; }
-
-/* [개선] 합계 섹션 디자인 */
-.totals-summary-section {
-    @apply flex items-center justify-around mt-auto p-4 border-t-2 border-gray-200 bg-gray-50 rounded-b-lg;
-}
-.totals-summary-section > div { @apply text-center; }
-.totals-summary-section span:first-child { @apply text-xs font-medium text-gray-500 block; }
-.totals-summary-section span:last-child { @apply text-xs font-bold text-blue-700; }
-
-/* [개선] 견적 테이블 가독성 향상 (여백, 구분선, 호버 효과) */
-.quote-table { width: 100%; border-collapse: separate; table-layout: fixed; border-spacing: 0; }
-.quote-table th, .quote-table td { border-bottom: 1px solid #e5e7eb; padding: 0; vertical-align: middle; }
-
-/* [수정] 헤더(th)도 좌측 정렬을 기본으로 하고, td와 좌우 패딩을 동일하게 맞춤 */
-.quote-table th {
-    background-color: #f9fafb;
+.quote-tab.active {
+    background-color: #ffffff;
+    border-color: #d1d5db; /* gray-300 */
+    border-bottom: 1px solid #ffffff;
     font-weight: 600;
-    padding: 10px 12px; /* 상하 10px, 좌우 12px 패딩 */
-    border-top: 1px solid #e5e7eb;
-    text-align: left; /* 모든 헤더 셀은 기본적으로 좌측 정렬 */
-}
-.quote-table td { text-align: left; padding: 0 12px; } /* 모든 데이터 셀은 기본적으로 좌측 정렬 및 좌우 패딩 추가 */
-
-.quote-table th:first-child, .quote-table td:first-child {
-    min-width: 120px;
-    padding: 6px 12px;
-    text-align: left;
-}
-.quote-table th:first-child { border-left: 1px solid #e5e7eb; border-top-left-radius: 8px;}
-.quote-table th:last-child { border-right: 1px solid #e5e7eb; border-top-right-radius: 8px;}
-.quote-table td:first-child { border-left: 1px solid #e5e7eb; }
-.quote-table td:last-child { border-right: 1px solid #e5e7eb; }
-.quote-table tbody tr:hover { background-color: #f9fafb; }
-
-.quote-table th .remove-col-btn { @apply absolute top-1 right-1 text-gray-400 hover:text-red-500 text-xs; }
-.quote-table td .input-field-sm, .quote-table td .calculated-field {
-    border-radius: 0; border: none; box-shadow: none; height: 100%; width: 100%;
-    padding: 10px 0; /* [수정] 좌우 패딩은 부모 td에서 제어하므로 여기서는 상하 패딩만 설정 */
-    background-color: transparent;
+    color: #4f46e5; /* indigo-600 */
 }
 
-/* [수정] calculated-field의 정렬 방식을 좌측으로 변경 */
-.quote-table .calculated-field {
-    display: flex;
-    align-items: center;
-    justify-content: flex-start; /* flexbox를 이용한 좌측 정렬 */
-    text-align: left; /* text-align도 명시 */
-}
-.quote-table .dynamic-row-delete-btn { @apply text-gray-400 hover:text-red-500 text-xs p-1 cursor-pointer transition-colors; }
-
-/* [개선] 오른쪽 패널 디자인 (카드 스타일 적용) */
-.right-panel-container > section {
-    border: 1px solid #e5e7eb;
-    padding: 1.5rem;
-    border-radius: 0.5rem;
-    background-color: #ffffff;
-    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-}
-
-.dynamic-section { border: 1px dashed #d1d5db; padding: 1rem; border-radius: 8px; background-color: #f9fafb; position: relative; }
-.delete-dynamic-section-btn { position: absolute; top: 0.5rem; right: 0.5rem; background: none; border: none; padding: 0.25rem 0.5rem; font-size: 0.9rem; z-index: 10; color: #9ca3af; cursor: pointer; transition: all 0.2s ease-in-out; border-radius: 99px; }
-.delete-dynamic-section-btn:hover { color: #ef4444; background-color: #fee2e2; }
-.add-row-btn { background-color: #e0e7ff; color: #3730a3; border: none; padding: 0.25rem 0.75rem; font-size: 0.75rem; border-radius: 4px; cursor: pointer; font-weight: 500; transition: background-color 0.2s; }
-.add-row-btn:hover { background-color: #c7d2fe; }
-
-.flight-schedule-table, .price-table { width: 100%; border-collapse: collapse; table-layout: auto; margin-top: 1rem; }
-.flight-schedule-table th, .flight-schedule-table td,
-.price-table th, .price-table td {
-    border: 1px solid #e5e7eb;
-    padding: 6px 8px; /* 여백 조정 */
-    vertical-align: middle;
-    text-align: center;
-    font-size: 12px; /* 폰트 크기 통일 */
-}
-.flight-schedule-table th, .price-table th { background-color: #f3f4f6; font-weight: 500; color: #374151; }
-.flight-schedule-table td input, .price-table td input {
-    width: 100%; height: 100%; border: none; background: transparent; padding: 2px; text-align: center;
-}
-.flight-schedule-table .delete-row-btn, .price-table .delete-row-btn { background: none; border: none; color: #ef4444; cursor: pointer; width: 100%; }
-
-.price-table tfoot .grand-total { font-weight: bold; padding-right: 0.5rem; text-align: right; }
-.price-table .text-left { text-align: left; }
-.price.table .text-right { text-align: right; }
-
-.inline-copy-btn {
-    @apply p-1 text-gray-400 rounded-full hover:bg-gray-200 hover:text-gray-600 transition-colors;
-}
-.inline-copy-btn i {
-    @apply text-sm align-middle;
-}
-
-
-/* =======================================================================
-   [통합] 호텔 카드 메이커 (hotel_maker) 스타일
-   ======================================================================= */
-.hm-control-buttons button {
-    padding: 8px 12px;
-    font-size: 12px;
-    border-radius: 6px;
-    color: white;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    cursor: pointer;
-    transition: all 0.2s;
-    border: 1px solid transparent;
-    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-}
-.hm-control-buttons button:hover {
-    filter: brightness(1.1);
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
-}
-
-.hm-btn-copy-html { background-color: #10B981; }
-.hm-btn-preview { background-color: #6366F1; }
-.hm-btn-load-db { background-color: #F59E0B; }
-
-#hotelTabsContainer {
-    display: flex;
-    flex-wrap: wrap;
-    border-bottom: 2px solid #e2e8f0;
-    margin-bottom: 1rem;
-    align-items: center;
-}
-.hm-hotel-tab-button {
-    padding: 8px 12px;
-    margin-right: 4px;
-    margin-bottom: -2px;
-    border: 2px solid transparent;
-    border-bottom: none;
-    border-radius: 6px 6px 0 0;
-    background-color: transparent;
-    font-size: 13px;
-    font-weight: 500;
-    color: #4a5568;
-    cursor: pointer;
-    max-width: 180px;
-    display: inline-flex;
-    align-items: center;
-    transition: all 0.2s ease-in-out;
-}
-.hm-hotel-tab-button:hover {
-    color: #2c5282;
-    background-color: #f0f5ff;
-}
-.hm-hotel-tab-button.active {
-    background-color: white;
-    border-color: #e2e8f0 #e2e8f0 white;
-    color: #2563EB;
-    font-weight: 700;
-}
-.hm-tab-title { flex-grow: 1; text-align: left; }
-.hm-tab-delete-icon {
-    margin-left: 0.6rem; color: #a0aec0; font-size: 0.8rem; padding: 2px;
-    border-radius: 50%; transition: all 0.2s;
-}
-.hm-tab-delete-icon:hover { color: #e53e3e; background-color: #fed7d7; }
-.hm-add-hotel-tab-btn {
-    color: #2563EB; border-style: dashed; border-color: #a0aec0;
-}
-.hm-add-hotel-tab-btn:hover { border-color: #2563EB; background-color: #eff6ff; }
-
-#hotelEditorForm { padding-top: 0.5rem; }
-.hm-input-card-group {
-    background-color: #ffffff;
-    padding: 1.5rem;
-    border-radius: 8px;
-    border: 1px solid #e2e8f0;
-    margin-bottom: 1rem;
-}
-.hm-form-field { position: relative; margin-bottom: 1.25rem; }
-.hm-form-field label {
-    position: absolute;
-    left: 0.75rem;
-    top: 0.8rem;
-    color: #718096;
-    pointer-events: none;
-    transition: all 0.2s ease-out;
-    background-color: #ffffff;
-    padding: 0 0.25rem;
-    font-size: 13px;
-}
-.hm-form-field input, .hm-form-field textarea {
-    width: 100%;
-    padding: 0.8rem 0.75rem;
-    border: 1px solid #cbd5e0;
-    border-radius: 6px;
-    font-size: 13px;
-    transition: border-color 0.2s;
-}
-.hm-form-field input:focus, .hm-form-field textarea:focus {
-    outline: none;
-    border-color: #2563EB;
-    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
-}
-.hm-form-field input:focus + label,
-.hm-form-field input:not(:placeholder-shown) + label,
-.hm-form-field textarea:focus + label,
-.hm-form-field textarea:not(:placeholder-shown) + label {
-    top: -0.6rem;
-    left: 0.5rem;
-    font-size: 11px;
-    color: #2563EB;
-    font-weight: 500;
-}
-.hm-form-field textarea { min-height: 120px; }
-
-#hotelEditorForm.disabled {
-    opacity: 0.6;
-    pointer-events: none;
-    filter: grayscale(80%);
-}
-
-
-/* =======================================================================
-   [통합] 상세 일정표 (itinerary_planner) 스타일
-   ======================================================================= */
-
-.ip-header {
-    background-color: white;
-    border-bottom: 1px solid #E0E0E0;
-}
-.ip-header-title-container {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-.ip-header-title-input {
-    font-size: 16px;
-    font-weight: bold;
-    padding: 0.25rem 0.5rem;
-    border: 1px solid #D1D5DB;
-    border-radius: 0.375rem;
-    flex-grow: 1;
-    min-width: 200px;
-}
-.ip-action-button {
-    padding: 8px 12px;
-    font-size: 12px;
-    border-radius: 6px;
-    transition: all 0.2s ease-in-out;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    color: white; /* 텍스트 색상 추가 */ /* 텍스트 색상 추가 */
-}
-.ip-action-button:hover {
-    filter: brightness(0.95);
-}
-.ip-day-section {
-    margin-bottom: 16px;
-    border: 1px solid transparent;
-    border-radius: 0.375rem;
-    background-color: #ffffff;
-    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
-}
-.ip-day-section.sortable-ghost {
-    background-color: #e0e7ff;
-    border: 1px dashed #6366f1;
-}
-.ip-day-section.sortable-chosen {
-    opacity: 0.7;
-}
-
-.ip-day-header-container {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 12px 8px;
-    border-bottom: 1px solid #EEE;
-    background-color: #fdfdfd;
-    border-radius: 6px 6px 0 0;
-    cursor: grab;
-}
-
-.ip-modal-backdrop {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-color: rgba(0,0,0,0.5);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 1000;
-}
-.ip-modal-content {
-    background-color: white;
-    padding: 24px;
-    border-radius: 8px;
-    width: 90%;
-    max-width: 500px;
-    max-height: 90vh;
-    overflow-y: auto;
-}
-/* =======================================================================
-   [통합] 상세 일정표 (itinerary_planner) 스타일
-   ======================================================================= */
-
-.ip-header {
-    background-color: white;
-    border-bottom: 1px solid #E0E0E0;
-}
-.ip-header-title-container {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-.ip-header-title-input {
-    font-size: 16px;
-    font-weight: bold;
-    padding: 0.25rem 0.5rem;
-    border: 1px solid #D1D5DB;
-    border-radius: 0.375rem;
-    flex-grow: 1;
-    min-width: 200px;
-}
-.ip-action-button {
-    padding: 8px 12px;
-    font-size: 12px;
-    border-radius: 6px;
-    transition: all 0.2s ease-in-out;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    color: white; /* 텍스트 색상 추가 */
-}
-.ip-action-button:hover {
-    filter: brightness(0.95);
-}
-.ip-day-section {
-    margin-bottom: 16px;
-    border: 1px solid transparent;
-    border-radius: 0.375rem;
-    background-color: #ffffff;
-    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
-}
-.ip-day-section.sortable-ghost {
-    background-color: #e0e7ff;
-    border: 1px dashed #6366f1;
-}
-.ip-day-section.sortable-chosen {
-    opacity: 0.7;
-}
-
-.ip-day-header-container {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 12px 8px;
-    border-bottom: 1px solid #EEE;
-    background-color: #fdfdfd;
-    border-radius: 6px 6px 0 0;
-    cursor: grab;
-}
-.ip-day-header-main {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-grow: 1;
-}
-.ip-day-header-title {
-    font-size: 14px;
-    font-weight: 600;
-}
-.ip-date-edit-input-text {
-    font-size: 12px;
-    padding: 4px 8px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    max-width: 200px;
-}
-.ip-day-header-controls {
-     display: flex;
-     align-items: center;
-     gap: 2px;
-}
-.ip-icon-button {
+.close-tab-btn {
     background: none;
     border: none;
-    padding: 4px;
+    font-size: 1.1rem;
+    line-height: 1;
+    color: #9ca3af; /* gray-400 */
     cursor: pointer;
-    border-radius: 4px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
 }
-.ip-icon-button:hover {
-    background-color: #e0e0e0;
-}
-.ip-icon-button svg {
-    width: 20px;
-    height: 20px;
-    color: #555;
-}
-.ip-icon-button.ip-delete-day-button svg {
-    color: #ef4444;
-}
-.ip-icon-button.ip-delete-day-button:hover svg {
-    color: #dc2626;
-}
-.ip-card-action-icon-button svg {
-    width: 18px;
-    height: 18px;
-}
-.ip-card-action-icon-button.ip-delete-activity-button svg {
-    color: #ef4444;
-}
- .ip-card-action-icon-button.ip-delete-activity-button:hover svg {
-    color: #dc2626;
+.close-tab-btn:hover {
+    color: #ef4444; /* red-500 */
 }
 
-.ip-day-toggle-button svg {
-    transition: transform 0.2s ease-in-out;
-}
-.ip-day-content-wrapper {
-    padding: 0 8px 8px 8px;
-}
-.ip-activity-card {
-    background-color: white;
-    border-radius: 8px;
-    border: 1px solid #E0E0E0;
-    padding: 16px;
-    margin-top: 16px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-    display: flex;
-    cursor: grab;
-}
-.ip-activities-list .ip-activity-card:first-child {
-     margin-top: 0;
-}
-.ip-activity-card:active {
-    cursor: grabbing;
-}
-.ip-card-time-icon-area {
+.tab-name-input {
+    background-color: #fff;
+    border: 1px solid #6366f1; /* indigo-500 */
+    border-radius: 4px;
+    padding: 2px 4px;
     width: 100px;
-    flex-shrink: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-}
-.ip-card-icon {
-    font-size: 20px;
-    margin-bottom: 4px;
-}
-.ip-card-time {
-    font-size: 12px;
-    font-weight: bold;
-    min-height: 18px;
-}
-.ip-card-details-area {
-    flex-grow: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-.ip-card-title {
-    font-size: 13px;
-    font-weight: bold;
-}
-.ip-card-description, .ip-card-location, .ip-card-cost, .ip-card-notes {
-    font-size: 12px;
-}
-.ip-card-image {
-    width: 250px;
-    height: 200px;
-    object-fit: cover;
-    border-radius: 4px;
-    margin-top: 8px;
-}
-.ip-card-location a {
-    color: #007bff;
-    text-decoration: none;
-}
-.ip-card-location a:hover {
-    text-decoration: underline;
-}
-.ip-card-actions-direct {
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    gap: 0.5rem;
-    margin-left: auto;
-    padding-left: 0.5rem;
+    font-size: inherit;
+    font-family: inherit;
+    color: inherit;
 }
 
-/* [추가] 통합 UI용 플로팅 라벨 스타일 */
+/* Calculator & Layout */
+.split-container {
+    display: flex;
+    width: 100%;
+}
+
+.pnr-pane {
+    flex-grow: 1;           /* 원래대로 복원 */
+    padding-right: 1rem;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.resizer-handle {
+    width: 7px;
+    cursor: col-resize;
+    background-color: #e5e7eb; /* gray-200 */
+    transition: background-color 0.2s;
+    position: relative;
+}
+
+.resizer-handle:hover {
+    background-color: #9ca3af; /* gray-400 on hover */
+}
+
+.resizer-handle:active {
+    background-color: #6b7280; /* gray-500 when dragging */
+}
+
+.quote-pane {
+    min-width: 280px;       /* 최소 너비만 설정 */
+    flex-shrink: 0;         /* 수축 방지 */
+    padding-left: 1rem;
+    overflow-x: auto;       /* 테이블 스크롤 허용 */
+    min-height: 400px;
+}
+
+.quote-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8125rem; /* 13px - 데스크탑 최적화된 크기 */
+}
+
+.quote-table th, .quote-table td {
+    border: 1px solid #e5e7eb; /* gray-200 */
+    padding: 0.5rem;
+    text-align: center;
+    overflow-wrap: anywhere;
+}
+
+.quote-table th {
+    background-color: #f9fafb; /* gray-50 */
+}
+
+.quote-table .input-field-sm {
+    width: 100%;
+    padding: 0.25rem;
+    border: 1px solid #d1d5db; /* gray-300 */
+    border-radius: 0.25rem;
+    text-align: right;
+}
+
+.calculated-field {
+    padding: 0.25rem;
+    text-align: right;
+    font-weight: 600;
+}
+
+/* 전체 합계 섹션의 라벨 텍스트 크기 조정 */
+.totals-summary-section {
+    font-size: 0.625rem; /* 라벨 텍스트: 10px (한 포인트 더 작게) */
+}
+
+/* 전체 합계 섹션의 숫자 값들 (보라색 부분) */
+.totals-summary-section .totalSalesPrice,
+.totals-summary-section .totalProfit,
+.totals-summary-section .totalProfitMargin {
+    font-weight: bold;
+    font-size: 0.75rem; /* 숫자: 12px 유지 */
+}
+
+/* Form Fields */
 .form-field {
     position: relative;
 }
 
-.form-field label {
-    position: absolute;
-    left: 0.85rem; /* 14px */
-    top: 0.6rem;  /* 10px */
-    font-size: 14px;
-    color: #6b7280; /* gray-500 */
-    pointer-events: none;
-    transition: all 0.2s ease-out;
-    background-color: #ffffff; /* 입력 필드 배경색과 동일하게 */
-    padding: 0 0.25rem; /* 4px */
+.form-field .input-field {
+    width: 100%;
+    padding: 1rem 0.5rem 0.25rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.25rem;
 }
 
-/* Input이 포커스되거나, 내용이 있을 때(placeholder가 보이지 않을 때) 라벨 스타일 */
+.form-field label {
+    position: absolute;
+    top: 0.5rem;
+    left: 0.5rem;
+    color: #6b7280; /* gray-500 */
+    font-size: 0.875rem;
+    transition: all 0.2s;
+    pointer-events: none;
+}
+
 .form-field .input-field:focus + label,
-.form-field .input-field:not(:placeholder-shown) + label,
-.form-field textarea:focus + label,
-.form-field textarea:not(:placeholder-shown) + label {
-    top: -0.6rem; /* 위로 이동 */
-    left: 0.75rem;
-    font-size: 12px;
-    color: #4338ca; /* indigo-700 */
+.form-field .input-field:not(:placeholder-shown) + label {
+    top: 0.125rem;
+    font-size: 0.75rem;
+    color: #4f46e5; /* indigo-600 */
+}
+
+/* Itinerary Planner Styles */
+.ip-header-title-container h1 {
+    display: inline-block;
+}
+.ip-header-title-container .icon-button {
+    display: inline-flex;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+.ip-header-title-container:hover .icon-button {
+    opacity: 1;
+}
+
+.icon-button {
+    background: none; border: none; cursor: pointer; padding: 0.25rem; color: #6b7280;}
+.icon-button:hover { color: #4f46e5; }
+.icon-button svg { width: 1rem; height: 1rem; }
+
+.day-header-container { display: flex; justify-content: space-between; align-items: center; padding: 0.5rem; background-color: #f9fafb; border-radius: 0.25rem;}
+.day-header-main { display: flex; align-items: center; }
+.day-header-title { font-weight: 600; }
+
+.activity-card { display: flex; gap: 0.75rem; padding: 0.75rem; border-radius: 0.25rem; background-color: white; border: 1px solid #e5e7eb; /* Add a subtle border */}
+.activity-card:hover { box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+
+.card-time-icon-area { flex-shrink: 0; width: 50px; text-align: center;}
+.card-details-area { flex-grow: 1; }
+.card-title { font-weight: 600; margin-bottom: 0.25rem; }
+.card-description, .card-location, .card-cost, .card-notes { font-size: 0.875rem; color: #4b5563; }
+.card-actions-direct { display: flex; flex-direction: column; }
+
+/* Hotel Maker Styles */
+.hm-tabs-container .hotel-tab-button {
+    padding: 0.5rem 1rem;
+    border: none;
+    border-bottom: 2px solid transparent;
+    cursor: pointer;
+    background: none;
+}
+.hm-tabs-container .hotel-tab-button.active {
+    border-bottom-color: #4f46e5; /* indigo-600 */
+    color: #4f46e5;
     font-weight: 600;
 }
 
-/* ================================================= */
-/* [개선] 통합된 호텔카드 메이커 UI 스타일               */
-/* ================================================= */
-
-/* 탭 컨테이너 */
-.hotel-tabs-container {
-    display: flex;
-    flex-wrap: wrap;
-    border-bottom: 2px solid #e5e7eb;
-    margin-bottom: -2px; /* 활성 탭과 콘텐츠 연결 */
-}
-
-/* 개별 탭 버튼 */
-.hotel-tab-button {
-    padding: 10px 16px;
-    border: 2px solid transparent;
-    border-bottom: none;
-    background-color: transparent;
-    color: #4b5563;
-    cursor: pointer;
-    border-radius: 6px 6px 0 0;
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 14px;
-    font-weight: 500;
-    transition: all 0.2s ease-in-out;
-    max-width: 200px; /* 탭 너비 제한 */
-}
-.hotel-tab-button:hover {
-    background-color: #f9fafb;
-    color: #1f2937;
-}
-
-/* 활성화된 탭 */
-.hotel-tab-button.active {
-    background-color: white;
-    border-color: #e5e7eb #e5e7eb white;
-    color: #1d4ed8;
-    font-weight: 700;
-    position: relative;
-    z-index: 1;
-}
-.hotel-tab-button .tab-title {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-.hotel-tab-button .tab-delete-icon {
-    color: #9ca3af;
-    font-size: 12px;
-    padding: 2px;
-    border-radius: 50%;
-    transition: all 0.2s;
-}
-.hotel-tab-button:hover .tab-delete-icon {
-    background-color: #e5e7eb;
-}
-.hotel-tab-button .tab-delete-icon:hover {
-    color: #ef4444;
-    background-color: #fee2e2;
-}
-
-/* 새 호텔 추가 버튼 */
-#hm-addHotelTabBtn-1, /* ID는 동적으로 변하므로 시작 부분으로 선택 */
-[id^="hm-addHotelTabBtn-"] { 
-    padding: 10px 12px;
-    color: #374151;
-}
-[id^="hm-addHotelTabBtn-"]:hover {
-    color: #1d4ed8;
-    background-color: #eff6ff;
-}
-
-/* 입력 필드 비활성화 스타일 */
-.hm-editor-form.disabled {
+.hm-editor-form.disabled { 
     opacity: 0.5;
     pointer-events: none;
 }
 
-/* [개선] 플로팅 라벨 입력 필드 스타일 */
-.form-field {
-    position: relative;
-    margin-bottom: 1.25rem;
-}
-.form-field label {
-    position: absolute;
-    left: 0.8rem;
-    top: 0.8rem;
-    color: #6b7280;
-    pointer-events: none;
-    transition: all 0.2s ease-out;
-    background-color: #ffffff; /* 라벨이 인풋 선을 가릴 수 있도록 배경색 지정 */
-    padding: 0 0.25rem;
-    font-size: 14px;
-}
-.form-field input, .form-field textarea {
-    width: 100%;
-    padding: 0.75rem;
-    border: 1px solid #d1d5db;
-    border-radius: 6px;
-    font-size: 14px;
-    transition: border-color 0.2s;
-}
-.form-field input:focus, .form-field textarea:focus {
-    outline: none;
-    border-color: #2563EB;
-    box-shadow: 0 0 0 1px #2563EB;
+/* General utilities */
+.sortable-ghost {
+    opacity: 0.4;
+    background: #c7d2fe; /* indigo-200 */
 }
 
-/* 라벨이 위로 올라가는 조건 */
-.form-field input:focus + label,
-.form-field input:not(:placeholder-shown) + label,
-.form-field textarea:focus + label,
-.form-field textarea:not(:placeholder-shown) + label {
-    top: -0.65rem; /* 인풋 상단 테두리 위로 이동 */
-    left: 0.6rem;
-    font-size: 12px;
-    color: #2563EB; /* 포커스 시 라벨 색상 변경 */
+.sortable-chosen {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+/* File Tab Bar */
+#fileTabBar {
+    border-bottom: 1px solid #e5e7eb;
+}
+
+.file-tab {
+    display: flex;
+    align-items: center;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    background-color: #f9fafb;
+    border: 1px solid #e5e7eb;
+    transition: all 0.2s ease-in-out;
+    white-space: nowrap;
+    max-width: 200px;
+}
+
+.file-tab.active {
+    background-color: #eef2ff; /* indigo-50 */
+    border-color: #a5b4fc; /* indigo-300 */
+    color: #4338ca; /* indigo-700 */
     font-weight: 500;
 }
 
-/* =======================================================================
-   [통합] 상세 일정표 (itinerary_planner) 스타일
-   ======================================================================= */
-
-.ip-header {
-    background-color: white;
-    border-bottom: 1px solid #E0E0E0;
-}
-.ip-header-title-container {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-.ip-header-title-input {
-    font-size: 16px;
-    font-weight: bold;
-    padding: 0.25rem 0.5rem;
-    border: 1px solid #D1D5DB;
-    border-radius: 0.375rem;
-    flex-grow: 1;
-    min-width: 200px;
-}
-.ip-action-button {
-    padding: 8px 12px;
-    font-size: 12px;
-    border-radius: 6px;
-    transition: all 0.2s ease-in-out;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    color: white; /* 텍스트 색상 추가 */
-}
-.ip-action-button:hover {
-    filter: brightness(0.95);
-}
-.ip-day-section {
-    margin-bottom: 16px;
-    border: 1px solid transparent;
-    border-radius: 0.375rem;
-    background-color: #ffffff;
-    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
-}
-.ip-day-section.sortable-ghost {
-    background-color: #e0e7ff;
-    border: 1px dashed #6366f1;
-}
-.ip-day-section.sortable-chosen {
-    opacity: 0.7;
+.file-tab:not(.active):hover {
+    background-color: #f3f4f6;
 }
 
-.ip-day-header-container {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 12px 8px;
-    border-bottom: 1px solid #EEE;
-    background-color: #fdfdfd;
-    border-radius: 6px 6px 0 0;
-    cursor: grab;
-}
-.ip-day-header-main {
-    display: flex;
-    align-items: center;
-    gap: 8px;
+.file-tab-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
     flex-grow: 1;
 }
-.ip-day-header-title {
-    font-size: 14px;
-    font-weight: 600;
-}
-.ip-date-edit-input-text {
-    font-size: 12px;
-    padding: 4px 8px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    max-width: 200px;
-}
-.ip-day-header-controls {
-     display: flex;
-     align-items: center;
-     gap: 2px;
-}
-.ip-icon-button {
+
+.file-tab-close {
+    margin-left: 8px;
+    padding: 2px;
+    border-radius: 50%;
     background: none;
     border: none;
-    padding: 4px;
     cursor: pointer;
-    border-radius: 4px;
+    color: #9ca3af;
+    font-size: 14px;
+    line-height: 1;
+    width: 20px;
+    height: 20px;
     display: flex;
     align-items: center;
     justify-content: center;
 }
-.ip-icon-button:hover {
-    background-color: #e0e0e0;
-}
-.ip-icon-button svg {
-    width: 20px;
-    height: 20px;
-    color: #555;
-}
-.ip-icon-button.ip-delete-day-button svg {
-    color: #ef4444;
-}
-.ip-icon-button.ip-delete-day-button:hover svg {
-    color: #dc2626;
-}
-.ip-card-action-icon-button svg {
-    width: 18px;
-    height: 18px;
-}
-.ip-card-action-icon-button.ip-delete-activity-button svg {
-    color: #ef4444;
-}
- .ip-card-action-icon-button.ip-delete-activity-button:hover svg {
-    color: #dc2626;
+
+.file-tab-close:hover {
+    background-color: #e5e7eb;
+    color: #374151;
 }
 
-.ip-day-toggle-button svg {
-    transition: transform 0.2s ease-in-out;
-}
-.ip-day-content-wrapper {
-    padding: 0 8px 8px 8px;
-}
-.ip-activity-card {
-    background-color: white;
-    border-radius: 8px;
-    border: 1px solid #E0E0E0;
-    padding: 16px;
-    margin-top: 16px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-    display: flex;
-    cursor: grab;
-}
-.ip-activities-list .ip-activity-card:first-child {
-     margin-top: 0;
-}
-.ip-activity-card:active {
-    cursor: grabbing;
-}
-.ip-card-time-icon-area {
-    width: 100px;
-    flex-shrink: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-}
-.ip-card-icon {
-    font-size: 20px;
-    margin-bottom: 4px;
-}
-.ip-card-time {
-    font-size: 12px;
-    font-weight: bold;
-    min-height: 18px;
-}
-.ip-card-details-area {
-    flex-grow: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-.ip-card-title {
-    font-size: 13px;
-    font-weight: bold;
-}
-.ip-card-description, .ip-card-location, .ip-card-cost, .ip-card-notes {
-    font-size: 12px;
-}
-.ip-card-image {
-    width: 250px;
-    height: 200px;
-    object-fit: cover;
-    border-radius: 4px;
-    margin-top: 8px;
-}
-.ip-card-location a {
-    color: #007bff;
-    text-decoration: none;
-}
-.ip-card-location a:hover {
-    text-decoration: underline;
-}
-.ip-card-actions-direct {
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    gap: 0.5rem;
-    margin-left: auto;
-    padding-left: 0.5rem;
+.file-tab.active .file-tab-close {
+    color: #6366f1;
 }
 
-/* [추가] 통합 UI용 플로팅 라벨 스타일 */
-.form-field {
-    position: relative;
+.file-tab.active .file-tab-close:hover {
+    background-color: #c7d2fe;
+    color: #3730a3;
 }
 
-.form-field label {
-    position: absolute;
-    left: 0.85rem; /* 14px */
-    top: 0.6rem;  /* 10px */
-    font-size: 14px;
-    color: #6b7280; /* gray-500 */
-    pointer-events: none;
-    transition: all 0.2s ease-out;
-    background-color: #ffffff; /* 입력 필드 배경색과 동일하게 */
-    padding: 0 0.25rem; /* 4px */
-}
-
-/* Input이 포커스되거나, 내용이 있을 때(placeholder가 보이지 않을 때) 라벨 스타일 */
-.form-field .input-field:focus + label,
-.form-field .input-field:not(:placeholder-shown) + label,
-.form-field textarea:focus + label,
-.form-field textarea:not(:placeholder-shown) + label {
-    top: -0.6rem; /* 위로 이동 */
-    left: 0.75rem;
-    font-size: 12px;
-    color: #4338ca; /* indigo-700 */
-    font-weight: 600;
-}
-
-/* =======================================================================
-   [통합] 상세 일정표 (itinerary_planner) 스타일
-   ======================================================================= */
-
-.ip-header {
-    background-color: white;
-    border-bottom: 1px solid #E0E0E0;
-}
-.ip-header-title-container {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-.ip-header-title-input {
-    font-size: 16px;
-    font-weight: bold;
-    padding: 0.25rem 0.5rem;
-    border: 1px solid #D1D5DB;
-    border-radius: 0.375rem;
-    flex-grow: 1;
-    min-width: 200px;
-}
-.ip-action-button {
-    padding: 8px 12px;
-    font-size: 12px;
-    border-radius: 6px;
-    transition: all 0.2s ease-in-out;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    color: white; /* 텍스트 색상 추가 */
-}
-.ip-action-button:hover {
-    filter: brightness(0.95);
-}
-.ip-day-section {
-    margin-bottom: 16px;
-    border: 1px solid transparent;
-    border-radius: 0.375rem;
-    background-color: #ffffff;
-    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
-}
-.ip-day-section.sortable-ghost {
-    background-color: #e0e7ff;
-    border: 1px dashed #6366f1;
-}
-.ip-day-section.sortable-chosen {
-    opacity: 0.7;
-}
-
-.ip-day-header-container {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 12px 8px;
-    border-bottom: 1px solid #EEE;
-    background-color: #fdfdfd;
-    border-radius: 6px 6px 0 0;
-    cursor: grab;
-}
-.ip-day-header-main {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-grow: 1;
-}
-.ip-day-header-title {
-    font-size: 14px;
-    font-weight: 600;
-}
-.ip-date-edit-input-text {
-    font-size: 12px;
-    padding: 4px 8px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    max-width: 200px;
-}
-.ip-day-header-controls {
-     display: flex;
-     align-items: center;
-     gap: 2px;
-}
-.ip-icon-button {
-    background: none;
+.file-tab-input {
     border: none;
-    padding: 4px;
-    cursor: pointer;
-    border-radius: 4px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    background: transparent;
+    outline: none;
+    padding: 0;
+    margin: 0;
+    font: inherit;
+    color: inherit;
+    width: 100%;
 }
-.ip-icon-button:hover {
-    background-color: #e0e0e0;
-}
-.ip-icon-button svg {
-    width: 20px;
-    height: 20px;
-    color: #555;
-}
-.ip-icon-button.ip-delete-day-button svg {
-    color: #ef4444;
-}
-.ip-icon-button.ip-delete-day-button:hover svg {
-    color: #dc2626;
-}
-.ip-card-action-icon-button svg {
-    width: 18px;
-    height: 18px;
-}
-.ip-card-action-icon-button.ip-delete-activity-button svg {
-    color: #ef4444;
-}
- .ip-card-action-icon-button.ip-delete-activity-button:hover svg {
-    color: #dc2626;
+.file-tab-input:focus {
+    background-color: white;
+    outline: 1px solid #a5b4fc;
+    border-radius: 3px;
 }
 
-.ip-day-toggle-button svg {
-    transition: transform 0.2s ease-in-out;
+.table-container {
+    overflow-x: auto;
 }
-.ip-day-content-wrapper {
-    padding: 0 8px 8px 8px;
+
+/* Price Table Cell Styling */
+.price-table-cell {
+    display: block;
+    width: 100%;
+    padding: 4px 8px;
+    border: none;
+    background: transparent;
+    outline: none;
+    min-height: 16px;
+    color: #212529;
+    font-weight: 400;
 }
-.ip-activity-card {
+
+.price-table-cell:focus {
+    background-color: #fff3cd;
+    border-radius: 3px;
+    box-shadow: 0 0 0 2px #ffc107;
+}
+
+.price-table-cell:empty:before {
+    content: attr(data-placeholder);
+    color: #6c757d;
+    font-style: italic;
+}
+
+.price-table-cell[readonly] {
+    background-color: #f8f9fa;
+    color: #6c757d;
+    cursor: not-allowed;
+}
+
+/* Flight Schedule Cell Styling */
+.flight-schedule-cell {
+    display: block;
+    width: 100%;
+    padding: 4px 8px;
+    border: none;
+    background: transparent;
+    outline: none;
+    min-height: 16px;
+    color: #212529;
+    font-weight: 400;
+}
+
+.flight-schedule-cell:focus {
+    background-color: #fff3cd;
+    border-radius: 3px;
+    box-shadow: 0 0 0 2px #ffc107;
+}
+
+.flight-schedule-cell:empty:before {
+    content: attr(data-placeholder);
+    color: #6c757d;
+    font-style: italic;
+}
+
+/* Dynamic Section Tables (Flight/Price) */
+.flight-schedule-table,
+.price-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    margin-bottom: 1rem;
     background-color: white;
-    border-radius: 8px;
-    border: 1px solid #E0E0E0;
-    padding: 16px;
-    margin-top: 16px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-    display: flex;
-    cursor: grab;
 }
-.ip-activities-list .ip-activity-card:first-child {
-     margin-top: 0;
+
+.flight-schedule-table th, .flight-schedule-table td,
+.price-table th, .price-table td {
+    border: 1px solid #e5e7eb;
+    padding: 8px 12px;
+    text-align: center;
+    vertical-align: middle;
 }
-.ip-activity-card:active {
-    cursor: grabbing;
+
+.flight-schedule-table thead tr,
+.price-table thead tr {
+    background-color: #f8f9fa;
+    border-bottom: 2px solid #dee2e6;
 }
-.ip-card-time-icon-area {
-    width: 100px;
-    flex-shrink: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-}
-.ip-card-icon {
-    font-size: 20px;
-    margin-bottom: 4px;
-}
-.ip-card-time {
-    font-size: 12px;
-    font-weight: bold;
-    min-height: 18px;
-}
-.ip-card-details-area {
-    flex-grow: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-.ip-card-title {
+
+.flight-schedule-table th {
+    font-weight: 600;
+    text-align: center;
+    color: #495057;
     font-size: 13px;
-    font-weight: bold;
 }
-.ip-card-description, .ip-card-location, .ip-card-cost, .ip-card-notes {
-    font-size: 12px;
+
+.price-table th {
+    font-weight: 600;
+    text-align: center;
+    color: #495057;
 }
+
+.price-table td {
+    color: #212529;
+    font-weight: 400;
+}
+
+.flight-schedule-table td {
+    color: #212529;
+    font-weight: 400;
+}
+
+.flight-schedule-table input,
+.price-table input {
+    width: 100%;
+    padding: 0.25rem 0.5rem;
+    border: 1px solid #d1d5db;
+    border-radius: 0.25rem;
+    text-align: center;
+}
+
+/* --- Table Clean Style --- */
+
+/* Remove zebra-striping for cleaner look */
+.flight-schedule-table tbody tr,
+.price-table tbody tr {
+    background-color: white;
+}
+
+/* Subtle hover effect */
+.flight-schedule-table tbody tr:hover,
+.price-table tbody tr:hover {
+    background-color: #f8f9fa;
+}
+
+/* Focus style for inputs within tables */
+.flight-schedule-table input:focus,
+.price-table input:focus {
+    outline: 2px solid transparent;
+    outline-offset: 2px;
+    border-color: #4f46e5; /* indigo-600 */
+    box-shadow: 0 0 0 2px #c7d2fe; /* indigo-200 */
+}
+
+/* PNR Textarea Font Size */
+.pnr-pane textarea {
+    font-size: 11.5px;
+}
+
+/* Style for dynamic module titles (to look like h4) */
+.flight-schedule-subgroup input[placeholder="항공사"],
+.price-subgroup-title {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    border: none;
+    padding: 0;
+    background-color: transparent;
+    box-shadow: none;
+    border-radius: 0;
+}
+/* Add a bottom border on focus for editing visibility */
+.flight-schedule-subgroup input[placeholder="항공사"]:focus,
+.price-subgroup-title:focus {
+    border-bottom: 1px solid #4f46e5; /* indigo-600 */
+    box-shadow: none;
+}
+
+/* Itinerary Planner Card Image Size */
 .ip-card-image {
-    width: 250px;
-    height: 200px;
-    object-fit: cover;
+    max-width: 300px;
+    height: auto;
     border-radius: 4px;
     margin-top: 8px;
 }
-.ip-card-location a {
-    color: #007bff;
-    text-decoration: none;
-}
-.ip-card-location a:hover {
-    text-decoration: underline;
-}
-.ip-card-actions-direct {
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    gap: 0.5rem;
-    margin-left: auto;
-    padding-left: 0.5rem;
+
+/* 견적 계산기 +추가 버튼 스타일 */
+.add-dynamic-row-btn {
+    color: #000000 !important; /* Black text */
+    font-size: 0.6875rem !important; /* 11px */
+    font-weight: bold;
 }
 
-/* [추가] 통합 UI용 플로팅 라벨 스타일 */
-.form-field {
-    position: relative;
-}
-
-.form-field label {
-    position: absolute;
-    left: 0.85rem; /* 14px */
-    top: 0.6rem;  /* 10px */
-    font-size: 14px;
-    color: #6b7280; /* gray-500 */
-    pointer-events: none;
-    transition: all 0.2s ease-out;
-    background-color: #ffffff; /* 입력 필드 배경색과 동일하게 */
-    padding: 0 0.25rem; /* 4px */
-}
-
-/* Input이 포커스되거나, 내용이 있을 때(placeholder가 보이지 않을 때) 라벨 스타일 */
-.form-field .input-field:focus + label,
-.form-field .input-field:not(:placeholder-shown) + label,
-.form-field textarea:focus + label,
-.form-field textarea:not(:placeholder-shown) + label {
-    top: -0.6rem; /* 위로 이동 */
-    left: 0.75rem;
+/* 메모 모듈 텍스트 크기 */
+#memoText {
     font-size: 12px;
-    color: #4338ca; /* indigo-700 */
-    font-weight: 600;
 }
 
-/* [추가] 상품가 행 강조 스타일 */
-.quote-table tbody tr[data-row-id="salesPrice"] {
-    background-color: #eff6ff; /* 연한 파란색 배경 (Tailwind blue-50) */
-    font-weight: 700; /* 굵은 글씨 */
+/* 포함/불포함 텍스트 영역 폰트 크기 */
+.inclusion-text,
+.exclusion-text {
+    font-size: 12px;
 }
 
-.quote-table tbody tr[data-row-id="salesPrice"] td:first-child span {
-    color: #3730a3; /* 대표 색상으로 텍스트 색상 강조 (Tailwind indigo-800) */
+/* 고객 정보 텍스트 및 입력창 크기 */
+#customerInfoContainer label,
+#customerInfoContainer input {
+    font-size: 12px !important;
 }
 
-.quote-table tbody tr:hover { 
-    background-color: #f9fafb; 
+.btn-green {
+    background-color: #22c55e; /* green-500 */
+    color: #ffffff;
 }
-
-/* 강조된 행에 호버 시에도 배경색 유지 */
-.quote-table tbody tr[data-row-id="salesPrice"]:hover {
-    background-color: #e0e7ff; /* 호버 시 약간 더 진한 파란색 (Tailwind blue-100) */
+.btn-green:hover {
+    background-color: #16a34a; /* green-600 */
 }
