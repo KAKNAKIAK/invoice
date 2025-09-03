@@ -626,8 +626,14 @@ function rebindWorkspaceEventListeners() {
                     const formula = target.dataset.formula;
                     if (formula) {
                         target.value = formula;
-                        target.select();
                     }
+                    target.select();
+                } else if (target.matches('.flight-schedule-cell, .price-table-cell')) {
+                    const range = document.createRange();
+                    range.selectNodeContents(target);
+                    const selection = window.getSelection();
+                    selection.removeAllRanges();
+                    selection.addRange(range);
                 }
             });
 
@@ -3159,8 +3165,15 @@ function setupEventListeners() {
             const formula = target.dataset.formula;
             if (formula) {
                 target.value = formula;
-                target.select();
             }
+            target.select();
+        } else if (target.matches('.flight-schedule-cell, .price-table-cell')) {
+            // For contenteditable elements, select all text inside
+            const range = document.createRange();
+            range.selectNodeContents(target);
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
         }
     });
 
