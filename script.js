@@ -114,6 +114,27 @@ class FileSession {
                 createCustomerCard();
             }
         }
+        
+        // 견적 그룹 UI 복원
+        const tabsContainer = document.getElementById('quoteGroupTabs');
+        const contentsContainer = document.getElementById('quoteGroupContentsContainer');
+        if (tabsContainer) tabsContainer.innerHTML = '';
+        if (contentsContainer) contentsContainer.innerHTML = '';
+        
+        // 모든 그룹 UI 다시 생성
+        Object.keys(this.quoteGroupsData).forEach(groupId => {
+            createGroupUI(groupId);
+        });
+        
+        // 활성 그룹 복원
+        if (this.activeGroupId && this.quoteGroupsData[this.activeGroupId]) {
+            switchGroup(this.activeGroupId);
+        }
+        
+        // 이벤트 리스너 재바인딩 (중요!)
+        console.log('이벤트 리스너 재바인딩 중...');
+        rebindWorkspaceEventListeners();
+        console.log('이벤트 리스너 재바인딩 완료');
     }
 }
 
@@ -446,22 +467,24 @@ function rebindWorkspaceEventListeners() {
         contentsContainer.replaceWith(contentsContainer.cloneNode(true));
         const newContentsContainer = document.getElementById('quoteGroupContentsContainer');
         if (newContentsContainer) {
-            // setupEventListeners()의 contentsContainer 이벤트 위임 코드 복사
-            newContentsContainer.addEventListener('click', (event) => {
-                const target = event.target;
-                const button = target.closest('button');
+        newContentsContainer.addEventListener('click', (event) => {
+            console.log('클릭 이벤트 감지됨:', event.target);
+            const target = event.target;
+            const button = target.closest('button');
 
-                if (!button) {
-                    if(target.matches('.person-type-name-span, .person-count-span, .dynamic-row-label-span, .cost-row-label-span')) {
-                        const calcContainer = target.closest('.calculator-instance');
-                        const callback = () => calculateAll(calcContainer);
-                        const inputType = target.classList.contains('person-count-span') ? 'number' : 'text';
-                        makeEditable(target, inputType, callback);
-                    }
-                    return;
+            if (!button) {
+                if(target.matches('.person-type-name-span, .person-count-span, .dynamic-row-label-span, .cost-row-label-span')) {
+                    const calcContainer = target.closest('.calculator-instance');
+                    const callback = () => calculateAll(calcContainer);
+                    const inputType = target.classList.contains('person-count-span') ? 'number' : 'text';
+                    makeEditable(target, inputType, callback);
                 }
-                
-                const groupId = button.closest('.calculation-group-content')?.id.split('-').pop();
+                return;
+            }
+            
+            console.log('버튼 클릭됨:', button, 'classes:', button.className);
+            const groupId = button.closest('.calculation-group-content')?.id.split('-').pop();
+            console.log('groupId:', groupId);
 
                 if (button.classList.contains('add-calculator-btn')) {
                     syncGroupUIToData(groupId);
@@ -607,14 +630,23 @@ function rebindWorkspaceEventListeners() {
                     else if (button.classList.contains('delete-day-button')) ip_showConfirmDeleteDayModal(button.closest('.ip-day-section').dataset.dayId.split('-')[1], groupId);
                     else if (button.classList.contains('add-activity-button')) ip_openActivityModal(groupId, button.closest('.day-content-wrapper').querySelector('.activities-list').dataset.dayIndex);
                     else if (button.classList.contains('edit-activity-button')) {
-                        const card = button.closest('.ip-activity-card');
-                        ip_openActivityModal(groupId, card.dataset.dayIndex, card.dataset.activityIndex);
+                        console.log('편집 버튼 클릭됨 - 현재 비활성화됨');
+                        // 편집 기능 비활성화
+                        return;
                     } else if (button.classList.contains('duplicate-activity-button')) {
-                        const card = button.closest('.ip-activity-card');
-                        ip_handleDuplicateActivity(groupId, card.dataset.dayIndex, card.dataset.activityIndex);
+                        console.log('복제 버튼 클릭됨 - 현재 비활성화됨');
+                        // 복제 기능 비활성화
+                        return;
                     } else if (button.classList.contains('delete-activity-button')) {
+                        console.log('삭제 버튼 클릭됨'); // 디버깅용
                         const card = button.closest('.ip-activity-card');
-                        ip_handleDeleteActivity(groupId, card.dataset.dayIndex, card.dataset.activityIndex);
+                        if (card) {
+                            if (confirm('이 일정을 삭제하시겠습니까?')) {
+                                ip_handleDeleteActivity(groupId, card.dataset.dayIndex, card.dataset.activityIndex);
+                            }
+                        } else {
+                            console.error('활동 카드를 찾을 수 없습니다');
+                        }
                     }
                 }
             });
@@ -740,7 +772,13 @@ function rebindWorkspaceEventListeners() {
                     }
                 }
             });
+            
+            console.log('quoteGroupContentsContainer 이벤트 리스너 재바인딩 완료');
+        } else {
+            console.error('newContentsContainer를 찾을 수 없습니다');
         }
+    } else {
+        console.error('quoteGroupContentsContainer를 찾을 수 없습니다');
     }
 
     // 견적 그룹 탭 컨테이너 이벤트 위임 재바인딩
@@ -1367,10 +1405,15 @@ function initializeItineraryPlannerForGroup(container, groupId) {
 }
 
 function ip_render(groupId) {
+    console.log(`일정 렌더링 시작: ${groupId}`);
     const container = document.getElementById(`itinerary-planner-container-${groupId}`);
-    if (!container) return;
+    if (!container) {
+        console.error(`일정 컨테이너를 찾을 수 없습니다: itinerary-planner-container-${groupId}`);
+        return;
+    }
     ip_renderHeaderTitle(groupId, container);
     ip_renderDays(groupId, container);
+    console.log(`일정 렌더링 완료: ${groupId}`);
 }
 function ip_renderHeaderTitle(groupId, container) {
     const itineraryData = quoteGroupsData[groupId].itineraryData;
@@ -1422,7 +1465,47 @@ function ip_renderActivities(activitiesListElement, activities, dayIndex, groupI
         const locHTML = activity.locationLink ? `<div class="card-location">📍 <a href="${activity.locationLink}" target="_blank" title="${activity.locationLink}">${locationText}</a></div>` : '';
         const costHTML = activity.cost ? `<div class="card-cost">💰 ${activity.cost}</div>` : '';
         const notesHTML = activity.notes ? `<div class="card-notes">📝 ${activity.notes.replace(/\n/g, '<br>')}</div>` : '';
-        card.innerHTML = `<div class="card-time-icon-area"><div class="card-icon">${activity.icon||'&nbsp;'}</div><div class="card-time" data-time-value="${activity.time||''}">${ip_formatTimeToHHMM(activity.time)}</div></div><div class="card-details-area"><div class="card-title">${activity.title||''}</div>${descHTML}${imageHTML}${locHTML}${costHTML}${notesHTML}</div><div class="card-actions-direct"><button class="icon-button edit-activity-button" title="수정">${ip_editIconSVG}</button><button class="icon-button duplicate-activity-button" title="복제">${ip_duplicateIconSVG}</button><button class="icon-button delete-activity-button" title="삭제">${ip_deleteIconSVG}</button></div>`;
+        card.innerHTML = `<div class="card-time-icon-area"><div class="card-icon">${activity.icon||'&nbsp;'}</div><div class="card-time" data-time-value="${activity.time||''}">${ip_formatTimeToHHMM(activity.time)}</div></div><div class="card-details-area"><div class="card-title">${activity.title||''}</div>${descHTML}${imageHTML}${locHTML}${costHTML}${notesHTML}</div><div class="card-actions-direct"><button class="icon-button edit-activity-button" title="수정" disabled style="opacity: 0.3; cursor: not-allowed;">${ip_editIconSVG}</button><button class="icon-button duplicate-activity-button" title="복제" disabled style="opacity: 0.3; cursor: not-allowed;">${ip_duplicateIconSVG}</button><button class="icon-button delete-activity-button" title="삭제">${ip_deleteIconSVG}</button></div>`;
+        
+        // 삭제 버튼만 직접 이벤트 바인딩 (강화된 버전)
+        const deleteBtn = card.querySelector('.delete-activity-button');
+        
+        if (deleteBtn) {
+            // 여러 방법으로 이벤트 바인딩
+            deleteBtn.onclick = function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('onclick 삭제 버튼 클릭됨');
+                if (confirm('이 일정을 삭제하시겠습니까?')) {
+                    console.log('삭제 확인됨, 삭제 진행');
+                    console.log('groupId:', groupId, 'dayIndex:', dayIndex, 'activityIndex:', activityIndex);
+                    ip_handleDeleteActivity(groupId, parseInt(dayIndex), parseInt(activityIndex));
+                }
+            };
+            
+            deleteBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('addEventListener 삭제 버튼 클릭됨');
+                if (confirm('이 일정을 삭제하시겠습니까?')) {
+                    console.log('삭제 확인됨, 삭제 진행');
+                    console.log('groupId:', groupId, 'dayIndex:', dayIndex, 'activityIndex:', activityIndex);
+                    ip_handleDeleteActivity(groupId, parseInt(dayIndex), parseInt(activityIndex));
+                }
+            });
+            
+            // 추가 속성으로도 설정
+            deleteBtn.setAttribute('onclick', `
+                event.preventDefault(); 
+                event.stopPropagation(); 
+                console.log('HTML onclick 삭제 버튼 클릭됨');
+                if (confirm('이 일정을 삭제하시겠습니까?')) {
+                    console.log('HTML onclick 삭제 진행');
+                    ip_handleDeleteActivity('${groupId}', ${dayIndex}, ${activityIndex});
+                }
+            `);
+        }
+        
         activitiesListElement.appendChild(card);
     });
 }
@@ -1607,6 +1690,11 @@ async function ip_loadTripFromFirestore(tripId, groupId) {
             };
             showToastMessage(`'${loadedData.title}' 일정을 불러왔습니다.`);
             ip_render(groupId);
+            
+            // 일정 불러온 후 이벤트 리스너 재바인딩
+            console.log('일정 로딩 후 이벤트 리스너 재바인딩 중...');
+            rebindWorkspaceEventListeners();
+            console.log('일정 로딩 후 이벤트 리스너 재바인딩 완료');
         } else { showToastMessage("선택한 일정을 찾을 수 없습니다.", true); }
     } catch(error) { showToastMessage("일정 불러오기 중 오류 발생", true); console.error(error); }
 }
