@@ -269,9 +269,9 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 0.42rem 0.55rem;
-    background-color: #eef2ff;
-    border: 1px solid #d8e3ff;
+    padding: 0.3rem 0.5rem;
+    background-color: #ffffff;
+    border: 1px solid #e5e7eb;
     border-radius: 0.45rem;
 }
 .day-header-main { display: flex; align-items: center; gap: 0.375rem; }
@@ -288,8 +288,8 @@ body {
     transition: background-color 0.2s ease, border-color 0.2s ease;
 }
 .ip-day-header-container:hover {
-    background-color: #e8eeff;
-    border-color: #c7d8ff;
+    background-color: #ffffff;
+    border-color: #d1d5db;
 }
 .ip-day-header-container:active { cursor: grabbing; }
 
@@ -710,7 +710,7 @@ body {
 
 .memo-tab {
     border: 1px solid #d1d5db;
-    background-color: #f8fafc;
+    background-color: #ffffff;
     color: #374151;
     border-radius: 0.375rem;
     font-size: 11px;
@@ -723,8 +723,8 @@ body {
 }
 
 .memo-tab.active {
-    background-color: #e0e7ff;
-    border-color: #a5b4fc;
+    background-color: #ffffff;
+    border-color: #94a3b8;
     color: #3730a3;
     font-weight: 600;
 }

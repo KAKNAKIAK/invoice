@@ -1649,7 +1649,7 @@ function initializeItineraryPlannerForGroup(container, groupId) {
             </div>
         </header>
         <main class="ip-main-content accordion-body">
-            <div id="ip-daysContainer-${groupId}" class="space-y-4"></div>
+            <div id="ip-daysContainer-${groupId}" class="space-y-2"></div>
             <div class="add-day-button-container mt-6 text-center">
                 <button id="ip-addDayButton-${groupId}" class="btn btn-indigo"><i class="fas fa-plus mr-2"></i>새 날짜 추가</button>
             </div>
@@ -1701,7 +1701,7 @@ function ip_renderDays(groupId, container) {
         let dateDisplayHTML = day.editingDate
             ? `<input type="text" class="date-edit-input-text" value="${day.date}" placeholder="YYYY-MM-DD"><button class="save-date-button icon-button" title="날짜 저장">${ip_saveIconSVG}</button><button class="cancel-date-edit-button icon-button" title="취소">${ip_cancelIconSVG}</button>`
             : `<h2 class="day-header-title">${ip_formatDate(day.date, dayIndex + 1)}</h2>`;
-        daySection.innerHTML = `<div class="ip-day-header-container day-header-container"><div class="ip-day-header-main">${dateDisplayHTML}</div><div class="ip-day-header-controls"><button class="delete-day-button icon-button" title="이 날짜 삭제">${ip_deleteIconSVG}</button><button class="day-toggle-button icon-button">${day.isCollapsed ? collapsedIcon : expandedIcon}</button></div></div><div class="day-content-wrapper ${day.isCollapsed ? 'hidden' : ''}"><div class="activities-list ip-activities-list pt-2" data-day-index="${dayIndex}"></div><button class="add-activity-button mt-3 ml-2 btn btn-sm btn-outline"><i class="fas fa-plus mr-1"></i>일정 추가</button></div>`;
+        daySection.innerHTML = `<div class="ip-day-header-container day-header-container"><div class="ip-day-header-main">${dateDisplayHTML}</div><div class="ip-day-header-controls"><button class="delete-day-button icon-button" title="이 날짜 삭제">${ip_deleteIconSVG}</button><button class="day-toggle-button icon-button">${day.isCollapsed ? collapsedIcon : expandedIcon}</button></div></div><div class="day-content-wrapper ${day.isCollapsed ? 'hidden' : ''}"><div class="activities-list ip-activities-list pt-1" data-day-index="${dayIndex}"></div><button class="add-activity-button mt-2 ml-2 btn btn-sm btn-outline"><i class="fas fa-plus mr-1"></i>일정 추가</button></div>`;
         daysContainer.appendChild(daySection);
         const activitiesList = daySection.querySelector('.activities-list');
         ip_renderActivities(activitiesList, day.activities, dayIndex, groupId);
