@@ -106,6 +106,19 @@ function showToastMessage(message, isError = false) {
     }, 3000);
 }
 
+function getSortableIndex(evt, primaryKey, fallbackKey) {
+    const primaryValue = evt[primaryKey];
+    if (Number.isInteger(primaryValue)) return primaryValue;
+    const fallbackValue = evt[fallbackKey];
+    return Number.isInteger(fallbackValue) ? fallbackValue : null;
+}
+
+function getDayIndexFromList(element) {
+    if (!element || !element.dataset) return null;
+    const parsedIndex = parseInt(element.dataset.dayIndex, 10);
+    return Number.isInteger(parsedIndex) ? parsedIndex : null;
+}
+
 // --- Icon SVGs ---
 const editIconSVG = `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>`;
 const saveIconSVG = `<svg fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>`;
@@ -154,9 +167,9 @@ function renderTrip() {
         daySection.querySelector('.delete-day-button').addEventListener('click', (e) => { const dayIdx = parseInt(e.currentTarget.dataset.dayIndex); showConfirmDeleteDayModal(dayIdx); });
         daySection.querySelector('.day-toggle-button').addEventListener('click', handleToggleDayCollapse);
         daySection.querySelector('.add-activity-button').addEventListener('click', handleOpenActivityModalForNew);
-        if (typeof Sortable !== 'undefined' && activitiesList) { new Sortable(activitiesList, { group: 'shared-activities', animation: 150, ghostClass: 'sortable-ghost', dragClass: 'sortable-drag', handle: '.activity-card', onEnd: function (evt) { const fromDayIndex = parseInt(evt.from.dataset.dayIndex); const toDayIndex = parseInt(evt.to.dataset.dayIndex); const oldActivityIndex = evt.oldDraggableIndex; const newActivityIndex = evt.newDraggableIndex; if (oldActivityIndex !== undefined && newActivityIndex !== undefined) { const movedActivity = tripData.days[fromDayIndex].activities.splice(oldActivityIndex, 1)[0]; tripData.days[toDayIndex].activities.splice(newActivityIndex, 0, movedActivity); renderTrip(); } } }); }
+        if (typeof Sortable !== 'undefined' && activitiesList) { new Sortable(activitiesList, { group: 'shared-activities', animation: 150, draggable: '.activity-card', ghostClass: 'sortable-ghost', dragClass: 'sortable-drag', fallbackOnBody: true, forceFallback: true, filter: 'a,button,input,textarea,select', preventOnFilter: false, onEnd: function (evt) { const fromDayIndex = getDayIndexFromList(evt.from); const toDayIndex = getDayIndexFromList(evt.to); const oldActivityIndex = getSortableIndex(evt, 'oldDraggableIndex', 'oldIndex'); const newActivityIndex = getSortableIndex(evt, 'newDraggableIndex', 'newIndex'); if (fromDayIndex === null || toDayIndex === null || oldActivityIndex === null || newActivityIndex === null) return; if (!tripData.days[fromDayIndex] || !tripData.days[toDayIndex]) return; const movedActivity = tripData.days[fromDayIndex].activities.splice(oldActivityIndex, 1)[0]; if (!movedActivity) return; tripData.days[toDayIndex].activities.splice(newActivityIndex, 0, movedActivity); renderTrip(); } }); }
     });
-    if (typeof Sortable !== 'undefined' && daysContainer) { if (daysContainer.children.length > 0 && !daysContainer.sortableInstance) { daysContainer.sortableInstance = new Sortable(daysContainer, { animation: 200, ghostClass: 'day-section.sortable-ghost', handle: '.day-header-container', onEnd: function(evt) { const oldIndex = evt.oldDraggableIndex; const newIndex = evt.newDraggableIndex; if (oldIndex !== undefined && newIndex !== undefined && oldIndex !== newIndex) { const movedDay = tripData.days.splice(oldIndex, 1)[0]; tripData.days.splice(newIndex, 0, movedDay); recalculateAllDates(); renderTrip(); } } }); } else if (daysContainer.children.length === 0 && daysContainer.sortableInstance) { daysContainer.sortableInstance.destroy(); daysContainer.sortableInstance = null; } }
+    if (typeof Sortable !== 'undefined' && daysContainer) { if (daysContainer.children.length > 0 && !daysContainer.sortableInstance) { daysContainer.sortableInstance = new Sortable(daysContainer, { animation: 200, draggable: '.day-section', ghostClass: 'day-section.sortable-ghost', handle: '.day-header-main', fallbackOnBody: true, forceFallback: true, filter: 'a,button,input,textarea,select', preventOnFilter: false, onEnd: function(evt) { const oldIndex = getSortableIndex(evt, 'oldDraggableIndex', 'oldIndex'); const newIndex = getSortableIndex(evt, 'newDraggableIndex', 'newIndex'); if (oldIndex === null || newIndex === null || oldIndex === newIndex) return; const movedDay = tripData.days.splice(oldIndex, 1)[0]; if (!movedDay) return; tripData.days.splice(newIndex, 0, movedDay); recalculateAllDates(); renderTrip(); } }); } else if (daysContainer.children.length === 0 && daysContainer.sortableInstance) { daysContainer.sortableInstance.destroy(); daysContainer.sortableInstance = null; } }
 }
 
 function renderActivities(activitiesListElement, activities, dayIndex) {

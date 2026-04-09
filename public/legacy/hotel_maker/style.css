@@ -1,0 +1,131 @@
+body {
+    font-family: 'Noto Sans KR', 'Inter', sans-serif;
+    background-color: transparent; /* iframe 배경 투명 유지 */
+}
+
+.editor-container {
+    max-width: 100%; margin: 0; padding: 0;
+    background-color: transparent;
+    border-radius: 0; box-shadow: none;
+}
+
+/* [개선] 버튼 스타일을 메인 앱과 통일 */
+.control-buttons button {
+    padding: 8px 12px;
+    font-size: 12px;
+    border-radius: 6px;
+    color: white;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 1px solid transparent;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+.control-buttons button:hover {
+    filter: brightness(1.1);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+}
+
+.btn-copy-html { background-color: #10B981; }
+.btn-preview { background-color: #6366F1; }
+.btn-load-html { background-color: #F59E0B; }
+
+/* [개선] 탭 디자인을 메인 앱과 통일 */
+#hotelTabsContainer {
+    display: flex;
+    flex-wrap: wrap;
+    border-bottom: 2px solid #e2e8f0;
+    margin-bottom: 1rem;
+    align-items: center;
+}
+.hotel-tab-button {
+    padding: 8px 12px;
+    margin-right: 4px;
+    margin-bottom: -2px;
+    border: 2px solid transparent;
+    border-bottom: none;
+    border-radius: 6px 6px 0 0;
+    background-color: transparent;
+    font-size: 13px;
+    font-weight: 500;
+    color: #4a5568;
+    cursor: pointer;
+    max-width: 180px;
+    display: inline-flex;
+    align-items: center;
+    transition: all 0.2s ease-in-out;
+}
+.hotel-tab-button:hover {
+    color: #2c5282;
+    background-color: #f0f5ff;
+}
+.hotel-tab-button.active {
+    background-color: white;
+    border-color: #e2e8f0 #e2e8f0 white;
+    color: #2563EB;
+    font-weight: 700;
+}
+.tab-title { flex-grow: 1; text-align: left; }
+.tab-delete-icon {
+    margin-left: 0.6rem; color: #a0aec0; font-size: 0.8rem; padding: 2px;
+    border-radius: 50%; transition: all 0.2s;
+}
+.tab-delete-icon:hover { color: #e53e3e; background-color: #fed7d7; }
+#addHotelTabBtn {
+    color: #2563EB; border-style: dashed; border-color: #a0aec0;
+}
+#addHotelTabBtn:hover { border-color: #2563EB; background-color: #eff6ff; }
+
+/* [개선] 입력 폼 그룹 스타일 */
+#hotelEditorForm { padding-top: 0.5rem; }
+.input-card-group {
+    background-color: #ffffff;
+    padding: 1.5rem;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    margin-bottom: 1rem;
+}
+.form-field { position: relative; margin-bottom: 1.25rem; }
+.form-field label {
+    position: absolute;
+    left: 0.75rem;
+    top: 0.8rem;
+    color: #718096;
+    pointer-events: none;
+    transition: all 0.2s ease-out;
+    background-color: #ffffff;
+    padding: 0 0.25rem;
+    font-size: 13px;
+}
+.form-field input, .form-field textarea {
+    width: 100%;
+    padding: 0.8rem 0.75rem;
+    border: 1px solid #cbd5e0;
+    border-radius: 6px;
+    font-size: 13px;
+    transition: border-color 0.2s;
+}
+.form-field input:focus, .form-field textarea:focus {
+    outline: none;
+    border-color: #2563EB;
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+}
+.form-field input:focus + label,
+.form-field input:not(:placeholder-shown) + label,
+.form-field textarea:focus + label,
+.form-field textarea:not(:placeholder-shown) + label {
+    top: -0.6rem;
+    left: 0.5rem;
+    font-size: 11px;
+    color: #2563EB;
+    font-weight: 500;
+}
+.form-field textarea { min-height: 120px; }
+
+#hotelEditorForm.disabled {
+    opacity: 0.6;
+    pointer-events: none;
+    filter: grayscale(80%);
+}

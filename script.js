@@ -1,4 +1,4 @@
-
+﻿
 // =======================================================================
 // 1. 전역 변수 및 설정
 // =======================================================================
@@ -9,8 +9,8 @@ let currentFileHandle = null;
 
 const ROW_DEFINITIONS = [
     { id: 'airfare', label: '항공', type: 'costInput' }, { id: 'hotel', label: '호텔', type: 'costInput' },
-    { id: 'ground', label: '지상', type: 'costInput' }, { id: 'insurance', label: '보험', type: 'costInput' },
-    { id: 'commission', label: '커미션', type: 'costInput' }, { id: 'addDynamicRow', label: '+', type: 'button' },
+    { id: 'ground', label: '지상', type: 'costInput' }, { id: 'commission', label: '커미션', type: 'costInput' },
+    { id: 'addDynamicRow', label: '+', type: 'button' }, { id: 'insurance', label: '보험', type: 'costInput' },
     { id: 'netCost', label: '넷가', type: 'calculated' }, { id: 'salesPrice', label: '상품가', type: 'salesInput' },
     { id: 'profitPerPerson', label: '1인수익', type: 'calculated' }, { id: 'profitMargin', label: '1인수익률', type: 'calculatedPercentage' }
 ];
@@ -27,6 +27,134 @@ const firebaseConfig = {
 };
 const fbApp = firebase.initializeApp(firebaseConfig, 'memoApp');
 const db = firebase.firestore(fbApp);
+const DEFAULT_MEMO_TEXT = '지원어려울시 업셀링 요청';
+
+function createMemoTabId() {
+    return `memo_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+}
+
+function ensureMemoTabsForSession(session, fallbackText = '') {
+    if (!session) return null;
+    if (!Array.isArray(session.memoTabs) || session.memoTabs.length === 0) {
+        const initialContent = (typeof session.memoText === 'string' && session.memoText.length > 0)
+            ? session.memoText
+            : (typeof fallbackText === 'string' ? fallbackText : '');
+        session.memoTabs = [{
+            id: createMemoTabId(),
+            title: '메모 1',
+            content: initialContent
+        }];
+    }
+
+    session.memoTabs = session.memoTabs.map((tab, index) => ({
+        id: tab?.id ? String(tab.id) : createMemoTabId(),
+        title: (typeof tab?.title === 'string' && tab.title.trim()) ? tab.title.trim() : `메모 ${index + 1}`,
+        content: typeof tab?.content === 'string' ? tab.content : ''
+    }));
+
+    if (!session.activeMemoTabId || !session.memoTabs.some(tab => tab.id === session.activeMemoTabId)) {
+        session.activeMemoTabId = session.memoTabs[0].id;
+    }
+    return session;
+}
+
+function syncActiveMemoTabContentFromTextarea() {
+    const session = getCurrentSession();
+    const memoTextarea = document.getElementById('memoText');
+    if (!session || !memoTextarea) return;
+
+    ensureMemoTabsForSession(session, memoTextarea.value || '');
+    const activeTab = session.memoTabs.find(tab => tab.id === session.activeMemoTabId);
+    if (activeTab) {
+        activeTab.content = memoTextarea.value;
+        session.memoText = memoTextarea.value;
+    }
+}
+
+function renderMemoTabs() {
+    const session = getCurrentSession();
+    const tabsContainer = document.getElementById('memoTabsContainer');
+    const memoTextarea = document.getElementById('memoText');
+    if (!session || !tabsContainer || !memoTextarea) return;
+
+    ensureMemoTabsForSession(session, memoTextarea.value || session.memoText || '');
+    tabsContainer.innerHTML = '';
+
+    session.memoTabs.forEach((tab, index) => {
+        const tabButton = document.createElement('button');
+        tabButton.type = 'button';
+        tabButton.className = `memo-tab${tab.id === session.activeMemoTabId ? ' active' : ''}`;
+        tabButton.dataset.memoTabId = tab.id;
+
+        const titleSpan = document.createElement('span');
+        titleSpan.className = 'memo-tab-title';
+        titleSpan.textContent = tab.title || `메모 ${index + 1}`;
+        tabButton.appendChild(titleSpan);
+
+        if (session.memoTabs.length > 1) {
+            const closeSpan = document.createElement('span');
+            closeSpan.className = 'memo-tab-close';
+            closeSpan.dataset.action = 'close';
+            closeSpan.textContent = '×';
+            tabButton.appendChild(closeSpan);
+        }
+        tabsContainer.appendChild(tabButton);
+    });
+
+    const activeTab = session.memoTabs.find(tab => tab.id === session.activeMemoTabId);
+    memoTextarea.value = activeTab ? (activeTab.content || '') : '';
+    session.memoText = memoTextarea.value;
+}
+
+function setActiveMemoTab(tabId) {
+    const session = getCurrentSession();
+    if (!session) return;
+    syncActiveMemoTabContentFromTextarea();
+    ensureMemoTabsForSession(session);
+    if (!session.memoTabs.some(tab => tab.id === tabId)) return;
+    session.activeMemoTabId = tabId;
+    renderMemoTabs();
+    updateCurrentSession();
+}
+
+function addMemoTab(initial = {}) {
+    const session = getCurrentSession();
+    if (!session) return;
+    syncActiveMemoTabContentFromTextarea();
+    ensureMemoTabsForSession(session);
+    const nextIndex = session.memoTabs.length + 1;
+    const newTab = {
+        id: createMemoTabId(),
+        title: (typeof initial.title === 'string' && initial.title.trim()) ? initial.title.trim() : `메모 ${nextIndex}`,
+        content: typeof initial.content === 'string' ? initial.content : ''
+    };
+    session.memoTabs.push(newTab);
+    session.activeMemoTabId = newTab.id;
+    renderMemoTabs();
+    updateCurrentSession();
+}
+
+function closeMemoTab(tabId) {
+    const session = getCurrentSession();
+    if (!session) return;
+    syncActiveMemoTabContentFromTextarea();
+    ensureMemoTabsForSession(session);
+    if (session.memoTabs.length <= 1) return;
+
+    const tabIndex = session.memoTabs.findIndex(tab => tab.id === tabId);
+    if (tabIndex < 0) return;
+
+    const wasActive = session.activeMemoTabId === tabId;
+    session.memoTabs.splice(tabIndex, 1);
+
+    if (wasActive) {
+        const nextActive = session.memoTabs[Math.max(0, tabIndex - 1)] || session.memoTabs[0];
+        session.activeMemoTabId = nextActive.id;
+    }
+
+    renderMemoTabs();
+    updateCurrentSession();
+}
 
 // =======================================================================
 // 2. 파일 탭 시스템 - FileSession 클래스와 파일 관리
@@ -40,6 +168,8 @@ class FileSession {
         this.groupCounter = 0;
         this.activeGroupId = null;
         this.memoText = '';
+        this.memoTabs = [];
+        this.activeMemoTabId = null;
         this.customerInfo = [];
         this.uiState = {
             scrollTop: 0,
@@ -75,6 +205,11 @@ class FileSession {
         // 메모 텍스트 저장
         const memoTextarea = document.getElementById('memoText');
         if (memoTextarea) {
+            ensureMemoTabsForSession(this, memoTextarea.value || '');
+            const activeTab = this.memoTabs.find(tab => tab.id === this.activeMemoTabId);
+            if (activeTab) {
+                activeTab.content = memoTextarea.value;
+            }
             this.memoText = memoTextarea.value;
         }
         
@@ -102,7 +237,8 @@ class FileSession {
         // 메모 텍스트 복원
         const memoTextarea = document.getElementById('memoText');
         if (memoTextarea) {
-            memoTextarea.value = this.memoText || '';
+            ensureMemoTabsForSession(this, this.memoText || '');
+            renderMemoTabs();
         }
         
         // 고객 정보 복원
@@ -129,7 +265,7 @@ class FileSession {
         
         // 활성 그룹 복원
         if (this.activeGroupId && this.quoteGroupsData[this.activeGroupId]) {
-            switchGroup(this.activeGroupId);
+            switchTab(this.activeGroupId);
         }
         
         // 이벤트 리스너 재바인딩 (중요!)
@@ -404,6 +540,56 @@ function rebindWorkspaceEventListeners() {
         }
     }
 
+    const addMemoTabBtn = document.getElementById('addMemoTabBtn');
+    if (addMemoTabBtn) {
+        addMemoTabBtn.replaceWith(addMemoTabBtn.cloneNode(true));
+        const newAddMemoTabBtn = document.getElementById('addMemoTabBtn');
+        if (newAddMemoTabBtn) {
+            newAddMemoTabBtn.addEventListener('click', () => {
+                addMemoTab({ content: '' });
+            });
+        }
+    }
+
+    const copyMemoBtn = document.getElementById('copyMemoBtn');
+    if (copyMemoBtn) {
+        copyMemoBtn.replaceWith(copyMemoBtn.cloneNode(true));
+        const newCopyMemoBtn = document.getElementById('copyMemoBtn');
+        if (newCopyMemoBtn) {
+            newCopyMemoBtn.addEventListener('click', () => {
+                const memoTextarea = document.getElementById('memoText');
+                copyToClipboard(memoTextarea ? memoTextarea.value : '', '메모');
+            });
+        }
+    }
+
+    const memoTextarea = document.getElementById('memoText');
+    if (memoTextarea) {
+        memoTextarea.oninput = () => {
+            syncActiveMemoTabContentFromTextarea();
+            updateCurrentSession();
+        };
+    }
+
+    const memoTabsContainer = document.getElementById('memoTabsContainer');
+    if (memoTabsContainer) {
+        memoTabsContainer.onclick = (event) => {
+            const closeButton = event.target.closest('.memo-tab-close');
+            const tabButton = event.target.closest('.memo-tab');
+            if (!tabButton) return;
+            const tabId = tabButton.dataset.memoTabId;
+            if (!tabId) return;
+
+            if (closeButton) {
+                closeMemoTab(tabId);
+                return;
+            }
+            setActiveMemoTab(tabId);
+        };
+    }
+
+    renderMemoTabs();
+
     // 견적 그룹 버튼들 이벤트 바인딩
     const newGroupBtn = document.getElementById('newGroupBtn');
     if (newGroupBtn) {
@@ -419,12 +605,12 @@ function rebindWorkspaceEventListeners() {
                     flightSchedule: [],
                     priceInfo: [],
                     hotelMakerData: { allHotelData: [{ nameKo: '새 호텔 1', nameEn: "", website: "", image: "", description: "" }], currentHotelIndex: 0 },
-                    itineraryData: { title: "새 일정표", days: [], editingTitle: false },
+                    itineraryData: { title: "", days: [], editingTitle: false },
                     inclusionText: '',
                     exclusionText: ''
                 };
                 createGroupUI(newGroupId);
-                switchGroup(newGroupId);
+                switchTab(newGroupId);
             });
         }
     }
@@ -442,7 +628,7 @@ function rebindWorkspaceEventListeners() {
                 quoteGroupsData[newGroupId] = JSON.parse(JSON.stringify(sourceData));
                 groupCounter++;
                 createGroupUI(newGroupId);
-                switchGroup(newGroupId);
+                switchTab(newGroupId);
                 
                 // 견적 복사 후 분할 패널 너비를 최소 너비로 재설정
                 setTimeout(resetSplitPaneWidths, 50);
@@ -492,7 +678,9 @@ function rebindWorkspaceEventListeners() {
                     const groupData = quoteGroupsData[groupId];
                     const newCalcData = { id: `calc_${Date.now()}`, pnr: '', tableHTML: null, pnrTitle: 'PNR 정보' };
                     groupData.calculators.push(newCalcData);
-                    renderCalculators(groupId);
+                    const calculatorsWrapper = document.getElementById(`calculators-wrapper-${groupId}`);
+                    if (calculatorsWrapper) createCalculatorInstance(calculatorsWrapper, groupId, newCalcData);
+                    else renderCalculators(groupId);
                 } else if (button.classList.contains('copy-last-calculator-btn')) {
                      const groupData = quoteGroupsData[groupId];
                     if (!groupData || groupData.calculators.length === 0) { showToastMessage('복사할 견적 계산이 없습니다.', true); return; }
@@ -545,7 +733,7 @@ function rebindWorkspaceEventListeners() {
                          hm_switchTab(groupId, parseInt(button.dataset.index));
                     }
                 } else if (button.classList.contains('parse-gds-btn')) {
-                    window.open('./gds_parser/gds_parser.html', 'GDS_Parser', `width=800,height=500,top=${(screen.height / 2) - 250},left=${(screen.width / 2) - 400}`);
+                    openGdsParserWindow();
                 } else if (button.classList.contains('copy-flight-schedule-btn')) {
                     copyHtmlToClipboard(generateFlightScheduleInlineHtml(quoteGroupsData[groupId].flightSchedule));
                 } else if (button.classList.contains('copy-price-info-btn')) {
@@ -617,10 +805,28 @@ function rebindWorkspaceEventListeners() {
                     if (section.classList.contains('price-subgroup')) {
                         updateGrandTotal(section, groupId);
                     }
+                } else if (button.classList.contains('accordion-toggle-btn')) {
+                    const section = button.closest('.accordion-section');
+                    const body = section.querySelector('.accordion-body');
+                    if (body) {
+                        const isHidden = body.style.display === 'none';
+                        body.style.display = isHidden ? '' : 'none';
+                        button.textContent = isHidden ? '▼' : '▶';
+                    }
                 } else if (button.classList.contains('day-toggle-button')) {
                      ip_handleToggleDayCollapse(event, button.closest('.ip-day-section').dataset.dayId.split('-')[1], groupId);
                 }
-                else if(button.id.startsWith('ip-')) {
+                else if (
+                    button.id.startsWith('ip-') ||
+                    button.classList.contains('add-activity-button') ||
+                    button.classList.contains('edit-activity-button') ||
+                    button.classList.contains('duplicate-activity-button') ||
+                    button.classList.contains('delete-activity-button') ||
+                    button.classList.contains('edit-date-button') ||
+                    button.classList.contains('save-date-button') ||
+                    button.classList.contains('cancel-date-edit-button') ||
+                    button.classList.contains('delete-day-button')
+                ) {
                     if (button.id.includes('loadFromDBBtn')) ip_openLoadTripModal(groupId);
                     else if (button.id.includes('copyInlineHtmlButton')) ip_handleCopyInlineHtml(groupId);
                     else if (button.id.includes('inlinePreviewButton')) ip_handleInlinePreview(groupId);
@@ -892,7 +1098,7 @@ function initializeWorkspaceForSession(session) {
     workspace.innerHTML = `
         <header class="mb-8 flex justify-between items-center">
             <div class="flex items-baseline gap-4">
-                <h1 class="text-3xl font-bold text-indigo-700">2025 견적</h1>
+                <h1 class="text-3xl font-bold text-indigo-700">견적 계산기_2026 버전</h1>
                 <a href="./manual/index.html" target="_blank" class="text-sm font-medium text-indigo-600 hover:text-indigo-800 hover:underline">사용 매뉴얼</a>
             </div>
             <div class="flex items-center space-x-2 flex-wrap">
@@ -918,20 +1124,31 @@ function initializeWorkspaceForSession(session) {
                     <section class="w-full sm:w-1/2 p-4 sm:p-6 border border-gray-200 rounded-lg flex flex-col">
                         <div class="flex justify-between items-center mb-4">
                             <h2 class="text-base font-semibold text-gray-800">메모</h2>
-                            <button type="button" id="loadMemoFromDbBtn" class="btn btn-sm btn-outline"><i class="fas fa-database mr-1"></i> DB</button>
+                            <div class="memo-header-actions">
+                                <button type="button" id="loadMemoFromDbBtn" class="btn btn-sm btn-outline"><i class="fas fa-database mr-1"></i> DB</button>
+                                <button type="button" id="addMemoTabBtn" class="btn btn-sm btn-outline" title="새 메모 탭"><i class="fas fa-plus"></i></button>
+                            </div>
                         </div>
+                        <div id="memoTabsContainer" class="memo-tabs-container"></div>
                         <textarea id="memoText" class="w-full flex-grow px-3 py-2 border rounded-md shadow-sm" placeholder="메모 입력..."></textarea>
                         <button type="button" id="copyMemoBtn" class="mt-2 btn btn-sm btn-outline"><i class="far fa-copy"></i> 메모 복사</button>
                     </section>
                     <section class="w-full sm:w-1/2 p-4 sm:p-6 border border-gray-200 rounded-lg">
-                        <h2 class="text-base font-semibold text-gray-800 mb-4">업무 보조 툴</h2>
-                        <div class="grid grid-cols-1 gap-2 mt-4">
-                            <a href="https://kaknakiak.github.io/ERPTOGDS/" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline text-center">GDS 엔트리 생성기</a>
-                            <a href="https://kaknakiak.github.io/PNRTOERP/" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline text-center">PNR 네임필드추출</a>
-                            <a href="https://incomparable-meringue-d33b6b.netlify.app/" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline text-center">간편 URL 단축기</a>
-                            <a href="https://kaknakiak.github.io/hotelbooking/" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline text-center">호텔 수배서 작성기</a>
-                            <a href="https://kaknakiak.github.io/hotelinformation/" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline text-center">호텔카드 메이커</a>
-                            <a href="https://kaknakiak.github.io/tripplantest2/" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline text-center">상세일정표</a>
+                        <h2 class="text-base font-semibold text-gray-800 mb-4">url 단축기</h2>
+                        <div class="mt-4">
+                            <div class="rounded-md border border-gray-200 overflow-hidden bg-white" style="height: 220px;">
+                                <iframe
+                                    src="https://incomparable-meringue-d33b6b.netlify.app/"
+                                    title="간편 URL 단축기"
+                                    class="w-full"
+                                    style="width: 180%; height: 380px; border: 0; transform: scale(0.56); transform-origin: top left;"
+                                    loading="lazy"
+                                    allow="clipboard-write"
+                                    referrerpolicy="no-referrer-when-downgrade"
+                                    scrolling="no"
+                                ></iframe>
+                            </div>
+                            <a href="https://incomparable-meringue-d33b6b.netlify.app/" target="_blank" rel="noopener noreferrer" class="mt-2 inline-block text-sm text-indigo-600 hover:underline">새 창에서 열기</a>
                         </div>
                     </section>
                 </div>
@@ -1065,11 +1282,17 @@ const hmDb = firebase.firestore(hmFbApp);
 
 function initializeHotelMakerForGroup(container, groupId) {
     container.innerHTML = `
-        <div class="hm-controls flex flex-wrap gap-2 justify-end mb-4">
-            <button id="hm-copyHtmlBtn-${groupId}" class="btn btn-sm btn-outline"><i class="fas fa-copy"></i> 코드 복사</button>
-            <button id="hm-previewHotelBtn-${groupId}" class="btn btn-sm btn-outline"><i class="fas fa-eye"></i> 미리보기</button>
-            <button id="hm-loadHotelHtmlBtn-${groupId}" class="btn btn-sm btn-green"><i class="fas fa-database"></i> DB 불러오기</button>
+        <div class="hm-controls flex items-center gap-2 mb-4" style="flex-wrap:nowrap;">
+            <button type="button" class="accordion-toggle-btn" title="접기/펼치기" style="background:none;border:none;cursor:pointer;padding:2px 4px;font-size:12px;color:#6b7280;line-height:1;">▼</button>
+            <h2 class="text-base font-semibold" style="flex-shrink:0;margin:0;">호텔카드 메이커</h2>
+            <div class="flex items-center gap-2" style="margin-left:auto;flex-shrink:0;">
+                <button id="hm-copyHtmlBtn-${groupId}" class="btn btn-sm btn-outline"><i class="fas fa-copy"></i> 코드 복사</button>
+                <button id="hm-previewHotelBtn-${groupId}" class="btn btn-sm btn-outline"><i class="fas fa-eye"></i> 미리보기</button>
+                <button id="hm-loadHotelHtmlBtn-${groupId}" class="btn btn-sm btn-green"><i class="fas fa-database"></i> DB 불러오기</button>
+                <a href="https://kaknakiak.github.io/hotelinformation/" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline">원본 사이트</a>
+            </div>
         </div>
+        <div class="accordion-body hm-accordion-body">
         <div id="hm-hotelTabsContainer-${groupId}" class="hm-tabs-container flex flex-wrap items-center border-b-2 border-gray-200 mb-4">
             <button id="hm-addHotelTabBtn-${groupId}" class="hotel-tab-button"><i class="fas fa-plus mr-2"></i>새 호텔 추가</button>
         </div>
@@ -1085,6 +1308,7 @@ function initializeHotelMakerForGroup(container, groupId) {
                 </div>
                 <div class="form-field mt-4"><textarea id="hm-hotelDescription-${groupId}" class="input-field" rows="4" placeholder=" "></textarea><label for="hm-hotelDescription-${groupId}">간단 설명</label></div>
             </div>
+        </div>
         </div>
     `;
 
@@ -1412,17 +1636,19 @@ function ip_parseAndValidateDateInput(inputValue) { let dateStr = inputValue.tri
 
 function initializeItineraryPlannerForGroup(container, groupId) {
     container.innerHTML = `
-        <header class="ip-header sticky top-0 z-10 py-3 px-4 -mx-4 mb-4 bg-white/80 backdrop-blur-sm">
-            <div class="flex justify-between items-center h-[50px]">
-                <div id="ip-headerTitleSection-${groupId}" class="ip-header-title-container"></div>
-                <div class="flex items-center space-x-2">
+        <header class="ip-header sticky top-0 z-10 py-2 px-4 -mx-4 mb-4 bg-white/80 backdrop-blur-sm">
+            <div class="flex items-center gap-3" style="flex-wrap:nowrap;">
+                <button type="button" class="accordion-toggle-btn" title="접기/펼치기" style="background:none;border:none;cursor:pointer;padding:2px 4px;font-size:12px;color:#6b7280;line-height:1;">▼</button>
+                <div id="ip-headerTitleSection-${groupId}" class="ip-header-title-container" style="flex-shrink:0;"></div>
+                <div class="flex items-center gap-2" style="margin-left:auto;flex-shrink:0;">
                     <button id="ip-copyInlineHtmlButton-${groupId}" class="btn btn-sm btn-outline" title="일정표 코드 복사"><i class="fas fa-copy"></i> 코드 복사</button>
                     <button id="ip-inlinePreviewButton-${groupId}" class="btn btn-sm btn-outline" title="인라인 형식 미리보기"><i class="fas fa-eye"></i> 미리보기</button>
                     <button id="ip-loadFromDBBtn-${groupId}" class="btn btn-sm btn-green" title="DB에서 일정 불러오기"><i class="fas fa-database"></i><span class="inline ml-2">DB 불러오기</span></button>
+                    <a href="https://kaknakiak.github.io/tripplantest2/" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline">원본 사이트</a>
                 </div>
             </div>
         </header>
-        <main class="ip-main-content">
+        <main class="ip-main-content accordion-body">
             <div id="ip-daysContainer-${groupId}" class="space-y-4"></div>
             <div class="add-day-button-container mt-6 text-center">
                 <button id="ip-addDayButton-${groupId}" class="btn btn-indigo"><i class="fas fa-plus mr-2"></i>새 날짜 추가</button>
@@ -1452,9 +1678,13 @@ function ip_renderHeaderTitle(groupId, container) {
         const input = document.createElement('input'); input.type = 'text'; input.className = 'ip-header-title-input'; input.value = itineraryData.title;
         const saveButton = document.createElement('button'); saveButton.className = 'icon-button'; saveButton.title = '제목 저장'; saveButton.innerHTML = ip_saveIconSVG; saveButton.addEventListener('click', () => ip_handleSaveTripTitle(groupId));
         const cancelButton = document.createElement('button'); cancelButton.className = 'icon-button'; cancelButton.title = '취소'; cancelButton.innerHTML = ip_cancelIconSVG; cancelButton.addEventListener('click', () => ip_handleCancelTripTitleEdit(groupId));
-        headerTitleSection.append(input, saveButton, cancelButton); input.focus();
+        headerTitleSection.append(input, saveButton, cancelButton);
+        requestAnimationFrame(() => { input.focus(); input.select(); });
     } else {
-        const titleH1 = document.createElement('h1'); titleH1.className = 'text-2xl font-bold'; titleH1.textContent = itineraryData.title;
+        const titleH1 = document.createElement('h2'); titleH1.className = 'text-base font-semibold'; titleH1.textContent = itineraryData.title || '일정표';
+        titleH1.style.cursor = 'pointer';
+        titleH1.title = '클릭하여 제목 수정';
+        titleH1.addEventListener('click', () => ip_handleEditTripTitle(groupId));
         const editButton = document.createElement('button'); editButton.className = 'icon-button ml-2'; editButton.title = '여행 제목 수정'; editButton.innerHTML = ip_editIconSVG; editButton.addEventListener('click', () => ip_handleEditTripTitle(groupId));
         headerTitleSection.append(titleH1, editButton);
     }
@@ -1470,15 +1700,15 @@ function ip_renderDays(groupId, container) {
         const collapsedIcon = `<svg class="toggle-icon w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>`;
         let dateDisplayHTML = day.editingDate
             ? `<input type="text" class="date-edit-input-text" value="${day.date}" placeholder="YYYY-MM-DD"><button class="save-date-button icon-button" title="날짜 저장">${ip_saveIconSVG}</button><button class="cancel-date-edit-button icon-button" title="취소">${ip_cancelIconSVG}</button>`
-            : `<h2 class="day-header-title">${ip_formatDate(day.date, dayIndex + 1)}</h2><button class="edit-date-button icon-button ml-2" title="날짜 수정">${ip_editIconSVG}</button>`;
-        daySection.innerHTML = `<div class="ip-day-header-container day-header-container"><div class="ip-day-header-main">${dateDisplayHTML}</div><div class="ip-day-header-controls"><button class="delete-day-button icon-button" title="이 날짜 삭제">${ip_deleteIconSVG}</button><button class="day-toggle-button icon-button">${day.isCollapsed ? collapsedIcon : expandedIcon}</button></div></div><div class="day-content-wrapper ${day.isCollapsed ? 'hidden' : ''}"><div class="activities-list ip-activities-list pt-4" data-day-index="${dayIndex}"></div><button class="add-activity-button mt-4 ml-2 btn btn-sm btn-outline"><i class="fas fa-plus mr-1"></i>일정 추가</button></div>`;
+            : `<h2 class="day-header-title">${ip_formatDate(day.date, dayIndex + 1)}</h2>`;
+        daySection.innerHTML = `<div class="ip-day-header-container day-header-container"><div class="ip-day-header-main">${dateDisplayHTML}</div><div class="ip-day-header-controls"><button class="delete-day-button icon-button" title="이 날짜 삭제">${ip_deleteIconSVG}</button><button class="day-toggle-button icon-button">${day.isCollapsed ? collapsedIcon : expandedIcon}</button></div></div><div class="day-content-wrapper ${day.isCollapsed ? 'hidden' : ''}"><div class="activities-list ip-activities-list pt-2" data-day-index="${dayIndex}"></div><button class="add-activity-button mt-3 ml-2 btn btn-sm btn-outline"><i class="fas fa-plus mr-1"></i>일정 추가</button></div>`;
         daysContainer.appendChild(daySection);
         const activitiesList = daySection.querySelector('.activities-list');
         ip_renderActivities(activitiesList, day.activities, dayIndex, groupId);
     });
     if (typeof Sortable !== 'undefined') {
         new Sortable(daysContainer, { handle: '.day-header-container', animation: 150, ghostClass: 'sortable-ghost', onEnd: (evt) => { const itineraryData = quoteGroupsData[groupId].itineraryData; const movedDay = itineraryData.days.splice(evt.oldIndex, 1)[0]; itineraryData.days.splice(evt.newIndex, 0, movedDay); ip_recalculateAllDates(groupId); ip_render(groupId); } });
-        daysContainer.querySelectorAll('.activities-list').forEach(list => { new Sortable(list, { group: `shared-activities-${groupId}`, handle: '.ip-activity-card', animation: 150, ghostClass: 'sortable-ghost', onEnd: (evt) => { const fromDayIndex = parseInt(evt.from.dataset.dayIndex); const toDayIndex = parseInt(evt.to.dataset.dayIndex); const itineraryData = quoteGroupsData[groupId].itineraryData; const movedActivity = itineraryData.days[fromDayIndex].activities.splice(evt.oldIndex, 1)[0]; itineraryData.days[toDayIndex].activities.splice(evt.newIndex, 0, movedActivity); ip_render(groupId); } }); });
+        daysContainer.querySelectorAll('.activities-list').forEach(list => { new Sortable(list, { group: `shared-activities-${groupId}`, handle: '.ip-activity-drag-handle', animation: 150, ghostClass: 'sortable-ghost', onEnd: (evt) => { const fromDayIndex = parseInt(evt.from.dataset.dayIndex); const toDayIndex = parseInt(evt.to.dataset.dayIndex); const itineraryData = quoteGroupsData[groupId].itineraryData; const movedActivity = itineraryData.days[fromDayIndex].activities.splice(evt.oldIndex, 1)[0]; itineraryData.days[toDayIndex].activities.splice(evt.newIndex, 0, movedActivity); ip_render(groupId); } }); });
     }
 }
 function ip_renderActivities(activitiesListElement, activities, dayIndex, groupId) {
@@ -1486,14 +1716,22 @@ function ip_renderActivities(activitiesListElement, activities, dayIndex, groupI
     (activities || []).forEach((activity, activityIndex) => {
         const card = document.createElement('div'); card.className = 'ip-activity-card activity-card';
         card.dataset.activityId = activity.id; card.dataset.dayIndex = dayIndex; card.dataset.activityIndex = activityIndex;
-        let imageHTML = activity.imageUrl ? `<img src="${activity.imageUrl}" alt="${activity.title}" class="ip-card-image card-image" onerror="this.style.display='none';">` : '';
+        const summaryLabel = (activity.title || '').trim() || (activity.locationLink || '').trim() || '활동';
+        const imageHTML = activity.imageUrl ? `<img src="${activity.imageUrl}" alt="${activity.title}" class="ip-card-image card-image" onerror="this.style.display='none';">` : '';
         const descHTML = activity.description ? `<div class="card-description">${activity.description.replace(/\n/g, '<br>')}</div>` : '';
-        let locationText = activity.locationLink;
-        if (locationText && locationText.length > 35) { locationText = locationText.substring(0, 32) + '...'; }
-        const locHTML = activity.locationLink ? `<div class="card-location">📍 <a href="${activity.locationLink}" target="_blank" title="${activity.locationLink}">${locationText}</a></div>` : '';
+        const locHTML = activity.locationLink ? `<div class="card-location">장소: ${activity.locationLink}</div>` : '';
         const costHTML = activity.cost ? `<div class="card-cost">💰 ${activity.cost}</div>` : '';
         const notesHTML = activity.notes ? `<div class="card-notes">📝 ${activity.notes.replace(/\n/g, '<br>')}</div>` : '';
-        card.innerHTML = `<div class="card-time-icon-area"><div class="card-icon">${activity.icon||'&nbsp;'}</div><div class="card-time" data-time-value="${activity.time||''}">${ip_formatTimeToHHMM(activity.time)}</div></div><div class="card-details-area"><div class="card-title">${activity.title||''}</div>${descHTML}${imageHTML}${locHTML}${costHTML}${notesHTML}</div><div class="card-actions-direct"><button class="icon-button edit-activity-button" title="수정" disabled style="opacity: 0.3; cursor: not-allowed;">${ip_editIconSVG}</button><button class="icon-button duplicate-activity-button" title="복제" disabled style="opacity: 0.3; cursor: not-allowed;">${ip_duplicateIconSVG}</button><button class="icon-button delete-activity-button" title="삭제">${ip_deleteIconSVG}</button></div>`;
+        const detailBodyHTML = `${descHTML}${imageHTML}${locHTML}${costHTML}${notesHTML}`;
+        card.innerHTML = `<div class="ip-activity-shell"><details class="ip-activity-details"${activity.isExpanded ? ' open' : ''}><summary class="ip-activity-summary"><span class="ip-activity-drag-handle" title="드래그로 순서 이동">⋮⋮</span><span class="card-icon">${activity.icon || '&nbsp;'}</span><span class="card-time" data-time-value="${activity.time || ''}">${ip_formatTimeToHHMM(activity.time)}</span><span class="ip-activity-summary-label">${summaryLabel}</span><span class="ip-activity-summary-chevron">⌄</span></summary><div class="ip-activity-details-body">${detailBodyHTML || '<div class="card-empty-hint">상세 정보 없음</div>'}</div></details><div class="card-actions-direct"><button class="icon-button edit-activity-button" title="수정" disabled style="opacity: 0.3; cursor: not-allowed;">${ip_editIconSVG}</button><button class="icon-button duplicate-activity-button" title="복제" disabled style="opacity: 0.3; cursor: not-allowed;">${ip_duplicateIconSVG}</button><button class="icon-button delete-activity-button" title="삭제">${ip_deleteIconSVG}</button></div></div>`;
+
+        const detailsElement = card.querySelector('.ip-activity-details');
+        if (detailsElement) {
+            detailsElement.addEventListener('toggle', () => {
+                const targetActivity = quoteGroupsData[groupId]?.itineraryData?.days?.[dayIndex]?.activities?.[activityIndex];
+                if (targetActivity) targetActivity.isExpanded = detailsElement.open;
+            });
+        }
         
         // 삭제 버튼만 직접 이벤트 바인딩 (강화된 버전)
         const deleteBtn = card.querySelector('.delete-activity-button');
@@ -1553,7 +1791,15 @@ function ip_handleDuplicateActivity(groupId, dayIndex, activityIndex) {
 function ip_handleEditTripTitle(groupId) { quoteGroupsData[groupId].itineraryData.editingTitle = true; ip_render(groupId); }
 function ip_handleSaveTripTitle(groupId) { const container = document.getElementById(`itinerary-planner-container-${groupId}`); const input = container.querySelector(`#ip-headerTitleSection-${groupId} input`); quoteGroupsData[groupId].itineraryData.title = input.value; quoteGroupsData[groupId].itineraryData.editingTitle = false; ip_render(groupId); }
 function ip_handleCancelTripTitleEdit(groupId) { quoteGroupsData[groupId].itineraryData.editingTitle = false; ip_render(groupId); }
-function ip_handleEditDate(dayIndex, groupId) { quoteGroupsData[groupId].itineraryData.days.forEach((day, index) => { day.editingDate = (index === dayIndex); }); ip_render(groupId); }
+function ip_handleEditDate(dayIndex, groupId) {
+    quoteGroupsData[groupId].itineraryData.days.forEach((day, index) => { day.editingDate = (index === dayIndex); });
+    ip_render(groupId);
+    setTimeout(() => {
+        const container = document.getElementById(`itinerary-planner-container-${groupId}`);
+        const targetInput = container?.querySelector(`.ip-day-section[data-day-id="day-${dayIndex}"] .date-edit-input-text`);
+        if (targetInput) { targetInput.focus(); targetInput.select(); }
+    }, 0);
+}
 function ip_handleSaveDate(dayIndex, groupId, dateValue) {
     const validatedDate = ip_parseAndValidateDateInput(dateValue);
     if (validatedDate) {
@@ -1649,41 +1895,47 @@ function ip_handleInlinePreview(groupId) {
  * @returns {string} - <main> 기반 HTML 조각
  */
 function ip_generateInlineStyledHTML(itineraryData, options = {}) {
+    const hideTitleForCopy = Boolean(options.makePageTitleEmptyForCopy);
     let daysHTML = '';
     (itineraryData.days || []).forEach((day, dayIndex) => {
         let activitiesHTML = (day.activities || []).map(activity => {
             const imageHTML = activity.imageUrl ? `
-              <details open style="margin-top:8px;">
-                <summary style="font-size:12px;color:#007bff;cursor:pointer;display:inline-block;">🖼️ 사진</summary>
-                <img src="${activity.imageUrl}" alt="${activity.title}" style="max-width: 100%; height:auto;border-radius:4px;margin-top:8px;" onerror="this.style.display='none';">
-              </details>` : '';
+              <div style="margin-top:8px;">
+                <img src="${activity.imageUrl}" alt="${activity.title}" style="max-width: 100%; height:auto;border-radius:4px;display:block;" onerror="this.style.display='none';">
+              </div>` : '';
             
-            const locationHTML = activity.locationLink ? `<div style="font-size:12px;margin-top:4px;">📍 <a href="${activity.locationLink}" target="_blank" rel="noopener noreferrer" style="color:#007bff;text-decoration:none;">위치 보기</a></div>` : '';
             const costHTML = activity.cost ? `<div style="font-size:12px;margin-top:4px;">💰 ${activity.cost}</div>` : '';
             const notesHTML = activity.notes ? `<div style="font-size:12px;margin-top:4px;white-space:pre-wrap;">📝 ${activity.notes.replace(/\n/g, '<br>')}</div>` : '';
             const descHTML = activity.description ? `<div style="font-size:12px;white-space:pre-wrap;">${activity.description.replace(/\n/g, '<br>')}</div>` : '';
+            const summaryLabel = (activity.title || '').trim() || '활동';
             
             return `
-          <div style="background-color:white;border-radius:8px;border:1px solid #E0E0E0;padding:10px;margin-bottom:10px;display:flex; align-items: flex-start;">
-            <div style="width:50px;flex-shrink:0;margin-right:10px;">
-              <div style="font-size:20px;margin-bottom:4px;">${activity.icon || ' '}</div>
-              <div style="font-size:12px;font-weight:bold;white-space:nowrap;">${ip_formatTimeToHHMM(activity.time) || ' '}</div>
-            </div>
-            <div style="flex-grow:1; overflow: hidden;">
-              <div style="font-size:13px;font-weight:bold;">${activity.title || ''}</div>
-              ${descHTML}
-              ${imageHTML}
-              ${locationHTML}
-              ${costHTML}
-              ${notesHTML}
-            </div>
-          </div>`;
+          <li style="list-style:none;margin-bottom:8px;border:1px solid #E0E0E0;border-radius:8px;background:#fff;">
+            <details>
+              <summary style="cursor:pointer;padding:10px 12px;display:flex;align-items:center;gap:8px;">
+                <span style="font-size:14px;">${activity.icon || '-'}</span>
+                <span style="font-size:12px;font-weight:bold;min-width:42px;">${ip_formatTimeToHHMM(activity.time) || ''}</span>
+                <span style="font-size:13px;font-weight:600;flex:1;min-width:0;">${summaryLabel}</span>
+                <span style="font-size:16px;color:#64748b;line-height:1;">⌄</span>
+              </summary>
+              <div style="padding:0 12px 12px 12px;">
+                ${descHTML}
+                ${imageHTML}
+                ${costHTML}
+                ${notesHTML}
+              </div>
+            </details>
+          </li>`;
         }).join('');
+
+        if (activitiesHTML) {
+            activitiesHTML = `<ul style="margin:0;padding:0;">${activitiesHTML}</ul>`;
+        }
 
         daysHTML += `
   <div style="margin-bottom: 10px;"> <details ${day.isCollapsed ? '' : 'open'}>
       <summary style="display: flex; align-items: center; padding: 10px 8px; border-bottom: 1px solid #EEE; background-color: #fdfdfd; cursor: pointer;">
-        <h2 style="font-size: 14px; font-weight: 600; margin:0;">${ip_formatDate(day.date, dayIndex + 1)}</h2>
+        <div style="font-size:14px;line-height:1.4;font-weight:600;margin:0;">${ip_formatDate(day.date, dayIndex + 1)}</div>
       </summary>
       <div style="padding: 5px;"> <div style="padding-top: 0.5rem;">
           ${activitiesHTML || '<p style="font-size:12px;color:#777;">일정이 없습니다.</p>'}
@@ -1697,8 +1949,8 @@ function ip_generateInlineStyledHTML(itineraryData, options = {}) {
     // [수정] main 태그의 padding: 0 16px -> 0 으로 변경하여 전체 컨테이너 여백 제거
     return `
 <main style="max-width: 750px; margin: auto; padding: 0; font-family: 'Malgun Gothic', '맑은 고딕', sans-serif;">
-  <header style="padding-top: 15px;"> <h1 style="font-size: 24px; font-weight: bold;">${itineraryData.title}</h1>
-  </header>
+  ${hideTitleForCopy ? '' : `<header style="padding-top: 15px;"> <h1 style="font-size: 24px; font-weight: bold;">${itineraryData.title}</h1>
+  </header>`}
   ${daysHTML}
 </main>`;
 }
@@ -1843,6 +2095,27 @@ function showToastMessage(message, isError = false) {
     }, 3000);
 }
 
+function getAppBasePath() {
+    const pathname = window.location.pathname || '/';
+    const legacyMarker = '/public/legacy/quote/';
+    const legacyIndex = pathname.indexOf(legacyMarker);
+    if (legacyIndex >= 0) {
+        const prefix = pathname.slice(0, legacyIndex);
+        return prefix ? `${prefix}/` : '/';
+    }
+
+    if (window.location.hostname.endsWith('github.io')) {
+        const first = pathname.split('/').filter(Boolean)[0] || '';
+        if (first && !first.includes('.')) return `/${first}/`;
+    }
+    return '/';
+}
+
+function openGdsParserWindow() {
+    const gdsUrl = `${window.location.origin}${getAppBasePath()}gds_parser/gds_parser.html`;
+    window.open(gdsUrl, 'GDS_Parser', `width=800,height=500,top=${(screen.height / 2) - 250},left=${(screen.width / 2) - 400}`);
+}
+
 function syncGroupUIToData(groupId) {
     const quoteGroupsData = getCurrentQuoteGroups();
     if (!groupId || !quoteGroupsData[groupId]) return;
@@ -1855,6 +2128,17 @@ function syncGroupUIToData(groupId) {
         const calcId = instance.dataset.calculatorId;
         const calculatorData = groupData.calculators.find(c => c.id === calcId);
         if (!calculatorData) return;
+
+        const splitContainer = instance.querySelector('.split-container');
+        const pnrPane = splitContainer?.querySelector('.pnr-pane');
+        const quotePane = splitContainer?.querySelector('.quote-pane');
+        if (pnrPane && quotePane) {
+            const pnrWidth = parseFloat(pnrPane.style.width) || pnrPane.offsetWidth;
+            const quoteWidth = parseFloat(quotePane.style.width) || quotePane.offsetWidth;
+            if (pnrWidth > 0 && quoteWidth > 0) {
+                calculatorData.splitPane = { pnrWidth, quoteWidth };
+            }
+        }
 
         const pnrTextarea = instance.querySelector('.pnr-pane textarea');
         if (pnrTextarea) {
@@ -1940,11 +2224,20 @@ async function getSaveDataBlob() {
     if (activeGroupId) {
         syncGroupUIToData(activeGroupId);
     }
+    syncActiveMemoTabContentFromTextarea();
+    const currentSession = getCurrentSession();
+    const memoTabsForSave = currentSession?.memoTabs ? JSON.parse(JSON.stringify(currentSession.memoTabs)) : [];
+    const activeMemoTabIdForSave = currentSession?.activeMemoTabId || (memoTabsForSave[0]?.id || null);
+    const memoTextForSave = (typeof currentSession?.memoText === 'string')
+        ? currentSession.memoText
+        : (document.getElementById('memoText')?.value || '');
     const allData = {
         quoteGroupsData,
         groupCounter,
         activeGroupId,
-        memoText: document.getElementById('memoText').value,
+        memoText: memoTextForSave,
+        memoTabs: memoTabsForSave,
+        activeMemoTabId: activeMemoTabIdForSave,
         customerInfo: getCustomerData()
     };
     const doc = document.cloneNode(true);
@@ -2078,7 +2371,10 @@ async function loadFileInCurrentTab(fileHandle) {
                     currentSession.groupCounter = restoredData.groupCounter || 0;
                     currentSession.activeGroupId = restoredData.activeGroupId;
                     currentSession.memoText = restoredData.memoText || '';
+                    currentSession.memoTabs = Array.isArray(restoredData.memoTabs) ? JSON.parse(JSON.stringify(restoredData.memoTabs)) : [];
+                    currentSession.activeMemoTabId = restoredData.activeMemoTabId || null;
                     currentSession.customerInfo = restoredData.customerInfo || [];
+                    ensureMemoTabsForSession(currentSession, currentSession.memoText || '');
                     
                     // 전역 변수도 업데이트 (호환성을 위해)
                     quoteGroupsData = currentSession.quoteGroupsData;
@@ -2137,7 +2433,10 @@ async function loadFileInNewTab(fileHandle) {
                 session.groupCounter = restoredData.groupCounter || 0;
                 session.activeGroupId = restoredData.activeGroupId;
                 session.memoText = restoredData.memoText || '';
+                session.memoTabs = Array.isArray(restoredData.memoTabs) ? JSON.parse(JSON.stringify(restoredData.memoTabs)) : [];
+                session.activeMemoTabId = restoredData.activeMemoTabId || null;
                 session.customerInfo = restoredData.customerInfo || [];
+                ensureMemoTabsForSession(session, session.memoText || '');
                 
                 // 전역 변수도 업데이트 (호환성을 위해)
                 quoteGroupsData = session.quoteGroupsData;
@@ -2349,10 +2648,23 @@ async function loadAllSnippets() {
         return dataSets;
     } catch (error) { console.error("자주 쓰는 문자 목록 불러오기 오류:", error); showToastMessage("자주 쓰는 문자 목록을 불러오는 중 오류가 발생했습니다.", true); return []; }
 }
-function applyMemoData(snippet) {
+function applyMemoData(snippet, options = {}) {
+    const { openInNewTab = true } = options;
+    if (openInNewTab) {
+        addMemoTab({
+            title: snippet.name || '',
+            content: snippet.content || ''
+        });
+        showToastMessage(`'${snippet.name}' 메모가 새 탭으로 열렸습니다.`);
+        return;
+    }
+
     const memoTextarea = document.getElementById('memoText');
     if (!memoTextarea) return;
     memoTextarea.value = snippet.content || '';
+    syncActiveMemoTabContentFromTextarea();
+    renderMemoTabs();
+    updateCurrentSession();
     showToastMessage(`'${snippet.name}' 내용을 메모에 적용했습니다.`);
 }
 async function openLoadMemoModal() {
@@ -2367,8 +2679,7 @@ async function openLoadMemoModal() {
     const allSnippets = await loadAllSnippets();
     loadingMsg.style.display = 'none';
     const clickHandler = (item) => {
-        applyMemoData(item);
-        modal.classList.add('hidden');
+        applyMemoData(item, { openInNewTab: true });
     };
     renderFilteredList({ fullList: allSnippets, searchTerm: '', listElementId: 'memoList', clickHandler, itemTitleField: 'name' });
     searchInput.oninput = () => {
@@ -2395,7 +2706,7 @@ function addNewGroup() {
             currentHotelDocumentName: "새 호텔 정보 모음"
         },
         itineraryData: {
-            title: "새 여행 일정표",
+            title: "",
             editingTitle: false,
             days: [
                 { date: dateToYyyyMmDd(new Date()), activities: [], isCollapsed: false, editingDate: false }
@@ -2501,39 +2812,58 @@ function initializeGroup(groupEl, groupId) {
             </div> 
         </div> 
         <div class="xl:w-1/2 space-y-6 right-panel-container"> 
-            <section class="p-4 sm:p-6 border rounded-lg bg-gray-50/50">
+            <section class="p-4 sm:p-6 border rounded-lg bg-gray-50/50 accordion-section">
                 <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-base font-semibold">항공 스케줄</h2>
+                    <div class="flex items-center gap-2">
+                        <button type="button" class="accordion-toggle-btn" title="접기/펼치기" style="background:none;border:none;cursor:pointer;padding:2px 4px;font-size:12px;color:#6b7280;line-height:1;">▼</button>
+                        <h2 class="text-base font-semibold">요금 안내</h2>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <button type="button" class="btn btn-sm btn-outline copy-price-info-btn" title="HTML 복사"><i class="fas fa-clipboard"></i> 코드 복사</button>
+                        <button type="button" class="btn btn-sm btn-green add-price-subgroup-btn"><i class="fas fa-plus"></i> 추가</button>
+                    </div>
+                </div>
+                <div class="accordion-body">
+                    <div class="space-y-4 price-info-container"></div>
+                </div>
+            </section> 
+            <section class="p-4 sm:p-6 border rounded-lg bg-gray-50/50 accordion-section">
+                <div class="flex justify-between items-center mb-4">
+                    <div class="flex items-center gap-2">
+                        <button type="button" class="accordion-toggle-btn" title="접기/펼치기" style="background:none;border:none;cursor:pointer;padding:2px 4px;font-size:12px;color:#6b7280;line-height:1;">▼</button>
+                        <h2 class="text-base font-semibold">항공 스케줄</h2>
+                    </div>
                     <div class="flex items-center space-x-2">
                         <button type="button" class="btn btn-sm btn-outline copy-flight-schedule-btn" title="HTML 복사"><i class="fas fa-clipboard"></i> 코드 복사</button>
                         <button type="button" class="btn btn-sm btn-green parse-gds-btn">GDS 파싱</button>
                         <button type="button" class="btn btn-sm btn-outline add-flight-subgroup-btn"><i class="fas fa-plus"></i> 추가</button>
                     </div>
                 </div>
-                <div class="space-y-4 flight-schedule-container"></div>
-            </section> 
-            <section class="p-4 sm:p-6 border rounded-lg bg-gray-50/50">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-base font-semibold">요금 안내</h2>
-                    <div class="flex items-center space-x-2">
-                        <button type="button" class="btn btn-sm btn-outline copy-price-info-btn" title="HTML 복사"><i class="fas fa-clipboard"></i> 코드 복사</button>
-                        <button type="button" class="btn btn-sm btn-green add-price-subgroup-btn"><i class="fas fa-plus"></i> 추가</button>
-                    </div>
+                <div class="accordion-body">
+                    <div class="space-y-4 flight-schedule-container"></div>
                 </div>
-                <div class="space-y-4 price-info-container"></div>
             </section> 
-            <section class="p-4 sm:p-6 border rounded-lg bg-gray-50/50">
+            <section class="p-4 sm:p-6 border rounded-lg bg-gray-50/50 accordion-section">
                 <div class="flex justify-between items-center mb-4">
-                    <div class="flex items-center"><h2 class="text-base font-semibold">포함/불포함</h2><span class="text-sm text-gray-500 ml-2 inclusion-exclusion-doc-name-display"></span></div>
+                    <div class="flex items-center gap-2">
+                        <button type="button" class="accordion-toggle-btn" title="접기/펼치기" style="background:none;border:none;cursor:pointer;padding:2px 4px;font-size:12px;color:#6b7280;line-height:1;">▼</button>
+                        <div class="flex items-center"><h2 class="text-base font-semibold">포함/불포함</h2><span class="text-sm text-gray-500 ml-2 inclusion-exclusion-doc-name-display"></span></div>
+                    </div>
                     <button type="button" class="btn btn-sm btn-green load-inclusion-exclusion-db-btn"><i class="fas fa-database mr-1"></i> DB 불러오기</button>
                 </div>
-                <div class="flex flex-col sm:flex-row gap-4">
-                    <div class="w-full sm:w-1/2"><div class="flex items-center mb-1"><h3 class="font-medium">포함</h3><button type="button" class="ml-2 copy-inclusion-btn inline-copy-btn" title="포함 내역 복사"><i class="far fa-copy"></i></button></div><textarea class="w-full flex-grow px-3 py-2 border rounded-md shadow-sm inclusion-text" rows="5" title="클릭하여 수정 가능"></textarea></div>
-                    <div class="w-full sm:w-1/2"><div class="flex items-center mb-1"><h3 class="font-medium">불포함</h3><button type="button" class="ml-2 copy-exclusion-btn inline-copy-btn" title="불포함 내역 복사"><i class="far fa-copy"></i></button></div><textarea class="w-full flex-grow px-3 py-2 border rounded-md shadow-sm exclusion-text" rows="5" title="클릭하여 수정 가능"></textarea></div>
+                <div class="accordion-body">
+                    <div class="flex flex-col sm:flex-row gap-4">
+                        <div class="w-full sm:w-1/2"><div class="flex items-center mb-1"><h3 class="font-medium">포함</h3><button type="button" class="ml-2 copy-inclusion-btn inline-copy-btn" title="포함 내역 복사"><i class="far fa-copy"></i></button></div><textarea class="w-full flex-grow px-3 py-2 border rounded-md shadow-sm inclusion-text" rows="5" title="클릭하여 수정 가능"></textarea></div>
+                        <div class="w-full sm:w-1/2"><div class="flex items-center mb-1"><h3 class="font-medium">불포함</h3><button type="button" class="ml-2 copy-exclusion-btn inline-copy-btn" title="불포함 내역 복사"><i class="far fa-copy"></i></button></div><textarea class="w-full flex-grow px-3 py-2 border rounded-md shadow-sm exclusion-text" rows="5" title="클릭하여 수정 가능"></textarea></div>
+                    </div>
                 </div>
             </section> 
-            <section class="p-4 sm:p-6 border rounded-lg bg-gray-50/50"><h2 class="text-base font-semibold mb-4">호텔카드 메이커</h2><div id="hotel-maker-container-${groupId}"></div></section> 
-            <section class="p-4 sm:p-6 border rounded-lg bg-gray-50/50"><div id="itinerary-planner-container-${groupId}"></div></section> 
+            <section class="p-4 sm:p-6 border rounded-lg bg-gray-50/50 accordion-section">
+                <div id="itinerary-planner-container-${groupId}"></div>
+            </section> 
+            <section class="p-4 sm:p-6 border rounded-lg bg-gray-50/50 accordion-section">
+                <div id="hotel-maker-container-${groupId}"></div>
+            </section> 
         </div> 
     </div>`;
 
@@ -2580,7 +2910,7 @@ function initializeGroup(groupEl, groupId) {
     }
 }
 
-function buildCalculatorDOM(calcContainer) {
+function buildCalculatorDOM(calcContainer, calcData = null) {
     const content = document.createElement('div');
     content.innerHTML = `<div class="split-container"><div class="pnr-pane"><label class="label-text font-semibold mb-2"><span class="pnr-title-span" title="더블클릭하여 수정 가능">PNR 정보</span></label><textarea class="w-full flex-grow px-3 py-2 border rounded-md shadow-sm" placeholder="PNR 정보를 여기에 붙여넣으세요."></textarea></div><div class="resizer-handle"></div><div class="quote-pane"><div class="table-container"><table class="quote-table"><thead><tr class="header-row"><th><button type="button" class="btn btn-sm btn-primary add-person-type-btn"><i class="fas fa-plus"></i></button></th></tr><tr class="count-row"><th></th></tr></thead><tbody></tbody><tfoot></tfoot></table></div></div></div>`;
     const calculatorElement = content.firstElementChild;
@@ -2637,7 +2967,7 @@ function createCalculatorInstance(wrapper, groupId, calcData) {
     
     instanceContainer.appendChild(headerDiv);
     wrapper.appendChild(instanceContainer);
-    buildCalculatorDOM(instanceContainer);
+    buildCalculatorDOM(instanceContainer, calcData);
 
     if (calcData && calcData.tableHTML) {
         restoreCalculatorState(instanceContainer, calcData);
@@ -2645,7 +2975,35 @@ function createCalculatorInstance(wrapper, groupId, calcData) {
         addPersonTypeColumn(instanceContainer, '성인', 1);
     }
     
+    if (calcData && calcData.splitPane) {
+        setTimeout(() => applySavedSplitPaneWidths(instanceContainer, calcData.splitPane), 0);
+    }
+
     calculateAll(instanceContainer);
+}
+
+function applySavedSplitPaneWidths(instanceContainer, splitPane) {
+    if (!instanceContainer || !splitPane) return;
+    const splitContainer = instanceContainer.querySelector('.split-container');
+    const pnrPane = splitContainer?.querySelector('.pnr-pane');
+    const quotePane = splitContainer?.querySelector('.quote-pane');
+    const resizer = splitContainer?.querySelector('.resizer-handle');
+    if (!splitContainer || !pnrPane || !quotePane || !resizer) return;
+
+    const containerWidth = splitContainer.offsetWidth;
+    const resizerWidth = resizer.offsetWidth || 5;
+    const minPnrWidth = 150;
+    const minQuoteWidth = 280;
+    const savedQuoteWidth = Number(splitPane.quoteWidth);
+    if (!Number.isFinite(savedQuoteWidth)) return;
+
+    const maxQuoteWidth = containerWidth - minPnrWidth - resizerWidth;
+    const quoteWidth = Math.max(minQuoteWidth, Math.min(savedQuoteWidth, maxQuoteWidth));
+    const pnrWidth = containerWidth - quoteWidth - resizerWidth;
+    if (pnrWidth < minPnrWidth) return;
+
+    pnrPane.style.width = `${pnrWidth}px`;
+    quotePane.style.width = `${quoteWidth}px`;
 }
 
 function restoreCalculatorState(instanceContainer, calcData) {
@@ -3039,7 +3397,7 @@ function restoreState(data) {
         }
         if (!group.itineraryData) {
              group.itineraryData = {
-                title: "새 여행 일정표",
+                title: "",
                 editingTitle: false,
                 days: [{ date: dateToYyyyMmDd(new Date()), activities: [], isCollapsed: false, editingDate: false }]
             };
@@ -3047,7 +3405,17 @@ function restoreState(data) {
     });
 
     groupCounter = data.groupCounter || 0;
-    document.getElementById('memoText').value = data.memoText || '';
+    const currentSession = getCurrentSession();
+    if (currentSession) {
+        currentSession.memoText = data.memoText || '';
+        currentSession.memoTabs = Array.isArray(data.memoTabs) ? JSON.parse(JSON.stringify(data.memoTabs)) : [];
+        currentSession.activeMemoTabId = data.activeMemoTabId || null;
+        ensureMemoTabsForSession(currentSession, currentSession.memoText || '');
+    } else {
+        const memoTextarea = document.getElementById('memoText');
+        if (memoTextarea) memoTextarea.value = data.memoText || '';
+    }
+    renderMemoTabs();
     
     if (data.customerInfo && data.customerInfo.length > 0) { data.customerInfo.forEach(customer => createCustomerCard(customer)); }
     else { createCustomerCard(); }
@@ -3073,7 +3441,21 @@ function initializeNewSession() {
     }
     
     // 기존 초기화 로직
-    document.getElementById('memoText').value = '지원어려울시 업셀링 요청';
+    const currentSession = getCurrentSession();
+    if (currentSession) {
+        currentSession.memoText = DEFAULT_MEMO_TEXT;
+        currentSession.memoTabs = [{
+            id: createMemoTabId(),
+            title: '메모 1',
+            content: DEFAULT_MEMO_TEXT
+        }];
+        currentSession.activeMemoTabId = currentSession.memoTabs[0].id;
+        ensureMemoTabsForSession(currentSession, DEFAULT_MEMO_TEXT);
+    } else {
+        const memoTextarea = document.getElementById('memoText');
+        if (memoTextarea) memoTextarea.value = DEFAULT_MEMO_TEXT;
+    }
+    renderMemoTabs();
     
     // 현재 세션 업데이트
     updateCurrentSession();
@@ -3166,7 +3548,9 @@ function setupEventListeners() {
             const groupData = quoteGroupsData[groupId];
             const newCalcData = { id: `calc_${Date.now()}`, pnr: '', tableHTML: null, pnrTitle: 'PNR 정보' };
             groupData.calculators.push(newCalcData);
-            renderCalculators(groupId);
+            const calculatorsWrapper = document.getElementById(`calculators-wrapper-${groupId}`);
+            if (calculatorsWrapper) createCalculatorInstance(calculatorsWrapper, groupId, newCalcData);
+            else renderCalculators(groupId);
         } else if (button.classList.contains('copy-last-calculator-btn')) {
              const groupData = quoteGroupsData[groupId];
             if (!groupData || groupData.calculators.length === 0) { showToastMessage('복사할 견적 계산이 없습니다.', true); return; }
@@ -3219,7 +3603,7 @@ function setupEventListeners() {
                  hm_switchTab(groupId, parseInt(button.dataset.index));
             }
         } else if (button.classList.contains('parse-gds-btn')) {
-            window.open('./gds_parser/gds_parser.html', 'GDS_Parser', `width=800,height=500,top=${(screen.height / 2) - 250},left=${(screen.width / 2) - 400}`);
+            openGdsParserWindow();
         } else if (button.classList.contains('copy-flight-schedule-btn')) {
             copyHtmlToClipboard(generateFlightScheduleInlineHtml(quoteGroupsData[groupId].flightSchedule));
         } else if (button.classList.contains('copy-price-info-btn')) {
@@ -3291,10 +3675,28 @@ function setupEventListeners() {
             if (section.classList.contains('price-subgroup')) {
                 updateGrandTotal(section, groupId);
             }
+        } else if (button.classList.contains('accordion-toggle-btn')) {
+            const section = button.closest('.accordion-section');
+            const body = section.querySelector('.accordion-body');
+            if (body) {
+                const isHidden = body.style.display === 'none';
+                body.style.display = isHidden ? '' : 'none';
+                button.textContent = isHidden ? '▼' : '▶';
+            }
         } else if (button.classList.contains('day-toggle-button')) {
              ip_handleToggleDayCollapse(event, button.closest('.ip-day-section').dataset.dayId.split('-')[1], groupId);
         }
-        else if(button.id.startsWith('ip-')) {
+        else if (
+            button.id.startsWith('ip-') ||
+            button.classList.contains('add-activity-button') ||
+            button.classList.contains('edit-activity-button') ||
+            button.classList.contains('duplicate-activity-button') ||
+            button.classList.contains('delete-activity-button') ||
+            button.classList.contains('edit-date-button') ||
+            button.classList.contains('save-date-button') ||
+            button.classList.contains('cancel-date-edit-button') ||
+            button.classList.contains('delete-day-button')
+        ) {
             if (button.id.includes('loadFromDBBtn')) ip_openLoadTripModal(groupId);
             else if (button.id.includes('copyInlineHtmlButton')) ip_handleCopyInlineHtml(groupId);
             else if (button.id.includes('inlinePreviewButton')) ip_handleInlinePreview(groupId);
