@@ -1924,7 +1924,7 @@ function ip_generateInlineStyledHTML(itineraryData, options = {}) {
             if (hasExtraDetails) {
                 return `
           <li style="list-style:none;margin-bottom:8px;border:1px solid #E0E0E0;border-radius:8px;background:#fff;">
-            <details open>
+            <details>
               <summary style="cursor:pointer;padding:10px 12px;display:flex;align-items:center;gap:8px;">
                 ${summaryInnerHTML}
                 <span style="font-size:16px;color:#64748b;line-height:1;">⌄</span>
