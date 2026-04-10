@@ -819,9 +819,13 @@ function rebindWorkspaceEventListeners() {
                     const pnrTextarea = pnrPane.querySelector('textarea');
                     const resizer = splitContainer.querySelector('.resizer-handle');
                     const quotePane = splitContainer.querySelector('.quote-pane');
+                    const pnrTitleSpan = pnrPane.querySelector('.pnr-title-span');
+                    const pnrLabel = pnrPane.querySelector('label');
                     const isCollapsed = pnrTextarea.style.display === 'none';
                     if (isCollapsed) {
                         pnrTextarea.style.display = '';
+                        if (pnrTitleSpan) pnrTitleSpan.style.display = '';
+                        if (pnrLabel) pnrLabel.style.marginBottom = '';
                         pnrPane.style.flexGrow = '';
                         pnrPane.style.flexShrink = '';
                         pnrPane.style.minWidth = '';
@@ -837,6 +841,8 @@ function rebindWorkspaceEventListeners() {
                         button.dataset.savedPnrWidth = pnrPane.style.width || pnrPane.offsetWidth + 'px';
                         button.dataset.savedQuoteWidth = quotePane.style.width || quotePane.offsetWidth + 'px';
                         pnrTextarea.style.display = 'none';
+                        if (pnrTitleSpan) pnrTitleSpan.style.display = 'none';
+                        if (pnrLabel) pnrLabel.style.marginBottom = '0';
                         pnrPane.style.width = 'auto';
                         pnrPane.style.flexGrow = '0';
                         pnrPane.style.flexShrink = '0';
@@ -3357,10 +3363,14 @@ function restoreCalculatorState(instanceContainer, calcData) {
         const resizer = splitContainer?.querySelector('.resizer-handle');
         const quotePane = splitContainer?.querySelector('.quote-pane');
         const toggleBtn = splitContainer?.querySelector('.pnr-toggle-btn');
+        const pnrTitleSpan = pnrPane?.querySelector('.pnr-title-span');
+        const pnrLabel = pnrPane?.querySelector('label');
         if (pnrPane && pnrTextarea && resizer && quotePane && toggleBtn) {
             toggleBtn.dataset.savedPnrWidth = pnrPane.style.width || '';
             toggleBtn.dataset.savedQuoteWidth = quotePane.style.width || '';
             pnrTextarea.style.display = 'none';
+            if (pnrTitleSpan) pnrTitleSpan.style.display = 'none';
+            if (pnrLabel) pnrLabel.style.marginBottom = '0';
             pnrPane.style.width = 'auto';
             pnrPane.style.flexGrow = '0';
             pnrPane.style.flexShrink = '0';
@@ -4075,11 +4085,15 @@ function setupEventListeners() {
             const splitContainer = button.closest('.split-container');
             const pnrPane = splitContainer.querySelector('.pnr-pane');
             const pnrTextarea = pnrPane.querySelector('textarea');
+            const pnrTitleSpan = pnrPane.querySelector('.pnr-title-span');
+            const pnrLabel = pnrPane.querySelector('label');
             const resizer = splitContainer.querySelector('.resizer-handle');
             const quotePane = splitContainer.querySelector('.quote-pane');
             const isCollapsed = pnrTextarea.style.display === 'none';
             if (isCollapsed) {
                 pnrTextarea.style.display = '';
+                if (pnrTitleSpan) pnrTitleSpan.style.display = '';
+                if (pnrLabel) pnrLabel.style.marginBottom = '';
                 pnrPane.style.flexGrow = '';
                 pnrPane.style.flexShrink = '';
                 pnrPane.style.minWidth = '';
@@ -4095,6 +4109,8 @@ function setupEventListeners() {
                 button.dataset.savedPnrWidth = pnrPane.style.width || pnrPane.offsetWidth + 'px';
                 button.dataset.savedQuoteWidth = quotePane.style.width || quotePane.offsetWidth + 'px';
                 pnrTextarea.style.display = 'none';
+                if (pnrTitleSpan) pnrTitleSpan.style.display = 'none';
+                if (pnrLabel) pnrLabel.style.marginBottom = '0';
                 pnrPane.style.width = 'auto';
                 pnrPane.style.flexGrow = '0';
                 pnrPane.style.flexShrink = '0';
