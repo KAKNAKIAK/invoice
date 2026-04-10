@@ -814,12 +814,24 @@ function rebindWorkspaceEventListeners() {
                         button.textContent = isHidden ? '▼' : '▶';
                     }
                 } else if (button.classList.contains('pnr-toggle-btn')) {
-                    const pnrPane = button.closest('.pnr-pane');
-                    const textarea = pnrPane?.querySelector('textarea');
-                    if (textarea) {
-                        const isCollapsed = textarea.style.display === 'none';
-                        textarea.style.display = isCollapsed ? '' : 'none';
-                        button.textContent = isCollapsed ? '\u25bc' : '\u25b6';
+                    const splitContainer = button.closest('.split-container');
+                    const pnrPane = splitContainer.querySelector('.pnr-pane');
+                    const resizer = splitContainer.querySelector('.resizer-handle');
+                    const quotePane = splitContainer.querySelector('.quote-pane');
+                    const isCollapsed = pnrPane.style.display === 'none';
+                    if (isCollapsed) {
+                        pnrPane.style.display = '';
+                        resizer.style.display = '';
+                        if (button.dataset.savedPnrWidth) pnrPane.style.width = button.dataset.savedPnrWidth;
+                        if (button.dataset.savedQuoteWidth) quotePane.style.width = button.dataset.savedQuoteWidth;
+                        button.textContent = '\u25c0';
+                    } else {
+                        button.dataset.savedPnrWidth = pnrPane.style.width || pnrPane.offsetWidth + 'px';
+                        button.dataset.savedQuoteWidth = quotePane.style.width || quotePane.offsetWidth + 'px';
+                        pnrPane.style.display = 'none';
+                        resizer.style.display = 'none';
+                        quotePane.style.width = '100%';
+                        button.textContent = '\u25b6';
                     }
                 } else if (button.classList.contains('day-toggle-button')) {
                      ip_handleToggleDayCollapse(event, button.closest('.ip-day-section').dataset.dayId.split('-')[1], groupId);
@@ -2167,7 +2179,8 @@ function syncGroupUIToData(groupId) {
         const pnrTextarea = instance.querySelector('.pnr-pane textarea');
         if (pnrTextarea) {
             calculatorData.pnr = pnrTextarea.value;
-            calculatorData.pnrCollapsed = pnrTextarea.style.display === 'none';
+            const pnrPane = instance.querySelector('.pnr-pane');
+            calculatorData.pnrCollapsed = pnrPane ? pnrPane.style.display === 'none' : false;
         }
 
         const table = instance.querySelector('.quote-table');
@@ -2937,7 +2950,7 @@ function initializeGroup(groupEl, groupId) {
 
 function buildCalculatorDOM(calcContainer, calcData = null) {
     const content = document.createElement('div');
-    content.innerHTML = `<div class="split-container"><div class="pnr-pane"><label class="label-text font-semibold mb-2"><button type="button" class="pnr-toggle-btn" title="접기/펼치기" style="background:none;border:none;cursor:pointer;padding:2px 4px;font-size:12px;color:#6b7280;line-height:1;margin-right:4px;">▼</button><span class="pnr-title-span" title="더블클릭하여 수정 가능">PNR 정보</span></label><textarea class="w-full flex-grow px-3 py-2 border rounded-md shadow-sm" placeholder="PNR 정보를 여기에 붙여넣으세요."></textarea></div><div class="resizer-handle"></div><div class="quote-pane"><div class="table-container"><table class="quote-table"><thead><tr class="header-row"><th><button type="button" class="btn btn-sm btn-primary add-person-type-btn"><i class="fas fa-plus"></i></button></th></tr><tr class="count-row"><th></th></tr></thead><tbody></tbody><tfoot></tfoot></table></div></div></div>`;
+    content.innerHTML = `<div class="split-container"><button type="button" class="pnr-toggle-btn" title="PNR 접기/펼치기" style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:4px;cursor:pointer;padding:2px 3px;font-size:11px;color:#6b7280;line-height:1;flex-shrink:0;align-self:stretch;display:flex;align-items:center;">\u25c0</button><div class="pnr-pane"><label class="label-text font-semibold mb-2"><span class="pnr-title-span" title="더블클릭하여 수정 가능">PNR 정보</span></label><textarea class="w-full flex-grow px-3 py-2 border rounded-md shadow-sm" placeholder="PNR 정보를 여기에 붙여넣으세요."></textarea></div><div class="resizer-handle"></div><div class="quote-pane"><div class="table-container"><table class="quote-table"><thead><tr class="header-row"><th><button type="button" class="btn btn-sm btn-primary add-person-type-btn"><i class="fas fa-plus"></i></button></th></tr><tr class="count-row"><th></th></tr></thead><tbody></tbody><tfoot></tfoot></table></div></div></div>`;
     const calculatorElement = content.firstElementChild;
     calcContainer.appendChild(calculatorElement);
 
@@ -3036,10 +3049,20 @@ function restoreCalculatorState(instanceContainer, calcData) {
     const pnrTextarea = instanceContainer.querySelector('.pnr-pane textarea');
     if (pnrTextarea) {
         pnrTextarea.value = calcData.pnr || '';
-        if (calcData.pnrCollapsed) {
-            pnrTextarea.style.display = 'none';
-            const toggleBtn = instanceContainer.querySelector('.pnr-toggle-btn');
-            if (toggleBtn) toggleBtn.textContent = '\u25b6';
+    }
+    if (calcData.pnrCollapsed) {
+        const splitContainer = instanceContainer.querySelector('.split-container');
+        const pnrPane = splitContainer?.querySelector('.pnr-pane');
+        const resizer = splitContainer?.querySelector('.resizer-handle');
+        const quotePane = splitContainer?.querySelector('.quote-pane');
+        const toggleBtn = splitContainer?.querySelector('.pnr-toggle-btn');
+        if (pnrPane && resizer && quotePane && toggleBtn) {
+            toggleBtn.dataset.savedPnrWidth = pnrPane.style.width || '';
+            toggleBtn.dataset.savedQuoteWidth = quotePane.style.width || '';
+            pnrPane.style.display = 'none';
+            resizer.style.display = 'none';
+            quotePane.style.width = '100%';
+            toggleBtn.textContent = '\u25b6';
         }
     }
     
@@ -3716,12 +3739,24 @@ function setupEventListeners() {
                 button.textContent = isHidden ? '▼' : '▶';
             }
         } else if (button.classList.contains('pnr-toggle-btn')) {
-            const pnrPane = button.closest('.pnr-pane');
-            const textarea = pnrPane?.querySelector('textarea');
-            if (textarea) {
-                const isCollapsed = textarea.style.display === 'none';
-                textarea.style.display = isCollapsed ? '' : 'none';
-                button.textContent = isCollapsed ? '\u25bc' : '\u25b6';
+            const splitContainer = button.closest('.split-container');
+            const pnrPane = splitContainer.querySelector('.pnr-pane');
+            const resizer = splitContainer.querySelector('.resizer-handle');
+            const quotePane = splitContainer.querySelector('.quote-pane');
+            const isCollapsed = pnrPane.style.display === 'none';
+            if (isCollapsed) {
+                pnrPane.style.display = '';
+                resizer.style.display = '';
+                if (button.dataset.savedPnrWidth) pnrPane.style.width = button.dataset.savedPnrWidth;
+                if (button.dataset.savedQuoteWidth) quotePane.style.width = button.dataset.savedQuoteWidth;
+                button.textContent = '\u25c0';
+            } else {
+                button.dataset.savedPnrWidth = pnrPane.style.width || pnrPane.offsetWidth + 'px';
+                button.dataset.savedQuoteWidth = quotePane.style.width || quotePane.offsetWidth + 'px';
+                pnrPane.style.display = 'none';
+                resizer.style.display = 'none';
+                quotePane.style.width = '100%';
+                button.textContent = '\u25b6';
             }
         } else if (button.classList.contains('day-toggle-button')) {
              ip_handleToggleDayCollapse(event, button.closest('.ip-day-section').dataset.dayId.split('-')[1], groupId);
