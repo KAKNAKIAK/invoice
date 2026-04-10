@@ -828,6 +828,8 @@ function rebindWorkspaceEventListeners() {
                         pnrPane.style.paddingRight = '';
                         pnrPane.classList.remove('pnr-collapsed');
                         resizer.style.display = '';
+                        quotePane.style.flex = '';
+                        quotePane.style.minWidth = '';
                         if (button.dataset.savedPnrWidth) pnrPane.style.width = button.dataset.savedPnrWidth;
                         if (button.dataset.savedQuoteWidth) quotePane.style.width = button.dataset.savedQuoteWidth;
                         button.textContent = '\u25c0';
@@ -842,7 +844,9 @@ function rebindWorkspaceEventListeners() {
                         pnrPane.style.paddingRight = '0.5rem';
                         pnrPane.classList.add('pnr-collapsed');
                         resizer.style.display = 'none';
-                        quotePane.style.width = '100%';
+                        quotePane.style.width = '';
+                        quotePane.style.flex = '1';
+                        quotePane.style.minWidth = '0';
                         button.textContent = '\u25b6';
                     }
                 } else if (button.classList.contains('day-toggle-button')) {
@@ -3364,7 +3368,9 @@ function restoreCalculatorState(instanceContainer, calcData) {
             pnrPane.style.paddingRight = '0.5rem';
             pnrPane.classList.add('pnr-collapsed');
             resizer.style.display = 'none';
-            quotePane.style.width = '100%';
+            quotePane.style.width = '';
+            quotePane.style.flex = '1';
+            quotePane.style.minWidth = '0';
             toggleBtn.textContent = '\u25b6';
         }
     }
@@ -4080,6 +4086,8 @@ function setupEventListeners() {
                 pnrPane.style.paddingRight = '';
                 pnrPane.classList.remove('pnr-collapsed');
                 resizer.style.display = '';
+                quotePane.style.flex = '';
+                quotePane.style.minWidth = '';
                 if (button.dataset.savedPnrWidth) pnrPane.style.width = button.dataset.savedPnrWidth;
                 if (button.dataset.savedQuoteWidth) quotePane.style.width = button.dataset.savedQuoteWidth;
                 button.textContent = '\u25c0';
@@ -4094,7 +4102,9 @@ function setupEventListeners() {
                 pnrPane.style.paddingRight = '0.5rem';
                 pnrPane.classList.add('pnr-collapsed');
                 resizer.style.display = 'none';
-                quotePane.style.width = '100%';
+                quotePane.style.width = '';
+                quotePane.style.flex = '1';
+                quotePane.style.minWidth = '0';
                 button.textContent = '\u25b6';
             }
         } else if (button.classList.contains('day-toggle-button')) {
