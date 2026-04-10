@@ -364,6 +364,15 @@ body {
     user-select: none;
 }
 .ip-activity-details > summary::-webkit-details-marker { display: none; }
+.ip-activity-summary-static {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.62rem;
+    user-select: none;
+    cursor: grab;
+}
+.ip-activity-summary-static:active { cursor: grabbing; }
 .ip-activity-summary .card-icon {
     min-width: 1rem;
     font-size: 1rem;
