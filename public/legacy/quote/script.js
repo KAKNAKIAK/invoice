@@ -816,11 +816,14 @@ function rebindWorkspaceEventListeners() {
                 } else if (button.classList.contains('pnr-toggle-btn')) {
                     const splitContainer = button.closest('.split-container');
                     const pnrPane = splitContainer.querySelector('.pnr-pane');
+                    const pnrTextarea = pnrPane.querySelector('textarea');
                     const resizer = splitContainer.querySelector('.resizer-handle');
                     const quotePane = splitContainer.querySelector('.quote-pane');
-                    const isCollapsed = pnrPane.style.display === 'none';
+                    const isCollapsed = pnrTextarea.style.display === 'none';
                     if (isCollapsed) {
-                        pnrPane.style.display = '';
+                        pnrTextarea.style.display = '';
+                        pnrPane.style.flexGrow = '';
+                        pnrPane.style.paddingRight = '';
                         resizer.style.display = '';
                         if (button.dataset.savedPnrWidth) pnrPane.style.width = button.dataset.savedPnrWidth;
                         if (button.dataset.savedQuoteWidth) quotePane.style.width = button.dataset.savedQuoteWidth;
@@ -828,7 +831,10 @@ function rebindWorkspaceEventListeners() {
                     } else {
                         button.dataset.savedPnrWidth = pnrPane.style.width || pnrPane.offsetWidth + 'px';
                         button.dataset.savedQuoteWidth = quotePane.style.width || quotePane.offsetWidth + 'px';
-                        pnrPane.style.display = 'none';
+                        pnrTextarea.style.display = 'none';
+                        pnrPane.style.width = 'auto';
+                        pnrPane.style.flexGrow = '0';
+                        pnrPane.style.paddingRight = '0.5rem';
                         resizer.style.display = 'none';
                         quotePane.style.width = '100%';
                         button.textContent = '\u25b6';
@@ -2462,7 +2468,7 @@ function syncGroupUIToData(groupId) {
         if (pnrTextarea) {
             calculatorData.pnr = pnrTextarea.value;
             const pnrPane = instance.querySelector('.pnr-pane');
-            calculatorData.pnrCollapsed = pnrPane ? pnrPane.style.display === 'none' : false;
+            calculatorData.pnrCollapsed = pnrTextarea ? pnrTextarea.style.display === 'none' : false;
         }
 
         const table = instance.querySelector('.quote-table');
@@ -3234,7 +3240,7 @@ function initializeGroup(groupEl, groupId) {
 
 function buildCalculatorDOM(calcContainer, calcData = null) {
     const content = document.createElement('div');
-    content.innerHTML = `<div class="split-container"><button type="button" class="pnr-toggle-btn" title="PNR 접기/펼치기" style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:4px;cursor:pointer;padding:2px 3px;font-size:11px;color:#6b7280;line-height:1;flex-shrink:0;align-self:stretch;display:flex;align-items:center;">\u25c0</button><div class="pnr-pane"><label class="label-text font-semibold mb-2"><span class="pnr-title-span" title="더블클릭하여 수정 가능">PNR 정보</span></label><textarea class="w-full flex-grow px-3 py-2 border rounded-md shadow-sm" placeholder="PNR 정보를 여기에 붙여넣으세요."></textarea></div><div class="resizer-handle"></div><div class="quote-pane"><div class="table-container"><table class="quote-table"><thead><tr class="header-row"><th><button type="button" class="btn btn-sm btn-primary add-person-type-btn"><i class="fas fa-plus"></i></button></th></tr><tr class="count-row"><th></th></tr></thead><tbody></tbody><tfoot></tfoot></table></div></div></div>`;
+    content.innerHTML = `<div class="split-container"><div class="pnr-pane"><label class="label-text font-semibold mb-2" style="display:flex;align-items:center;gap:6px;"><span class="pnr-title-span" title="더블클릭하여 수정 가능">PNR 정보</span><button type="button" class="pnr-toggle-btn" title="PNR 접기/펼치기" style="background:#f1f5f9;border:1px solid #d1d5db;border-radius:4px;cursor:pointer;padding:1px 5px;font-size:10px;color:#6b7280;line-height:1.2;flex-shrink:0;">\u25c0</button></label><textarea class="w-full flex-grow px-3 py-2 border rounded-md shadow-sm" placeholder="PNR 정보를 여기에 붙여넣으세요."></textarea></div><div class="resizer-handle"></div><div class="quote-pane"><div class="table-container"><table class="quote-table"><thead><tr class="header-row"><th><button type="button" class="btn btn-sm btn-primary add-person-type-btn"><i class="fas fa-plus"></i></button></th></tr><tr class="count-row"><th></th></tr></thead><tbody></tbody><tfoot></tfoot></table></div></div></div>`;
     const calculatorElement = content.firstElementChild;
     calcContainer.appendChild(calculatorElement);
 
@@ -3337,13 +3343,17 @@ function restoreCalculatorState(instanceContainer, calcData) {
     if (calcData.pnrCollapsed) {
         const splitContainer = instanceContainer.querySelector('.split-container');
         const pnrPane = splitContainer?.querySelector('.pnr-pane');
+        const pnrTextarea = pnrPane?.querySelector('textarea');
         const resizer = splitContainer?.querySelector('.resizer-handle');
         const quotePane = splitContainer?.querySelector('.quote-pane');
         const toggleBtn = splitContainer?.querySelector('.pnr-toggle-btn');
-        if (pnrPane && resizer && quotePane && toggleBtn) {
+        if (pnrPane && pnrTextarea && resizer && quotePane && toggleBtn) {
             toggleBtn.dataset.savedPnrWidth = pnrPane.style.width || '';
             toggleBtn.dataset.savedQuoteWidth = quotePane.style.width || '';
-            pnrPane.style.display = 'none';
+            pnrTextarea.style.display = 'none';
+            pnrPane.style.width = 'auto';
+            pnrPane.style.flexGrow = '0';
+            pnrPane.style.paddingRight = '0.5rem';
             resizer.style.display = 'none';
             quotePane.style.width = '100%';
             toggleBtn.textContent = '\u25b6';
@@ -4049,11 +4059,14 @@ function setupEventListeners() {
         } else if (button.classList.contains('pnr-toggle-btn')) {
             const splitContainer = button.closest('.split-container');
             const pnrPane = splitContainer.querySelector('.pnr-pane');
+            const pnrTextarea = pnrPane.querySelector('textarea');
             const resizer = splitContainer.querySelector('.resizer-handle');
             const quotePane = splitContainer.querySelector('.quote-pane');
-            const isCollapsed = pnrPane.style.display === 'none';
+            const isCollapsed = pnrTextarea.style.display === 'none';
             if (isCollapsed) {
-                pnrPane.style.display = '';
+                pnrTextarea.style.display = '';
+                pnrPane.style.flexGrow = '';
+                pnrPane.style.paddingRight = '';
                 resizer.style.display = '';
                 if (button.dataset.savedPnrWidth) pnrPane.style.width = button.dataset.savedPnrWidth;
                 if (button.dataset.savedQuoteWidth) quotePane.style.width = button.dataset.savedQuoteWidth;
@@ -4061,7 +4074,10 @@ function setupEventListeners() {
             } else {
                 button.dataset.savedPnrWidth = pnrPane.style.width || pnrPane.offsetWidth + 'px';
                 button.dataset.savedQuoteWidth = quotePane.style.width || quotePane.offsetWidth + 'px';
-                pnrPane.style.display = 'none';
+                pnrTextarea.style.display = 'none';
+                pnrPane.style.width = 'auto';
+                pnrPane.style.flexGrow = '0';
+                pnrPane.style.paddingRight = '0.5rem';
                 resizer.style.display = 'none';
                 quotePane.style.width = '100%';
                 button.textContent = '\u25b6';
