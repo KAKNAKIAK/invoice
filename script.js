@@ -1,4 +1,4 @@
-﻿
+
 // =======================================================================
 // 1. 전역 변수 및 설정
 // =======================================================================
@@ -812,6 +812,14 @@ function rebindWorkspaceEventListeners() {
                         const isHidden = body.style.display === 'none';
                         body.style.display = isHidden ? '' : 'none';
                         button.textContent = isHidden ? '▼' : '▶';
+                    }
+                } else if (button.classList.contains('pnr-toggle-btn')) {
+                    const pnrPane = button.closest('.pnr-pane');
+                    const textarea = pnrPane?.querySelector('textarea');
+                    if (textarea) {
+                        const isCollapsed = textarea.style.display === 'none';
+                        textarea.style.display = isCollapsed ? '' : 'none';
+                        button.textContent = isCollapsed ? '\u25bc' : '\u25b6';
                     }
                 } else if (button.classList.contains('day-toggle-button')) {
                      ip_handleToggleDayCollapse(event, button.closest('.ip-day-section').dataset.dayId.split('-')[1], groupId);
@@ -2159,6 +2167,7 @@ function syncGroupUIToData(groupId) {
         const pnrTextarea = instance.querySelector('.pnr-pane textarea');
         if (pnrTextarea) {
             calculatorData.pnr = pnrTextarea.value;
+            calculatorData.pnrCollapsed = pnrTextarea.style.display === 'none';
         }
 
         const table = instance.querySelector('.quote-table');
@@ -2928,7 +2937,7 @@ function initializeGroup(groupEl, groupId) {
 
 function buildCalculatorDOM(calcContainer, calcData = null) {
     const content = document.createElement('div');
-    content.innerHTML = `<div class="split-container"><div class="pnr-pane"><label class="label-text font-semibold mb-2"><span class="pnr-title-span" title="더블클릭하여 수정 가능">PNR 정보</span></label><textarea class="w-full flex-grow px-3 py-2 border rounded-md shadow-sm" placeholder="PNR 정보를 여기에 붙여넣으세요."></textarea></div><div class="resizer-handle"></div><div class="quote-pane"><div class="table-container"><table class="quote-table"><thead><tr class="header-row"><th><button type="button" class="btn btn-sm btn-primary add-person-type-btn"><i class="fas fa-plus"></i></button></th></tr><tr class="count-row"><th></th></tr></thead><tbody></tbody><tfoot></tfoot></table></div></div></div>`;
+    content.innerHTML = `<div class="split-container"><div class="pnr-pane"><label class="label-text font-semibold mb-2"><button type="button" class="pnr-toggle-btn" title="접기/펼치기" style="background:none;border:none;cursor:pointer;padding:2px 4px;font-size:12px;color:#6b7280;line-height:1;margin-right:4px;">▼</button><span class="pnr-title-span" title="더블클릭하여 수정 가능">PNR 정보</span></label><textarea class="w-full flex-grow px-3 py-2 border rounded-md shadow-sm" placeholder="PNR 정보를 여기에 붙여넣으세요."></textarea></div><div class="resizer-handle"></div><div class="quote-pane"><div class="table-container"><table class="quote-table"><thead><tr class="header-row"><th><button type="button" class="btn btn-sm btn-primary add-person-type-btn"><i class="fas fa-plus"></i></button></th></tr><tr class="count-row"><th></th></tr></thead><tbody></tbody><tfoot></tfoot></table></div></div></div>`;
     const calculatorElement = content.firstElementChild;
     calcContainer.appendChild(calculatorElement);
 
@@ -3025,7 +3034,14 @@ function applySavedSplitPaneWidths(instanceContainer, splitPane) {
 function restoreCalculatorState(instanceContainer, calcData) {
     if (!instanceContainer || !calcData) return;
     const pnrTextarea = instanceContainer.querySelector('.pnr-pane textarea');
-    if (pnrTextarea) pnrTextarea.value = calcData.pnr || '';
+    if (pnrTextarea) {
+        pnrTextarea.value = calcData.pnr || '';
+        if (calcData.pnrCollapsed) {
+            pnrTextarea.style.display = 'none';
+            const toggleBtn = instanceContainer.querySelector('.pnr-toggle-btn');
+            if (toggleBtn) toggleBtn.textContent = '\u25b6';
+        }
+    }
     
     const pnrTitleSpan = instanceContainer.querySelector('.pnr-title-span');
     if (pnrTitleSpan) pnrTitleSpan.textContent = calcData.pnrTitle || 'PNR 정보';
@@ -3698,6 +3714,14 @@ function setupEventListeners() {
                 const isHidden = body.style.display === 'none';
                 body.style.display = isHidden ? '' : 'none';
                 button.textContent = isHidden ? '▼' : '▶';
+            }
+        } else if (button.classList.contains('pnr-toggle-btn')) {
+            const pnrPane = button.closest('.pnr-pane');
+            const textarea = pnrPane?.querySelector('textarea');
+            if (textarea) {
+                const isCollapsed = textarea.style.display === 'none';
+                textarea.style.display = isCollapsed ? '' : 'none';
+                button.textContent = isCollapsed ? '\u25bc' : '\u25b6';
             }
         } else if (button.classList.contains('day-toggle-button')) {
              ip_handleToggleDayCollapse(event, button.closest('.ip-day-section').dataset.dayId.split('-')[1], groupId);
