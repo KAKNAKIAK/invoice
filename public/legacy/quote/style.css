@@ -364,14 +364,6 @@ body {
     user-select: none;
 }
 .ip-activity-details > summary::-webkit-details-marker { display: none; }
-.ip-activity-drag-handle {
-    color: #94a3b8;
-    font-size: 0.95rem;
-    letter-spacing: -1px;
-    cursor: grab;
-    touch-action: none;
-}
-.ip-activity-drag-handle:active { cursor: grabbing; }
 .ip-activity-summary .card-icon {
     min-width: 1rem;
     font-size: 1rem;
