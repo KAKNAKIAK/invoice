@@ -2206,7 +2206,7 @@ function ip_generateInlineStyledHTML(itineraryData, options = {}) {
             if (hasExtraDetails) {
                 return `
           <li style="list-style:none;margin-bottom:8px;border:1px solid #E0E0E0;border-radius:8px;background:#fff;">
-            <details>
+            <details open>
               <summary style="cursor:pointer;padding:10px 12px;display:flex;align-items:center;gap:8px;">
                 ${summaryInnerHTML}
                 <span style="font-size:16px;color:#64748b;line-height:1;">⌄</span>
@@ -2231,7 +2231,7 @@ function ip_generateInlineStyledHTML(itineraryData, options = {}) {
         }
 
         daysHTML += `
-  <div style="margin-bottom: 10px;"> <details ${day.isCollapsed ? '' : 'open'}>
+  <div style="margin-bottom: 10px;"> <details open>
       <summary style="display: flex; align-items: center; padding: 10px 8px; border-bottom: 1px solid #EEE; background-color: #fdfdfd; cursor: pointer;">
         <div style="font-size:14px;line-height:1.4;font-weight:600;margin:0;">${ip_formatDate(day.date, dayIndex + 1)}</div>
       </summary>
