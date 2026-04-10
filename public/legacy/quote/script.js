@@ -2629,12 +2629,14 @@ async function saveFile(isSaveAs = false, clickedButton = null) {
             document.title = newHandle.name;
             showToastMessage('파일이 성공적으로 저장되었습니다.');
             await saveFileHandle(newHandle.name, newHandle);
+            if (currentSession) currentSession.markClean();
         } else {
             const writableStream = await sessionFileHandle.createWritable();
             await writableStream.write(blob);
             await writableStream.close();
             showToastMessage('변경사항이 성공적으로 저장되었습니다.');
             await saveFileHandle(sessionFileHandle.name, sessionFileHandle);
+            if (currentSession) currentSession.markClean();
         }
     } catch (err) {
         if (err.name !== 'AbortError') { console.error('파일 저장 실패:', err); showToastMessage('파일 저장에 실패했습니다.', true); }
@@ -4308,7 +4310,17 @@ document.addEventListener('DOMContentLoaded', () => {
         else { initializeNewSession(); }
     }
     setupEventListeners();
-    
+
+    // 페이지 이탈 시 저장되지 않은 변경사항 경고
+    window.addEventListener('beforeunload', function(e) {
+        var hasUnsaved = false;
+        filesManager.forEach(function(s) { if (s.dirty) hasUnsaved = true; });
+        if (hasUnsaved) {
+            e.preventDefault();
+            e.returnValue = '';
+        }
+    });
+
     // 기존 요소들에 툴팁 추가
     setTimeout(() => {
         addTooltipsToExistingElements();
