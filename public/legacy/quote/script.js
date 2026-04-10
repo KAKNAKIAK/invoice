@@ -823,7 +823,10 @@ function rebindWorkspaceEventListeners() {
                     if (isCollapsed) {
                         pnrTextarea.style.display = '';
                         pnrPane.style.flexGrow = '';
+                        pnrPane.style.flexShrink = '';
+                        pnrPane.style.minWidth = '';
                         pnrPane.style.paddingRight = '';
+                        pnrPane.classList.remove('pnr-collapsed');
                         resizer.style.display = '';
                         if (button.dataset.savedPnrWidth) pnrPane.style.width = button.dataset.savedPnrWidth;
                         if (button.dataset.savedQuoteWidth) quotePane.style.width = button.dataset.savedQuoteWidth;
@@ -834,7 +837,10 @@ function rebindWorkspaceEventListeners() {
                         pnrTextarea.style.display = 'none';
                         pnrPane.style.width = 'auto';
                         pnrPane.style.flexGrow = '0';
+                        pnrPane.style.flexShrink = '0';
+                        pnrPane.style.minWidth = 'fit-content';
                         pnrPane.style.paddingRight = '0.5rem';
+                        pnrPane.classList.add('pnr-collapsed');
                         resizer.style.display = 'none';
                         quotePane.style.width = '100%';
                         button.textContent = '\u25b6';
@@ -3353,7 +3359,10 @@ function restoreCalculatorState(instanceContainer, calcData) {
             pnrTextarea.style.display = 'none';
             pnrPane.style.width = 'auto';
             pnrPane.style.flexGrow = '0';
+            pnrPane.style.flexShrink = '0';
+            pnrPane.style.minWidth = 'fit-content';
             pnrPane.style.paddingRight = '0.5rem';
+            pnrPane.classList.add('pnr-collapsed');
             resizer.style.display = 'none';
             quotePane.style.width = '100%';
             toggleBtn.textContent = '\u25b6';
@@ -4066,7 +4075,10 @@ function setupEventListeners() {
             if (isCollapsed) {
                 pnrTextarea.style.display = '';
                 pnrPane.style.flexGrow = '';
+                pnrPane.style.flexShrink = '';
+                pnrPane.style.minWidth = '';
                 pnrPane.style.paddingRight = '';
+                pnrPane.classList.remove('pnr-collapsed');
                 resizer.style.display = '';
                 if (button.dataset.savedPnrWidth) pnrPane.style.width = button.dataset.savedPnrWidth;
                 if (button.dataset.savedQuoteWidth) quotePane.style.width = button.dataset.savedQuoteWidth;
@@ -4077,7 +4089,10 @@ function setupEventListeners() {
                 pnrTextarea.style.display = 'none';
                 pnrPane.style.width = 'auto';
                 pnrPane.style.flexGrow = '0';
+                pnrPane.style.flexShrink = '0';
+                pnrPane.style.minWidth = 'fit-content';
                 pnrPane.style.paddingRight = '0.5rem';
+                pnrPane.classList.add('pnr-collapsed');
                 resizer.style.display = 'none';
                 quotePane.style.width = '100%';
                 button.textContent = '\u25b6';
