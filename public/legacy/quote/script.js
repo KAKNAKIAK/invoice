@@ -816,41 +816,23 @@ function rebindWorkspaceEventListeners() {
                 } else if (button.classList.contains('pnr-toggle-btn')) {
                     const splitContainer = button.closest('.split-container');
                     const pnrPane = splitContainer.querySelector('.pnr-pane');
-                    const pnrTextarea = pnrPane.querySelector('textarea');
                     const resizer = splitContainer.querySelector('.resizer-handle');
                     const quotePane = splitContainer.querySelector('.quote-pane');
-                    const pnrTitleSpan = pnrPane.querySelector('.pnr-title-span');
-                    const pnrLabel = pnrPane.querySelector('label');
-                    const isCollapsed = pnrTextarea.style.display === 'none';
+                    const isCollapsed = pnrPane.style.display === 'none';
                     if (isCollapsed) {
-                        pnrTextarea.style.display = '';
-                        if (pnrTitleSpan) pnrTitleSpan.style.display = '';
-                        if (pnrLabel) pnrLabel.style.marginBottom = '';
-                        pnrPane.style.flexGrow = '';
-                        pnrPane.style.flexShrink = '';
-                        pnrPane.style.minWidth = '';
-                        pnrPane.style.paddingRight = '';
-                        pnrPane.classList.remove('pnr-collapsed');
+                        pnrPane.style.display = '';
                         resizer.style.display = '';
-                        quotePane.style.flex = '';
-                        quotePane.style.minWidth = '';
                         if (button.dataset.savedPnrWidth) pnrPane.style.width = button.dataset.savedPnrWidth;
                         if (button.dataset.savedQuoteWidth) quotePane.style.width = button.dataset.savedQuoteWidth;
+                        quotePane.style.flex = '';
+                        quotePane.style.minWidth = '';
                         button.textContent = '\u25c0';
                     } else {
                         button.dataset.savedPnrWidth = pnrPane.style.width || pnrPane.offsetWidth + 'px';
                         button.dataset.savedQuoteWidth = quotePane.style.width || quotePane.offsetWidth + 'px';
-                        pnrTextarea.style.display = 'none';
-                        if (pnrTitleSpan) pnrTitleSpan.style.display = 'none';
-                        if (pnrLabel) pnrLabel.style.marginBottom = '0';
-                        pnrPane.style.width = 'auto';
-                        pnrPane.style.flexGrow = '0';
-                        pnrPane.style.flexShrink = '0';
-                        pnrPane.style.minWidth = 'fit-content';
-                        pnrPane.style.paddingRight = '0.5rem';
-                        pnrPane.classList.add('pnr-collapsed');
+                        pnrPane.style.display = 'none';
                         resizer.style.display = 'none';
-                        quotePane.style.width = '';
+                        quotePane.style.width = '100%';
                         quotePane.style.flex = '1';
                         quotePane.style.minWidth = '0';
                         button.textContent = '\u25b6';
@@ -2484,7 +2466,7 @@ function syncGroupUIToData(groupId) {
         if (pnrTextarea) {
             calculatorData.pnr = pnrTextarea.value;
             const pnrPane = instance.querySelector('.pnr-pane');
-            calculatorData.pnrCollapsed = pnrTextarea ? pnrTextarea.style.display === 'none' : false;
+            calculatorData.pnrCollapsed = pnrPane ? pnrPane.style.display === 'none' : false;
         }
 
         const table = instance.querySelector('.quote-table');
@@ -3256,7 +3238,7 @@ function initializeGroup(groupEl, groupId) {
 
 function buildCalculatorDOM(calcContainer, calcData = null) {
     const content = document.createElement('div');
-    content.innerHTML = `<div class="split-container"><div class="pnr-pane"><label class="label-text font-semibold mb-2" style="display:flex;align-items:center;gap:6px;"><span class="pnr-title-span" title="더블클릭하여 수정 가능">PNR 정보</span><button type="button" class="pnr-toggle-btn" title="PNR 접기/펼치기" style="background:#f1f5f9;border:1px solid #d1d5db;border-radius:4px;cursor:pointer;padding:1px 5px;font-size:10px;color:#6b7280;line-height:1.2;flex-shrink:0;">\u25c0</button></label><textarea class="w-full flex-grow px-3 py-2 border rounded-md shadow-sm" placeholder="PNR 정보를 여기에 붙여넣으세요."></textarea></div><div class="resizer-handle"></div><div class="quote-pane"><div class="table-container"><table class="quote-table"><thead><tr class="header-row"><th><button type="button" class="btn btn-sm btn-primary add-person-type-btn"><i class="fas fa-plus"></i></button></th></tr><tr class="count-row"><th></th></tr></thead><tbody></tbody><tfoot></tfoot></table></div></div></div>`;
+    content.innerHTML = `<div class="split-container"><div class="pnr-pane"><div class="label-text font-semibold mb-2" style="display:flex;align-items:center;gap:6px;"><span class="pnr-title-span" title="더블클릭하여 수정 가능">PNR 정보</span></div><textarea class="w-full flex-grow px-3 py-2 border rounded-md shadow-sm" placeholder="PNR 정보를 여기에 붙여넣으세요."></textarea></div><div class="resizer-handle"></div><div class="quote-pane"><div style="display:flex;justify-content:flex-end;margin-bottom:2px;"><button type="button" class="pnr-toggle-btn" title="PNR 접기/펼치기" style="background:#f1f5f9;border:1px solid #d1d5db;border-radius:4px;cursor:pointer;padding:1px 5px;font-size:10px;color:#6b7280;line-height:1.2;">\u25c0</button></div><div class="table-container"><table class="quote-table"><thead><tr class="header-row"><th><button type="button" class="btn btn-sm btn-primary add-person-type-btn"><i class="fas fa-plus"></i></button></th></tr><tr class="count-row"><th></th></tr></thead><tbody></tbody><tfoot></tfoot></table></div></div></div>`;
     const calculatorElement = content.firstElementChild;
     calcContainer.appendChild(calculatorElement);
 
@@ -3359,26 +3341,15 @@ function restoreCalculatorState(instanceContainer, calcData) {
     if (calcData.pnrCollapsed) {
         const splitContainer = instanceContainer.querySelector('.split-container');
         const pnrPane = splitContainer?.querySelector('.pnr-pane');
-        const pnrTextarea = pnrPane?.querySelector('textarea');
         const resizer = splitContainer?.querySelector('.resizer-handle');
         const quotePane = splitContainer?.querySelector('.quote-pane');
         const toggleBtn = splitContainer?.querySelector('.pnr-toggle-btn');
-        const pnrTitleSpan = pnrPane?.querySelector('.pnr-title-span');
-        const pnrLabel = pnrPane?.querySelector('label');
-        if (pnrPane && pnrTextarea && resizer && quotePane && toggleBtn) {
+        if (pnrPane && resizer && quotePane && toggleBtn) {
             toggleBtn.dataset.savedPnrWidth = pnrPane.style.width || '';
             toggleBtn.dataset.savedQuoteWidth = quotePane.style.width || '';
-            pnrTextarea.style.display = 'none';
-            if (pnrTitleSpan) pnrTitleSpan.style.display = 'none';
-            if (pnrLabel) pnrLabel.style.marginBottom = '0';
-            pnrPane.style.width = 'auto';
-            pnrPane.style.flexGrow = '0';
-            pnrPane.style.flexShrink = '0';
-            pnrPane.style.minWidth = 'fit-content';
-            pnrPane.style.paddingRight = '0.5rem';
-            pnrPane.classList.add('pnr-collapsed');
+            pnrPane.style.display = 'none';
             resizer.style.display = 'none';
-            quotePane.style.width = '';
+            quotePane.style.width = '100%';
             quotePane.style.flex = '1';
             quotePane.style.minWidth = '0';
             toggleBtn.textContent = '\u25b6';
@@ -4084,41 +4055,23 @@ function setupEventListeners() {
         } else if (button.classList.contains('pnr-toggle-btn')) {
             const splitContainer = button.closest('.split-container');
             const pnrPane = splitContainer.querySelector('.pnr-pane');
-            const pnrTextarea = pnrPane.querySelector('textarea');
-            const pnrTitleSpan = pnrPane.querySelector('.pnr-title-span');
-            const pnrLabel = pnrPane.querySelector('label');
             const resizer = splitContainer.querySelector('.resizer-handle');
             const quotePane = splitContainer.querySelector('.quote-pane');
-            const isCollapsed = pnrTextarea.style.display === 'none';
+            const isCollapsed = pnrPane.style.display === 'none';
             if (isCollapsed) {
-                pnrTextarea.style.display = '';
-                if (pnrTitleSpan) pnrTitleSpan.style.display = '';
-                if (pnrLabel) pnrLabel.style.marginBottom = '';
-                pnrPane.style.flexGrow = '';
-                pnrPane.style.flexShrink = '';
-                pnrPane.style.minWidth = '';
-                pnrPane.style.paddingRight = '';
-                pnrPane.classList.remove('pnr-collapsed');
+                pnrPane.style.display = '';
                 resizer.style.display = '';
-                quotePane.style.flex = '';
-                quotePane.style.minWidth = '';
                 if (button.dataset.savedPnrWidth) pnrPane.style.width = button.dataset.savedPnrWidth;
                 if (button.dataset.savedQuoteWidth) quotePane.style.width = button.dataset.savedQuoteWidth;
+                quotePane.style.flex = '';
+                quotePane.style.minWidth = '';
                 button.textContent = '\u25c0';
             } else {
                 button.dataset.savedPnrWidth = pnrPane.style.width || pnrPane.offsetWidth + 'px';
                 button.dataset.savedQuoteWidth = quotePane.style.width || quotePane.offsetWidth + 'px';
-                pnrTextarea.style.display = 'none';
-                if (pnrTitleSpan) pnrTitleSpan.style.display = 'none';
-                if (pnrLabel) pnrLabel.style.marginBottom = '0';
-                pnrPane.style.width = 'auto';
-                pnrPane.style.flexGrow = '0';
-                pnrPane.style.flexShrink = '0';
-                pnrPane.style.minWidth = 'fit-content';
-                pnrPane.style.paddingRight = '0.5rem';
-                pnrPane.classList.add('pnr-collapsed');
+                pnrPane.style.display = 'none';
                 resizer.style.display = 'none';
-                quotePane.style.width = '';
+                quotePane.style.width = '100%';
                 quotePane.style.flex = '1';
                 quotePane.style.minWidth = '0';
                 button.textContent = '\u25b6';
