@@ -816,22 +816,26 @@ function rebindWorkspaceEventListeners() {
                 } else if (button.classList.contains('pnr-toggle-btn')) {
                     const splitContainer = button.closest('.split-container');
                     const pnrPane = splitContainer.querySelector('.pnr-pane');
+                    const textarea = pnrPane.querySelector('textarea');
                     const resizer = splitContainer.querySelector('.resizer-handle');
                     const quotePane = splitContainer.querySelector('.quote-pane');
-                    const isCollapsed = pnrPane.style.display === 'none';
+                    const isCollapsed = textarea.style.display === 'none';
                     if (isCollapsed) {
-                        pnrPane.style.display = '';
+                        textarea.style.display = '';
                         resizer.style.display = '';
+                        pnrPane.style.overflow = '';
                         if (button.dataset.savedPnrWidth) pnrPane.style.width = button.dataset.savedPnrWidth;
                         if (button.dataset.savedQuoteWidth) quotePane.style.width = button.dataset.savedQuoteWidth;
-                        button.textContent = '\u25c0';
+                        button.textContent = '▼';
                     } else {
                         button.dataset.savedPnrWidth = pnrPane.style.width || pnrPane.offsetWidth + 'px';
                         button.dataset.savedQuoteWidth = quotePane.style.width || quotePane.offsetWidth + 'px';
-                        pnrPane.style.display = 'none';
+                        textarea.style.display = 'none';
+                        pnrPane.style.width = '100px';
+                        pnrPane.style.overflow = 'hidden';
                         resizer.style.display = 'none';
                         quotePane.style.width = '100%';
-                        button.textContent = '\u25b6';
+                        button.textContent = '▶';
                     }
                 } else if (button.classList.contains('day-toggle-button')) {
                      ip_handleToggleDayCollapse(event, button.closest('.ip-day-section').dataset.dayId.split('-')[1], groupId);
@@ -956,19 +960,6 @@ function rebindWorkspaceEventListeners() {
                     if (!groupId) return;
                     makeEditable(span, 'text', () => {
                         syncGroupUIToData(groupId);
-                        updateCurrentSession();
-                    });
-                } else if (event.target.matches('.pnr-title-span')) {
-                    const span = event.target;
-                    const instance = span.closest('.calculator-instance');
-                    const groupId = instance.closest('.calculation-group-content').id.split('-').pop();
-                    const calcId = instance.dataset.calculatorId;
-                    
-                    makeEditable(span, 'text', () => {
-                        const calculatorData = quoteGroupsData[groupId].calculators.find(c => c.id === calcId);
-                        if(calculatorData) {
-                            calculatorData.pnrTitle = span.textContent; // Read from the span itself
-                        }
                         updateCurrentSession();
                     });
                 } else if (event.target.closest('.ip-day-header-container')) {
@@ -2950,7 +2941,7 @@ function initializeGroup(groupEl, groupId) {
 
 function buildCalculatorDOM(calcContainer, calcData = null) {
     const content = document.createElement('div');
-    content.innerHTML = `<div class="split-container"><button type="button" class="pnr-toggle-btn" title="PNR 접기/펼치기" style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:4px;cursor:pointer;padding:2px 3px;font-size:11px;color:#6b7280;line-height:1;flex-shrink:0;align-self:stretch;display:flex;align-items:center;">\u25c0</button><div class="pnr-pane"><label class="label-text font-semibold mb-2"><span class="pnr-title-span" title="더블클릭하여 수정 가능">PNR 정보</span></label><textarea class="w-full flex-grow px-3 py-2 border rounded-md shadow-sm" placeholder="PNR 정보를 여기에 붙여넣으세요."></textarea></div><div class="resizer-handle"></div><div class="quote-pane"><div class="table-container"><table class="quote-table"><thead><tr class="header-row"><th><button type="button" class="btn btn-sm btn-primary add-person-type-btn"><i class="fas fa-plus"></i></button></th></tr><tr class="count-row"><th></th></tr></thead><tbody></tbody><tfoot></tfoot></table></div></div></div>`;
+    content.innerHTML = `<div class="split-container"><div class="pnr-pane"><label class="label-text font-semibold mb-2 flex items-center"><button type="button" class="pnr-toggle-btn accordion-toggle-btn" title="접기/펼치기" style="background:none;border:none;cursor:pointer;padding:2px 4px;font-size:12px;color:#6b7280;line-height:1;margin-right:4px;">▼</button><span class="pnr-title-span" title="클릭하여 수정">PNR 정보</span></label><textarea class="w-full flex-grow px-3 py-2 border rounded-md shadow-sm" placeholder="PNR 정보를 여기에 붙여넣으세요."></textarea></div><div class="resizer-handle"></div><div class="quote-pane"><div class="table-container"><table class="quote-table"><thead><tr class="header-row"><th><button type="button" class="btn btn-sm btn-primary add-person-type-btn"><i class="fas fa-plus"></i></button></th></tr><tr class="count-row"><th></th></tr></thead><tbody></tbody><tfoot></tfoot></table></div></div></div>`;
     const calculatorElement = content.firstElementChild;
     calcContainer.appendChild(calculatorElement);
 
@@ -3067,7 +3058,22 @@ function restoreCalculatorState(instanceContainer, calcData) {
     }
     
     const pnrTitleSpan = instanceContainer.querySelector('.pnr-title-span');
-    if (pnrTitleSpan) pnrTitleSpan.textContent = calcData.pnrTitle || 'PNR 정보';
+    if (pnrTitleSpan) {
+        pnrTitleSpan.textContent = calcData.pnrTitle || 'PNR 정보';
+        pnrTitleSpan.style.cursor = 'text';
+        pnrTitleSpan.addEventListener('click', () => {
+            const instance = pnrTitleSpan.closest('.calculator-instance');
+            const groupId = instance.closest('.calculation-group-content').id.split('-').pop();
+            const calcId = instance.dataset.calculatorId;
+            makeEditable(pnrTitleSpan, 'text', () => {
+                const calculatorData = quoteGroupsData[groupId].calculators.find(c => c.id === calcId);
+                if (calculatorData) {
+                    calculatorData.pnrTitle = pnrTitleSpan.textContent;
+                }
+                updateCurrentSession();
+            });
+        });
+    }
 
     const table = instanceContainer.querySelector('.quote-table');
     if (table && calcData.tableHTML) { 
@@ -3741,22 +3747,26 @@ function setupEventListeners() {
         } else if (button.classList.contains('pnr-toggle-btn')) {
             const splitContainer = button.closest('.split-container');
             const pnrPane = splitContainer.querySelector('.pnr-pane');
+            const textarea = pnrPane.querySelector('textarea');
             const resizer = splitContainer.querySelector('.resizer-handle');
             const quotePane = splitContainer.querySelector('.quote-pane');
-            const isCollapsed = pnrPane.style.display === 'none';
+            const isCollapsed = textarea.style.display === 'none';
             if (isCollapsed) {
-                pnrPane.style.display = '';
+                textarea.style.display = '';
                 resizer.style.display = '';
+                pnrPane.style.overflow = '';
                 if (button.dataset.savedPnrWidth) pnrPane.style.width = button.dataset.savedPnrWidth;
                 if (button.dataset.savedQuoteWidth) quotePane.style.width = button.dataset.savedQuoteWidth;
-                button.textContent = '\u25c0';
+                button.textContent = '▼';
             } else {
                 button.dataset.savedPnrWidth = pnrPane.style.width || pnrPane.offsetWidth + 'px';
                 button.dataset.savedQuoteWidth = quotePane.style.width || quotePane.offsetWidth + 'px';
-                pnrPane.style.display = 'none';
+                textarea.style.display = 'none';
+                pnrPane.style.width = '100px';
+                pnrPane.style.overflow = 'hidden';
                 resizer.style.display = 'none';
                 quotePane.style.width = '100%';
-                button.textContent = '\u25b6';
+                button.textContent = '▶';
             }
         } else if (button.classList.contains('day-toggle-button')) {
              ip_handleToggleDayCollapse(event, button.closest('.ip-day-section').dataset.dayId.split('-')[1], groupId);
