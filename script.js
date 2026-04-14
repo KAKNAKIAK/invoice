@@ -826,7 +826,7 @@ function rebindWorkspaceEventListeners() {
                         pnrPane.style.overflow = '';
                         if (button.dataset.savedPnrWidth) pnrPane.style.width = button.dataset.savedPnrWidth;
                         if (button.dataset.savedQuoteWidth) quotePane.style.width = button.dataset.savedQuoteWidth;
-                        button.textContent = '▼';
+                        button.textContent = '\u25c0';
                     } else {
                         button.dataset.savedPnrWidth = pnrPane.style.width || pnrPane.offsetWidth + 'px';
                         button.dataset.savedQuoteWidth = quotePane.style.width || quotePane.offsetWidth + 'px';
@@ -835,7 +835,7 @@ function rebindWorkspaceEventListeners() {
                         pnrPane.style.overflow = 'hidden';
                         resizer.style.display = 'none';
                         quotePane.style.width = '100%';
-                        button.textContent = '▶';
+                        button.textContent = '\u25b6';
                     }
                 } else if (button.classList.contains('day-toggle-button')) {
                      ip_handleToggleDayCollapse(event, button.closest('.ip-day-section').dataset.dayId.split('-')[1], groupId);
@@ -2941,7 +2941,7 @@ function initializeGroup(groupEl, groupId) {
 
 function buildCalculatorDOM(calcContainer, calcData = null) {
     const content = document.createElement('div');
-    content.innerHTML = `<div class="split-container"><div class="pnr-pane"><div class="label-text font-semibold mb-2 flex items-center"><button type="button" class="pnr-toggle-btn accordion-toggle-btn" title="접기/펼치기" style="background:none;border:none;cursor:pointer;padding:2px 4px;font-size:12px;color:#6b7280;line-height:1;margin-right:4px;">▼</button><span class="pnr-title-span" title="클릭하여 수정">PNR 정보</span></div><textarea class="w-full flex-grow px-3 py-2 border rounded-md shadow-sm" placeholder="PNR 정보를 여기에 붙여넣으세요."></textarea></div><div class="resizer-handle"></div><div class="quote-pane"><div class="table-container"><table class="quote-table"><thead><tr class="header-row"><th><button type="button" class="btn btn-sm btn-primary add-person-type-btn"><i class="fas fa-plus"></i></button></th></tr><tr class="count-row"><th></th></tr></thead><tbody></tbody><tfoot></tfoot></table></div></div></div>`;
+    content.innerHTML = `<div class="split-container"><div class="pnr-pane"><div class="label-text font-semibold mb-2 flex items-center"><span class="pnr-title-span" title="클릭하여 수정">PNR 정보</span></div><textarea class="w-full flex-grow px-3 py-2 border rounded-md shadow-sm" placeholder="PNR 정보를 여기에 붙여넣으세요."></textarea></div><div class="resizer-handle"></div><div class="quote-pane"><div style="display:flex;justify-content:flex-end;margin-bottom:4px;"><button type="button" class="pnr-toggle-btn accordion-toggle-btn" title="접기/펼치기" style="background:none;border:none;cursor:pointer;padding:2px 4px;font-size:12px;color:#6b7280;line-height:1;">◀</button></div><div class="table-container"><table class="quote-table"><thead><tr class="header-row"><th><button type="button" class="btn btn-sm btn-primary add-person-type-btn"><i class="fas fa-plus"></i></button></th></tr><tr class="count-row"><th></th></tr></thead><tbody></tbody><tfoot></tfoot></table></div></div></div>`;
     const calculatorElement = content.firstElementChild;
     calcContainer.appendChild(calculatorElement);
 
@@ -3758,7 +3758,7 @@ function setupEventListeners() {
                 pnrPane.style.overflow = '';
                 if (button.dataset.savedPnrWidth) pnrPane.style.width = button.dataset.savedPnrWidth;
                 if (button.dataset.savedQuoteWidth) quotePane.style.width = button.dataset.savedQuoteWidth;
-                button.textContent = '▼';
+                button.textContent = '\u25c0';
             } else {
                 button.dataset.savedPnrWidth = pnrPane.style.width || pnrPane.offsetWidth + 'px';
                 button.dataset.savedQuoteWidth = quotePane.style.width || quotePane.offsetWidth + 'px';
@@ -3767,7 +3767,7 @@ function setupEventListeners() {
                 pnrPane.style.overflow = 'hidden';
                 resizer.style.display = 'none';
                 quotePane.style.width = '100%';
-                button.textContent = '▶';
+                button.textContent = '\u25b6';
             }
         } else if (button.classList.contains('day-toggle-button')) {
              ip_handleToggleDayCollapse(event, button.closest('.ip-day-section').dataset.dayId.split('-')[1], groupId);
